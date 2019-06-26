@@ -1,10 +1,9 @@
 import unittest
 
+from overcooked_gridworld.mdp.overcooked_mdp import Action, Direction, PlayerState, OvercookedGridworld, OvercookedState, ObjectState, BASE_MDP_CONFIG
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
-from overcooked_gridworld.mdp.overcooked_mdp import Action, Direction, PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 
 START_ORDER_LIST = ["any"]
-EXPLOSION_TIME = 10
 
 class TestDirection(unittest.TestCase):
     def test_direction_number_conversion(self):
@@ -12,35 +11,38 @@ class TestDirection(unittest.TestCase):
         all_numbers = []
 
         for direction in Direction.ALL_DIRECTIONS:
-            number = Direction.get_number_from_direction(direction)
-            direction_again = Direction.get_direction_from_number(number)
+            number = Direction.DIRECTION_TO_INDEX[direction]
+            direction_again = Direction.INDEX_TO_DIRECTION[number]
             self.assertEqual(direction, direction_again)
             all_numbers.append(number)
 
         # Check that all directions are distinct
         num_directions = len(all_directions)
         self.assertEqual(len(set(all_directions)), num_directions)
+        
         # Check that the numbers are 0, 1, ... num_directions - 1
         self.assertEqual(set(all_numbers), set(range(num_directions)))
 
 class TestGridworld(unittest.TestCase):
     def setUp(self):
-        self.base_mdp = OvercookedGridworld.from_file('mdp_test', START_ORDER_LIST, EXPLOSION_TIME)
-        self.base_mdp.COOK_TIME = 5
+        partial_mdp_params = BASE_MDP_CONFIG.copy()
+        partial_mdp_params['layout_name'] = 'mdp_test'
+        partial_mdp_params['cook_time'] = 5
+        partial_mdp_params['start_order_list'] = ['onion', 'any']
+        self.base_mdp = OvercookedGridworld.from_layout_name(partial_mdp_params)
 
     def test_constructor_invalid_inputs(self):
         # Height and width must be at least 3.
         with self.assertRaises(AssertionError):
-            mdp = OvercookedGridworld.from_grid(['X', 'X', 'X'], START_ORDER_LIST, EXPLOSION_TIME)
+            mdp = OvercookedGridworld.from_grid(['X', 'X', 'X'], BASE_MDP_CONFIG)
         with self.assertRaises(AssertionError):
-            mdp = OvercookedGridworld.from_grid([['X', 'X', 'X']], START_ORDER_LIST, EXPLOSION_TIME)
+            mdp = OvercookedGridworld.from_grid([['X', 'X', 'X']], BASE_MDP_CONFIG)
         with self.assertRaises(AssertionError):
             # Borders must be present.
             mdp = OvercookedGridworld.from_grid(['XOSX',
                                                  'P  D',
                                                  ' 21 '],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # The grid can't be ragged.
@@ -48,8 +50,7 @@ class TestGridworld(unittest.TestCase):
                                                  'O  2XX',
                                                  'X1 3 X',
                                                  'XDXSXX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # There can't be more than two agents
@@ -57,8 +58,7 @@ class TestGridworld(unittest.TestCase):
                                                  'O  2O',
                                                  'X1 3X',
                                                  'XDXSX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # There can't be fewer than two agents.
@@ -66,8 +66,7 @@ class TestGridworld(unittest.TestCase):
                                                  'O   O',
                                                  'X1  X',
                                                  'XDXSX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # The agents must be numbered 1 and 2.
@@ -75,8 +74,7 @@ class TestGridworld(unittest.TestCase):
                                                  'O  3O',
                                                  'X1  X',
                                                  'XDXSX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # The agents must be numbered 1 and 2.
@@ -84,8 +82,7 @@ class TestGridworld(unittest.TestCase):
                                                  'O  1O',
                                                  'X1  X',
                                                  'XDXSX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
         with self.assertRaises(AssertionError):
             # B is not a valid element.
@@ -93,18 +90,19 @@ class TestGridworld(unittest.TestCase):
                                                  'O  2O',
                                                  'X1  X',
                                                  'XDXSX'],
-                                                 START_ORDER_LIST, 
-                                                 EXPLOSION_TIME)
+                                                 BASE_MDP_CONFIG)
 
     def test_start_positions(self):
         expected_state = OvercookedState(
-            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['any'])
+            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['onion', 'any'])
         self.assertEqual(self.base_mdp.get_start_state(), expected_state)
 
     def test_file_constructor(self):
-        mdp = OvercookedGridworld.from_file('corridor', START_ORDER_LIST, EXPLOSION_TIME)
+        partial_mdp_params = BASE_MDP_CONFIG.copy()
+        partial_mdp_params['layout_name'] = 'corridor'
+        mdp = OvercookedGridworld.from_layout_name(partial_mdp_params)
         expected_start_state = OvercookedState(
-            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {}, order_list=['any'])
+            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {}, order_list=None)
         actual_start_state = mdp.get_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
@@ -122,7 +120,6 @@ class TestGridworld(unittest.TestCase):
         e, w = Direction.EAST, Direction.WEST
         stay, interact = Direction.STAY, Action.INTERACT
         P, Obj = PlayerState, ObjectState
-        delivery_reward = OvercookedGridworld.DELIVERY_REWARD
 
         bad_state = OvercookedState(
             [P((0, 0), s), P((3, 1), s)], {}, order_list=[])
@@ -134,9 +131,8 @@ class TestGridworld(unittest.TestCase):
         env.state.order_list = ['onion', 'any']
 
         def check_transition(action, expected_state, expected_reward=0):
-            state = env.get_current_state()
-            ((pred_state, prob),), sparse_reward, dense_reward = self.base_mdp.get_transition_states_and_probs(state, action)
-            self.assertEqual(prob, 1)
+            state = env.state
+            pred_state, sparse_reward, dense_reward = self.base_mdp.get_transition_states_and_probs(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
@@ -262,7 +258,7 @@ class TestGridworld(unittest.TestCase):
         check_transition([interact, n], OvercookedState(
             [P((3, 2), s),
              P((2, 1), n, Obj('onion', (2, 1)))],
-            {}, order_list=['any']), expected_reward=delivery_reward)
+            {}, order_list=['any']), expected_reward=self.base_mdp.delivery_reward)
 
         check_transition([e, interact], OvercookedState(
             [P((3, 2), e),
@@ -307,6 +303,9 @@ class TestGridworld(unittest.TestCase):
              (2, 3): Obj('soup', (2, 3), ('tomato', 1, 0))}, 
             order_list=['any']))
                 
+class TestEnvironment(unittest.TestCase):
+    # TODO: Here
+    pass
 
 if __name__ == '__main__':
     unittest.main()

@@ -129,8 +129,8 @@ class MotionPlanner(object):
             return False
 
         # Restricting goals to be facing a terrain feature
-        pos_of_facing_terrain = Direction.move_in_direction(goal_position, goal_orientation)
-        facing_terrain_type = self.mdp.get_terrain_type_at(pos_of_facing_terrain)
+        pos_of_facing_terrain = Action.move_in_direction(goal_position, goal_orientation)
+        facing_terrain_type = self.mdp.get_terrain_type_at_pos(pos_of_facing_terrain)
         if facing_terrain_type == ' ' or (facing_terrain_type == 'X' and pos_of_facing_terrain not in self.counter_goals):
             return False
         return True
@@ -182,7 +182,7 @@ class MotionPlanner(object):
         # Get agent to goal position
         while position_to_go and curr_pos != goal_position:
             next_pos = position_to_go.pop(0)
-            action = Direction.determine_action_for_change_in_pos(curr_pos, next_pos)
+            action = Action.determine_action_for_change_in_pos(curr_pos, next_pos)
             action_plan.append(action)
             curr_or = action if action != Direction.STAY else curr_or
             pos_and_or_path.append((next_pos, curr_or))
@@ -260,7 +260,7 @@ class MotionPlanner(object):
         position and orientation to any feature in feature_pos_list and perform an interact action
         """
         start_pos = start_pos_and_or[0]
-        assert self.mdp.get_terrain_type_at(start_pos) != 'X'
+        assert self.mdp.get_terrain_type_at_pos(start_pos) != 'X'
         min_dist = np.Inf
         best_feature = None
         for feature_pos in feature_pos_list:
@@ -293,7 +293,7 @@ class MotionPlanner(object):
         goals = []
         valid_positions = self.mdp.get_valid_player_positions()
         for d in Direction.CARDINAL:
-            adjacent_pos = Direction.move_in_direction(goal_pos, d)
+            adjacent_pos = Action.move_in_direction(goal_pos, d)
             if adjacent_pos in valid_positions:
                 goal_orientation = Direction.OPPOSITE_DIRECTIONS[d]
                 motion_goal = (adjacent_pos, goal_orientation)
@@ -911,7 +911,7 @@ class MediumLevelPlanner(object):
     @staticmethod
     def from_params(mdp_params, mlp_params, force_compute=False):
         layout_name = mdp_params["LAYOUT_NAME"]
-        mdp = OvercookedGridworld.from_config(mdp_params)
+        mdp = OvercookedGridworld(mdp_params)
         return MediumLevelPlanner.from_pickle_or_compute(layout_name + "_am.pkl", mdp, mlp_params, force_compute)
 
     @staticmethod
@@ -928,8 +928,7 @@ class MediumLevelPlanner(object):
             assert mlp.ml_action_manager.params == mlp_params, "Saved params and intended params are different:\nSaved: {} \t Intended: {}"\
                 .format(mlp.ml_action_manager.params, mlp_params)
             assert np.array_equal(mlp.mdp.terrain_mtx, mdp.terrain_mtx)
-            assert mlp.mdp.explosion_time == mdp.explosion_time
-            assert mlp.mdp.COOK_TIME == mdp.COOK_TIME
+            assert mlp.mdp.mdp_config == mdp.mdp_config # TODO: Deep verify
             print("Loaded MediumLevelPlanner from {}".format(PLANNERS_DIR + filename))
         except FileNotFoundError:
             print("No file found, computing MediumLevelPlanner from scratch")
@@ -1041,9 +1040,6 @@ class MediumLevelPlanner(object):
         for goal_jm_state in self.ml_action_manager.joint_ml_actions(start_state):
             joint_motion_action_plans, end_pos_and_ors, plan_costs = self.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
             end_state = self.jmp.derive_state(start_state, end_pos_and_ors, joint_motion_action_plans)
-
-            if end_state.pot_explosion:
-                continue
 
             if SAFE_RUN:
                 assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
@@ -1240,9 +1236,6 @@ class HighLevelPlanner(object):
         for joint_hl_action in self.hl_action_manager.joint_hl_actions(start_state):
             _, end_state, hl_action_cost = self.perform_hl_action(joint_hl_action, start_state)
 
-            if end_state.pot_explosion:
-                continue
-
             successor_states.append((joint_hl_action, end_state, hl_action_cost))
         return successor_states
 
@@ -1257,8 +1250,6 @@ class HighLevelPlanner(object):
             joint_motion_action_plans, end_pos_and_ors, plan_costs = \
                 self.jmp.get_low_level_action_plan(curr_state.players_pos_and_or, curr_jm_goal)
             curr_state = self.jmp.derive_state(curr_state, end_pos_and_ors, joint_motion_action_plans)
-            if curr_state.pot_explosion:
-                return None, curr_state, None
             motion_goal_indices = self._advance_motion_goal_indices(motion_goal_indices, plan_costs)
             total_cost += min(plan_costs)
             full_plan.extend(joint_motion_action_plans)
@@ -1289,7 +1280,6 @@ class HighLevelPlanner(object):
         for joint_hl_action, curr_goal_state in hl_plan:
             assert all([type(a) is HighLevelAction for a in joint_hl_action])
             hl_action_plan, curr_state, hl_action_cost = self.perform_hl_action(joint_hl_action, curr_state)
-            assert not curr_state.pot_explosion
             full_joint_low_level_action_plan.extend(hl_action_plan)
             total_cost += hl_action_cost
             assert curr_state == curr_goal_state
@@ -1485,7 +1475,7 @@ class Heuristic(object):
         better_than_dispenser_total_cost = sum(np.sort(costs_better_than_dispenser)[:num_needed])
         return len(costs_better_than_dispenser), better_than_dispenser_total_cost
 
-    def _calculate_heuristic_costs(self):
+    def _calculate_heuristic_costs(self, debug=False):
         """Pre-computes the costs between common trip types for this mdp"""
         pot_locations = self.mdp.get_pot_locations()
         delivery_locations = self.mdp.get_serving_locations()
@@ -1501,7 +1491,7 @@ class Heuristic(object):
         onion_pot_cost = self.motion_planner.min_cost_between_features(onion_locations, pot_locations, manhattan_if_fail=True)
         tomato_pot_cost = self.motion_planner.min_cost_between_features(tomato_locations, pot_locations, manhattan_if_fail=True)
 
-        print(heuristic_cost_dict)
+        if debug: print("Heuristic cost dict", heuristic_cost_dict)
         assert onion_pot_cost != np.inf or tomato_pot_cost != np.inf
         if onion_pot_cost != np.inf:
             heuristic_cost_dict['onion-pot'] = onion_pot_cost

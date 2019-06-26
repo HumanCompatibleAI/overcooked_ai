@@ -1,6 +1,6 @@
 import unittest, time, pickle
 from overcooked_gridworld.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
-from overcooked_gridworld.mdp.overcooked_mdp import Direction, OvercookedGridworld, PlayerState, ObjectState, OvercookedState, Action
+from overcooked_gridworld.mdp.overcooked_mdp import Direction, OvercookedGridworld, PlayerState, ObjectState, OvercookedState, Action, BASE_PARTIAL_MDP_CONFIG
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 
 force_compute = False
@@ -13,7 +13,10 @@ P, Obj = PlayerState, ObjectState
 
 
 # Simple MDP Setup
-simple_mdp = OvercookedGridworld.from_file('simple_tomato', start_order_list=["any"], explosion_time=500, rew_shaping_params=None)
+partial_mdp_config = BASE_PARTIAL_MDP_CONFIG.copy()
+partial_mdp_config['layout_name'] = 'simple_tomato'
+partial_mdp_config['start_order_list'] = ['any']
+simple_mdp = OvercookedGridworld.from_layout_name(partial_mdp_config)
 
 base_params = {
     'start_orientations': False,
@@ -42,7 +45,10 @@ or_ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
 
 
 # Large MDP Setup
-large_mdp = OvercookedGridworld.from_file('corridor', start_order_list=["any"], explosion_time=500, rew_shaping_params=None)
+partial_mdp_config = BASE_PARTIAL_MDP_CONFIG.copy()
+partial_mdp_config['layout_name'] = 'corridor'
+partial_mdp_config['start_order_list'] = ['any']
+large_mdp = OvercookedGridworld.from_layout_name(partial_mdp_config)
 
 no_counters_params = {
     'start_orientations': False,

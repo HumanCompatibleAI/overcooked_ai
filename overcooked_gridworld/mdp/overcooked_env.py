@@ -10,90 +10,73 @@ class OvercookedEnv(object):
     it as the agent takes actions, and provides rewards to the agent.
     """
 
-    def __init__(self, mdp, start_state=None, horizon=float('inf'), random_start_pos=False, random_start_objs=False):
+    def __init__(self, mdp, start_state_fn=None, horizon=float('inf'), random_start_pos=False, random_start_objs=False):
         """
-        start_state (OvercookedState): what the environemt resets to when calling reset
+        start_state_fn (OvercookedState): function that returns start state, called at each environment reset
         horizon (float): number of steps before the environment returns True to .is_done()
         """
         self.mdp = mdp
+        self.horizon = horizon
         self.random_start_pos = random_start_pos
         self.random_start_objs = random_start_objs
-        if start_state is not None:
-            self.start_state_fn = lambda: start_state
-        else:
-            self.start_state_fn = lambda: self.mdp.get_start_state(random_start_pos=random_start_pos, random_start_objs=random_start_objs)
-        self.horizon = horizon
-        self.reset()
 
-    def copy(self):
-        # TODO: make this nicer, probably by modifying env signature to have start_state_fn as input
-        if self.random_start_pos or self.random_start_objs:
-            return OvercookedEnv(
-                mdp=self.mdp, 
-                start_state=None,
-                horizon=self.horizon,
-                random_start_pos=self.random_start_pos,
-                random_start_objs=self.random_start_objs
-            )
-        return OvercookedEnv(mdp=self.mdp, start_state=self.start_state_fn(), horizon=self.horizon)
+        if start_state_fn is None:
+            self.start_state_fn = lambda: self.mdp.get_start_state(random_start_pos=random_start_pos, random_start_objs=random_start_objs)
+        else:
+            self.start_state_fn = start_state_fn
+
+        self.reset()
 
     @staticmethod
     def from_config(env_config, start_state=None):
-        mdp = OvercookedGridworld.from_config(env_config)
+        mdp = OvercookedGridworld(env_config["mdp_config"])
         return OvercookedEnv(
-            mdp, 
-            start_state=None, 
-            horizon=env_config["ENV_HORIZON"], 
-            random_start_pos=env_config["RND_POS"], 
-            random_start_objs=env_config["RND_OBJS"]
+            mdp,
+            start_state_fn=None,
+            horizon=env_config["env_horizon"],
+            random_start_pos=env_config["rnd_starting_position"],
+            random_start_objs=env_config["rnd_starting_objs"]
         )
 
     def __repr__(self):
         return self.mdp.state_string(self.state)
 
-    def get_current_state(self):
-        return self.state
+    def copy(self):
+        return OvercookedEnv(
+            mdp=self.mdp,
+            start_state_fn=self.start_state_fn,
+            horizon=self.horizon,
+            random_start_pos=self.random_start_pos,
+            random_start_objs=self.random_start_objs
+        )
 
-    def get_actions(self, state):
-        return self.mdp.get_actions(state)
+    # def get_current_state(self):
+    #     return self.state
+
+    # def get_actions(self, state):
+    #     return self.mdp.get_actions(state)
 
     def step(self, joint_action):
-        """Performs a joint action, updating the state and providing a reward."""
+        """Performs a joint action, updating the state and providing a reward.
+        
+        sparse_reward is the environment sparse reward
+        reward_shaping is the component of the reward that is shaped
+        """
         assert not self.is_done()
-        state = self.get_current_state()
-        next_state, reward, shaped_reward, prob = self.get_random_next_state(state, joint_action)
-        self.cumulative_sparse_rewards += reward
-        self.cumulative_shaped_rewards += shaped_reward
+        next_state, sparse_reward, reward_shaping = self.mdp.get_transition_states_and_probs(self.state, joint_action)
+        self.cumulative_sparse_rewards += sparse_reward
+        self.cumulative_shaped_rewards += reward_shaping
         self.state = next_state
         self.t += 1
         done = self.is_done()
-        info = {"prob": prob}
+        info = {'shaped_r': reward_shaping}
         if done:
             info['episode'] = {
-                'sparse_r': self.cumulative_sparse_rewards,
-                'dense_r': self.cumulative_shaped_rewards,
-                'l': self.t, 
+                'ep_sparse_r': self.cumulative_sparse_rewards,
+                'ep_shaped_r': self.cumulative_shaped_rewards,
+                'ep_length': self.t
             }
-        info['dense_r'] = shaped_reward
-        return (next_state, reward, done, info)
-
-    def get_random_next_state(self, state, action):
-        """Chooses the next state according to T(state, action)."""
-        results, reward, shaped_reward = self.mdp.get_transition_states_and_probs(state, action)
-
-        # If deterministic, don't generate a random number
-        if len(results) == 1:
-            return (results[0][0], reward, shaped_reward, 1.0)
-
-        rand = random.random()
-        sum = 0.0
-        for next_state, prob in results:
-            sum += prob
-            if sum > 1.0:
-                raise ValueError('Total transition probability more than one.')
-            if rand < sum:
-                return (next_state, reward, shaped_reward, prob)
-        raise ValueError('Total transition probability less than one.')
+        return (next_state, sparse_reward, done, info)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -109,7 +92,7 @@ class OvercookedEnv(object):
     @staticmethod
     def execute_plan(mdp, start_state, action_plan, display=False, horizon=np.Inf):
         """Executes action_plan from start_state in mdp and returns resulting state."""
-        env = OvercookedEnv(mdp, start_state, horizon=horizon)
+        env = OvercookedEnv(mdp, lambda: start_state, horizon=horizon)
         env.state = start_state
         if display: print("Starting state\n{}".format(env))
         for a in action_plan:

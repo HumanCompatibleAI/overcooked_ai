@@ -73,7 +73,7 @@ class SearchTree(object):
 
             if self.is_goal(curr_state):
                 elapsed_time = time.time() - start_time
-                if info: print("Found goal after: \t {} seconds, \t {} state expanded ({} frac. unique) \t ~{} expansions/s".format(
+                if info: print("Found goal after: \t{:.2f} seconds,   \t{} state expanded ({:.2f} unique) \t ~{:.2f} expansions/s".format(
                     elapsed_time, iter_count, len(seen)/iter_count, iter_count/elapsed_time))
                 return curr_node.get_path(), curr_node.backwards_cost
             
@@ -116,7 +116,7 @@ class SearchNode(object):
     """
 
     def __init__(self, state, action, parent, action_cost, debug=False):
-        assert state != None
+        assert state is not None
         self.state = state
         # Action that led to this state
         self.action = action
