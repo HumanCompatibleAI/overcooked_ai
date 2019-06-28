@@ -1,6 +1,7 @@
 import unittest, time, pickle
 from overcooked_gridworld.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
-from overcooked_gridworld.mdp.overcooked_mdp import Direction, OvercookedGridworld, PlayerState, ObjectState, OvercookedState, Action, BASE_PARTIAL_MDP_CONFIG
+from overcooked_gridworld.mdp.actions import Direction, Action
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 
 force_compute = False
@@ -8,15 +9,12 @@ force_compute_large = False
 
 n, s = Direction.NORTH, Direction.SOUTH
 e, w = Direction.EAST, Direction.WEST
-stay, interact = Direction.STAY, Action.INTERACT
+stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
 
 
 # Simple MDP Setup
-partial_mdp_config = BASE_PARTIAL_MDP_CONFIG.copy()
-partial_mdp_config['layout_name'] = 'simple_tomato'
-partial_mdp_config['start_order_list'] = ['any']
-simple_mdp = OvercookedGridworld.from_layout_name(partial_mdp_config)
+simple_mdp = OvercookedGridworld.from_layout_name('simple_tomato', {'start_order_list': ['any'], 'cook_time': 20})
 
 base_params = {
     'start_orientations': False,
@@ -45,10 +43,7 @@ or_ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
 
 
 # Large MDP Setup
-partial_mdp_config = BASE_PARTIAL_MDP_CONFIG.copy()
-partial_mdp_config['layout_name'] = 'corridor'
-partial_mdp_config['start_order_list'] = ['any']
-large_mdp = OvercookedGridworld.from_layout_name(partial_mdp_config)
+large_mdp = OvercookedGridworld.from_layout_name('corridor', {'start_order_list': ['any'], 'cook_time': 20})
 
 no_counters_params = {
     'start_orientations': False,
@@ -75,7 +70,7 @@ ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
     action_manger_filename, large_mdp, same_goals_params, force_compute=force_compute_large)
 
 hlam = HighLevelActionManager(ml_planner_large)
-hlp = HighLevelPlanner(hlam) 
+hlp = HighLevelPlanner(hlam)
 
 class TestMotionPlanner(unittest.TestCase):
 
@@ -280,7 +275,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         a2_goal = ((5, 1), n)
         start = (a1_start, a2_start)
         goal = (a1_goal, a2_goal)
-        self.check_joint_plan(planner, start, goal, min_t=3, display=False)
+        self.check_joint_plan(planner, start, goal, min_t=3)
 
     def large_mdp_test_shared_motion_goal_with_conflict(self, planner):
         assert planner.same_motion_goals
@@ -292,7 +287,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         a2_goal = ((5, 1), n)
         start = (a1_start, a2_start)
         goal = (a1_goal, a2_goal)
-        self.check_joint_plan(planner, start, goal, min_t=2, display=False)
+        self.check_joint_plan(planner, start, goal, min_t=2)
 
     def large_mdp_test_shared_motion_goal_with_conflict_other(self, planner):
         assert planner.same_motion_goals
@@ -302,7 +297,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         a2_goal = ((5, 1), n)
         start = (a1_start, a2_start)
         goal = (a1_goal, a2_goal)
-        self.check_joint_plan(planner, start, goal, min_t=3, display=False)
+        self.check_joint_plan(planner, start, goal, min_t=3)
 
     def check_joint_plan(self, joint_motion_planner, start, goal, times=None, min_t=None, display=False):
         """Runs the plan in the environment and checks that the intended goals are achieved."""
@@ -427,7 +422,7 @@ class TestMediumLevelPlanner(unittest.TestCase):
     def check_full_plan(self, start_state, planner, debug=False):
         heuristic = Heuristic(planner.mp)
         joint_action_plan = planner.get_low_level_action_plan(start_state, heuristic.simple_heuristic, debug=debug, goal_info=debug)
-        resulting_state, _ = OvercookedEnv.execute_plan(planner.mdp, start_state, joint_action_plan, display=debug)
+        resulting_state, _ = OvercookedEnv.execute_plan(planner.mdp, start_state, joint_action_plan, display=False)
         self.assertEqual(len(resulting_state.order_list), 0)
         
 

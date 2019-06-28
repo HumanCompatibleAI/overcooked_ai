@@ -1,7 +1,8 @@
+import gym
 import tqdm
-import random
 import numpy as np
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, Action, Direction
+from overcooked_gridworld.mdp.actions import Action
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld
 
 class OvercookedEnv(object):
     """An environment containing a single agent that can take actions.
@@ -10,7 +11,7 @@ class OvercookedEnv(object):
     it as the agent takes actions, and provides rewards to the agent.
     """
 
-    def __init__(self, mdp, start_state_fn=None, horizon=float('inf'), random_start_pos=False, random_start_objs=False):
+    def __init__(self, mdp, start_state_fn=None, horizon=float('inf'), random_start_pos=False, random_start_objs_p=0.0):
         """
         start_state_fn (OvercookedState): function that returns start state, called at each environment reset
         horizon (float): number of steps before the environment returns True to .is_done()
@@ -18,10 +19,12 @@ class OvercookedEnv(object):
         self.mdp = mdp
         self.horizon = horizon
         self.random_start_pos = random_start_pos
-        self.random_start_objs = random_start_objs
+        self.random_start_objs_p = random_start_objs_p
 
         if start_state_fn is None:
-            self.start_state_fn = lambda: self.mdp.get_start_state(random_start_pos=random_start_pos, random_start_objs=random_start_objs)
+            self.start_state_fn = lambda: self.mdp.get_start_state(
+                random_start_pos=random_start_pos, rnd_obj_prob_thresh=random_start_objs_p
+            )
         else:
             self.start_state_fn = start_state_fn
 
@@ -29,13 +32,13 @@ class OvercookedEnv(object):
 
     @staticmethod
     def from_config(env_config, start_state=None):
-        mdp = OvercookedGridworld(env_config["mdp_config"])
+        mdp = OvercookedGridworld(**env_config["mdp_config"])
         return OvercookedEnv(
             mdp,
             start_state_fn=None,
             horizon=env_config["env_horizon"],
             random_start_pos=env_config["rnd_starting_position"],
-            random_start_objs=env_config["rnd_starting_objs"]
+            random_start_objs_p=env_config["rnd_starting_objs"]
         )
 
     def __repr__(self):
@@ -47,9 +50,10 @@ class OvercookedEnv(object):
             start_state_fn=self.start_state_fn,
             horizon=self.horizon,
             random_start_pos=self.random_start_pos,
-            random_start_objs=self.random_start_objs
+            random_start_objs_p=self.random_start_objs_p
         )
 
+    # TODO: Clean this
     # def get_current_state(self):
     #     return self.state
 
@@ -91,7 +95,8 @@ class OvercookedEnv(object):
 
     @staticmethod
     def execute_plan(mdp, start_state, action_plan, display=False, horizon=np.Inf):
-        """Executes action_plan from start_state in mdp and returns resulting state."""
+        """Executes action_plan (a list of joint actions) from a start state in 
+        the mdp and returns resulting state."""
         env = OvercookedEnv(mdp, lambda: start_state, horizon=horizon)
         env.state = start_state
         if display: print("Starting state\n{}".format(env))
@@ -233,8 +238,6 @@ class VariableOvercookedEnv(OvercookedEnv):
         self.cumulative_shaped_rewards = 0
         self.t = 0
 
-import gym
-from gym import spaces
 class Overcooked(gym.Env):
     """Wrapper for the Env class above that is compatible with gym API
     
@@ -266,12 +269,12 @@ class Overcooked(gym.Env):
             obs_shape = featurize_fn(dummy_state)[0].shape
             high = np.ones(obs_shape) * 10 # NOTE: arbitrary right now
 
-        self.observation_space = spaces.Box(high * 0, high, dtype=np.float32)
+        self.observation_space = gym.spaces.Box(high * 0, high, dtype=np.float32)
 
         if self.joint_actions:
-            self.action_space = spaces.Discrete(len(Action.ALL_ACTIONS)**2)
+            self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS)**2)
         else:
-            self.action_space = spaces.Discrete(len(Action.ALL_ACTIONS))
+            self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.reset()
 
     def step(self, action):

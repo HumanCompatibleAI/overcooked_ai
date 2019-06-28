@@ -1,123 +1,11 @@
-import tqdm
-import random
 import itertools
 import numpy as np
 from collections import defaultdict
-from overcooked_gridworld.utils import pos_distance
+from overcooked_gridworld.utils import pos_distance, load_dict_from_file
+from overcooked_gridworld.mdp.actions import Action, Direction
 
-eps = 10e-2
+
 LAYOUTS_DIR = "data/layouts/"
-
-NO_REW_SHAPING_PARAMS = {
-    "PLACEMENT_IN_POT_REW": 0,
-    "DISH_PICKUP_REWARD": 0,
-    "SOUP_PICKUP_REWARD": 0,
-    "DISH_DISP_DISTANCE_REW": 0,
-    "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0,
-}
-
-BASE_REW_SHAPING_PARAMS = {
-    "PLACEMENT_IN_POT_REW": 3,
-    "DISH_PICKUP_REWARD": 3,
-    "SOUP_PICKUP_REWARD": 5,
-    "DISH_DISP_DISTANCE_REW": 0,
-    "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0
-}
-
-class Direction(object):
-    """
-    The four possible directions a player can be facing.
-    """
-    
-    NORTH = (0, -1)
-    SOUTH = (0, 1)
-    EAST  = (1, 0)
-    WEST  = (-1, 0)
-    STAY = (0, 0)
-    CARDINAL = [NORTH, SOUTH, EAST, WEST]
-    INDEX_TO_DIRECTION = CARDINAL + [STAY]
-    DIRECTION_TO_INDEX = { a:i for i, a in enumerate(INDEX_TO_DIRECTION) }
-    ALL_DIRECTIONS = INDEX_TO_DIRECTION
-    OPPOSITE_DIRECTIONS = { NORTH: SOUTH, SOUTH: NORTH, EAST: WEST, WEST: EAST }
-
-    @staticmethod
-    def get_adjacent_directions(direction):
-        """Returns the directions within 90 degrees of the given direction.
-
-        direction: One of the Directions, except not Direction.STAY.
-        """
-        if direction in [Direction.NORTH, Direction.SOUTH]:
-            return [Direction.EAST, Direction.WEST]
-        elif direction in [Direction.EAST, Direction.WEST]:
-            return [Direction.NORTH, Direction.SOUTH]
-        raise ValueError('Invalid direction: %s' % direction)
-
-    # @staticmethod
-    # def get_number_from_direction(direction):
-    #     return Direction.DIRECTION_TO_INDEX[direction]
-
-    # @staticmethod
-    # def get_direction_from_number(number):
-    #     return Direction.INDEX_TO_DIRECTION[number]
-
-class Action(object):
-    """
-    The five actions available in the OvercookedGridworld.
-
-    Includes definitions of the actions as well as utility functions for
-    manipulating them or applying them.
-    """
-    
-    INTERACT = 'interact'
-    INDEX_TO_ACTION = Direction.INDEX_TO_DIRECTION + [INTERACT]
-    INDEX_TO_ACTION_INDEX_PAIRS = [v for v in itertools.product(range(len(INDEX_TO_ACTION)), repeat=2)]
-    ACTION_TO_INDEX = { a:i for i, a in enumerate(INDEX_TO_ACTION) }
-    ALL_ACTIONS = INDEX_TO_ACTION
-    MOTION_ACTIONS = Direction.INDEX_TO_DIRECTION
-    ACTION_TO_CHAR = { 
-        Direction.NORTH: "↑",
-        Direction.SOUTH: "↓",
-        Direction.EAST: "→",
-        Direction.WEST: "←",
-        Direction.STAY: "stay",
-        INTERACT: "interact"
-    }
-
-    @staticmethod
-    def move_in_direction(point, direction):
-        """
-        Takes a step in the given direction and returns the new point.
-
-        point: Tuple (x, y) representing a point in the x-y plane.
-        direction: One of the Directions, except not Direction.STAY or
-                   Direction.SELF_LOOP.
-        """
-        x, y = point
-        dx, dy = direction
-        return (x + dx, y + dy)
-
-    @staticmethod
-    def determine_action_for_change_in_pos(old_pos, new_pos):
-        """Determines an action that will enable intended transition"""
-        if old_pos == new_pos:
-            return Direction.STAY
-        new_x, new_y = new_pos
-        old_x, old_y = old_pos
-        direction = (new_x - old_x, new_y - old_y)
-        assert direction in Direction.ALL_DIRECTIONS
-        return direction
-
-    @staticmethod
-    def to_char(action):
-        assert action in Action.ALL_ACTIONS
-        return Action.ACTION_TO_CHAR[action]    
-
-    @staticmethod
-    def joint_action_to_char(joint_action):
-        assert all([a in Action.ALL_ACTIONS for a in joint_action])
-        return tuple(Action.to_char(a) for a in joint_action)
 
 class PlayerState(object):
     """
@@ -217,8 +105,7 @@ class ObjectState(object):
             valid_item_num = (1 <= num_items <= 3)
             valid_cook_time = (0 <= cook_time)
             return valid_soup_type and valid_item_num and valid_cook_time
-        else:
-            raise ValueError("Unrecognized object")
+        # Unrecognized object
         return False
 
     def deepcopy(self):
@@ -273,7 +160,7 @@ class OvercookedState(object):
         return tuple(zip(*[self.player_positions, self.player_orientations]))
 
     @property
-    def objects_by_type(self):
+    def unowned_objects_by_type(self):
         """
         Returns dictionary of (obj_name: ObjState)
         for all objects in the environment, NOT including
@@ -285,7 +172,7 @@ class OvercookedState(object):
         return objects_by_type
 
     @property
-    def player_objects(self):
+    def player_objects_by_type(self):
         """
         Returns dictionary of (obj_name: ObjState)
         for all objects held by players.
@@ -304,10 +191,9 @@ class OvercookedState(object):
         for all objects in the environment, including
         ones held by players.
         """
-        by_type = self.objects_by_type.copy()
-        player = self.player_objects.copy()
-        by_type.update(player)
-        return by_type
+        all_objs_by_type = self.unowned_objects_by_type.copy()
+        all_objs_by_type.update(self.player_objects_by_type)
+        return all_objs_by_type
 
     def has_object(self, pos):
         return pos in self.objects
@@ -332,12 +218,20 @@ class OvercookedState(object):
 
     @staticmethod
     def from_players_pos_and_or(players_pos_and_or, order_list):
+        """
+        Make a dummy OvercookedState with no objects based on the passed in player
+        positions and orientations and order list
+        """
         return OvercookedState(
             [PlayerState(*player_pos_and_or) for player_pos_and_or in players_pos_and_or], 
             objects={}, order_list=order_list)
 
     @staticmethod
     def from_player_positions(player_positions, order_list):
+        """
+        Make a dummy OvercookedState with no objects and with players facing
+        North based on the passed in player positions and order list
+        """
         dummy_pos_and_or = [(pos, Direction.NORTH) for pos in player_positions]
         return OvercookedState.from_players_pos_and_or(dummy_pos_and_or, order_list)
 
@@ -367,70 +261,88 @@ class OvercookedState(object):
             str(self.players), str(list(self.objects.values())), str(self.order_list))
 
 
-BASE_PARTIAL_MDP_CONFIG = {
-    "terrain": None,
-    "layout_name": "unnamed_layout",
-    "starting_player_positions": None,
-    "start_order_list": None,
-    "cook_time": 20,
-    "num_items_for_soup": 3,
-    "delivery_reward": 20,
-    "rew_shaping_params": None
+NO_REW_SHAPING_PARAMS = {
+    "PLACEMENT_IN_POT_REW": 0,
+    "DISH_PICKUP_REWARD": 0,
+    "SOUP_PICKUP_REWARD": 0,
+    "DISH_DISP_DISTANCE_REW": 0,
+    "POT_DISTANCE_REW": 0,
+    "SOUP_DISTANCE_REW": 0,
 }
 
+BASE_REW_SHAPING_PARAMS = {
+    "PLACEMENT_IN_POT_REW": 3,
+    "DISH_PICKUP_REWARD": 3,
+    "SOUP_PICKUP_REWARD": 5,
+    "DISH_DISP_DISTANCE_REW": 0,
+    "POT_DISTANCE_REW": 0,
+    "SOUP_DISTANCE_REW": 0
+}
 
 class OvercookedGridworld(object):
     """An MDP grid world based off of the Overcooked game."""
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
 
-    def __init__(self, mdp_config):
+    def __init__(self, terrain, starting_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
         """
-        `mdp_config` should contain:
-        - terrain: a matrix of strings that encode the MDP layout
-        - layout_name: string identifier of the layout
-        - starting_player_positions: tuple of positions for both players' starting positions
-        - start_order_list: either a list of orders or None if there is not specific list
-        - cook_time: amount of timesteps required for a soup to cook
-        - delivery_reward: amount of reward given per delivery
-        - rew_shaping_params: reward given for completion of specific subgoals
+        terrain: a matrix of strings that encode the MDP layout
+        layout_name: string identifier of the layout
+        starting_player_positions: tuple of positions for both players' starting positions
+        start_order_list: either a list of orders or None if there is not specific list
+        cook_time: amount of timesteps required for a soup to cook
+        delivery_reward: amount of reward given per delivery
+        rew_shaping_params: reward given for completion of specific subgoals
         """
-        assert set(mdp_config.keys()) == set(BASE_PARTIAL_MDP_CONFIG.keys())
-
-        terrain = mdp_config["terrain"]
         self.height = len(terrain)
         self.width = len(terrain[0])
         self.shape = (self.width, self.height)
         self.terrain_mtx = terrain
         self.terrain_pos_dict = self._get_terrain_type_pos_dict()
-        self.start_player_positions = mdp_config["starting_player_positions"]
-        self.start_order_list = mdp_config["start_order_list"]
-        self.soup_cooking_time = mdp_config["cook_time"]
-        self.num_items_for_soup = mdp_config["num_items_for_soup"]
-        self.delivery_reward = mdp_config["delivery_reward"]
-        self.reward_shaping_params = NO_REW_SHAPING_PARAMS if mdp_config["rew_shaping_params"] is None else mdp_config["rew_shaping_params"]
-        self.layout_name = mdp_config["layout_name"]
-        self.mdp_config = mdp_config
+        self.start_player_positions = starting_player_positions
+        self.start_order_list = start_order_list
+        self.soup_cooking_time = cook_time
+        self.num_items_for_soup = num_items_for_soup
+        self.delivery_reward = delivery_reward
+        self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
+        self.layout_name = layout_name
+
+    def __eq__(self, other):
+        return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
+                self.start_player_positions == other.start_player_positions and \
+                self.start_order_list == other.start_order_list and \
+                self.soup_cooking_time == other.soup_cooking_time and \
+                self.num_items_for_soup == other.num_items_for_soup and \
+                self.delivery_reward == other.delivery_reward and \
+                self.reward_shaping_params == other.reward_shaping_params and \
+                self.layout_name == other.layout_name
 
     @staticmethod
-    def from_layout_name(partial_mdp_config):
+    def from_layout_name(layout_name, params_to_overwrite={}):
         """
-        Populates the `terrain` and `starting_player_positions` of the mdp_config from the
-        layout file corresponding to layout_name, and returns the corresponding MDP instance.
+        Generates a OvercookedGridworld instance from a layout file.
 
-        # TODO: specify what partial mdp params should contain explicitly
+        One can overwrite the default mdp configuration using partial_mdp_config.
         """
-        layout_name = partial_mdp_config['layout_name']
-        with open(LAYOUTS_DIR + layout_name + ".layout", 'r') as f:
-            layout_grid = f.read().strip().split('\n')
-            return OvercookedGridworld.from_grid(
-                layout_grid,
-                partial_mdp_config
-            )
+        params_to_overwrite = params_to_overwrite.copy()
+        base_layout_params = load_dict_from_file(LAYOUTS_DIR + layout_name + '.layout')
+
+        grid = base_layout_params['grid']
+        del base_layout_params['grid']
+        base_layout_params['layout_name'] = layout_name
+
+        # Clean grid
+        grid = [layout_row.strip() for layout_row in grid.split("\n")]
+        return OvercookedGridworld.from_grid(grid, base_layout_params, params_to_overwrite)
 
     @staticmethod
-    def from_grid(layout_grid, partial_mdp_config):
-        # TODO: Add
-        mdp_config = partial_mdp_config.copy()
+    def from_grid(layout_grid, base_layout_params={}, params_to_overwrite={}, debug=False):
+        """
+        Returns instance of OvercookedGridworld with terrain and starting 
+        positions derived from layout_grid.
+        One can override default configuration parameters of the mdp in
+        partial_mdp_config.
+        """
+        mdp_config = base_layout_params.copy()
 
         layout_grid = [[c for c in row] for row in layout_grid]
         OvercookedGridworld._assert_valid_grid(layout_grid)
@@ -449,7 +361,14 @@ class OvercookedGridworld(object):
         assert all(position is not None for position in player_positions), 'A player was missing'
 
         mdp_config["starting_player_positions"] = player_positions
-        return OvercookedGridworld(mdp_config)
+
+        for k, v in params_to_overwrite.items():
+            curr_val = mdp_config[k]
+            if debug:
+                print("Overwriting mdp layout standard config value {}:{} -> {}".format(k, curr_val, v))
+            mdp_config[k] = v
+
+        return OvercookedGridworld(**mdp_config)
 
     def get_actions(self, state):
         """
@@ -470,7 +389,7 @@ class OvercookedGridworld(object):
             if p_action not in p_legal_actions:
                 raise ValueError('Invalid action')
 
-    def get_start_state(self, random_start_pos=False, random_start_objs=0.0):
+    def get_start_state(self, random_start_pos=False, rnd_obj_prob_thresh=0.0):
         """Returns the start state."""
         if random_start_pos:
             valid_positions = self.get_valid_joint_player_positions()
@@ -480,27 +399,30 @@ class OvercookedGridworld(object):
 
         start_state = OvercookedState.from_player_positions(start_pos, order_list=self.start_order_list)
 
-        # Hard-coded randomization of objects
-        thresh = random_start_objs
-        if thresh > 0:
-            pots = self.get_pot_states(start_state)["empty"]
-            for pot_loc in pots:
-                p = np.random.rand()
-                if p < thresh:
-                    n = int(np.random.randint(low=1, high=4))
-                    start_state.objects[pot_loc] = ObjectState("soup", pot_loc, ('onion', n, 0))
-
-            for player in start_state.players:
-                p = np.random.rand()
-                if p < thresh:
-                    obj = np.random.choice(["dish", "onion", "soup"], p=[0.2, 0.6, 0.2])
-                    if obj == "soup":
-                        player.set_object(
-                            ObjectState(obj, player.position, ('onion', self.num_items_for_soup, self.soup_cooking_time))
-                        )
-                    else:
-                        player.set_object(ObjectState(obj, player.position))
+        if rnd_obj_prob_thresh != 0:
+            return start_state
         
+        # Arbitrary hard-coding for randomization of objects
+        # For each pot, add a random amount of onions with prob rnd_obj_prob_thresh
+        pots = self.get_pot_states(start_state)["empty"]
+        for pot_loc in pots:
+            p = np.random.rand()
+            if p < rnd_obj_prob_thresh:
+                n = int(np.random.randint(low=1, high=4))
+                start_state.objects[pot_loc] = ObjectState("soup", pot_loc, ('onion', n, 0))
+
+        # For each player, add a random object with prob rnd_obj_prob_thresh
+        for player in start_state.players:
+            p = np.random.rand()
+            if p < rnd_obj_prob_thresh:
+                # Different objects have different probabilities
+                obj = np.random.choice(["dish", "onion", "soup"], p=[0.2, 0.6, 0.2])
+                if obj == "soup":
+                    player.set_object(
+                        ObjectState(obj, player.position, ('onion', self.num_items_for_soup, self.soup_cooking_time))
+                    )
+                else:
+                    player.set_object(ObjectState(obj, player.position))
         return start_state
 
     def is_terminal(self, state):
@@ -520,7 +442,7 @@ class OvercookedGridworld(object):
     def get_valid_player_positions_and_orientations(self):
         valid_states = []
         for pos in self.get_valid_player_positions():
-            valid_states.extend([(pos, d) for d in Direction.CARDINAL])
+            valid_states.extend([(pos, d) for d in Direction.ALL_DIRECTIONS])
         return valid_states
 
     def get_valid_joint_player_positions_and_orientations(self):
@@ -539,7 +461,7 @@ class OvercookedGridworld(object):
     def get_adjacent_features(self, player):
         adj_feats = []
         pos = player.position
-        for d in Direction.CARDINAL:
+        for d in Direction.ALL_DIRECTIONS:
             adj_pos = Action.move_in_direction(pos, d)
             adj_feats.append((pos, self.get_terrain_type_at_pos(adj_pos)))
         return adj_feats
@@ -683,7 +605,7 @@ class OvercookedGridworld(object):
             elif terrain_type == 'T' and player.held_object is None:
                 player.set_object(ObjectState('tomato', pos))
             elif terrain_type == 'D' and player.held_object is None:
-                dishes_already = len(new_state.player_objects['dish'])
+                dishes_already = len(new_state.player_objects_by_type['dish'])
                 player.set_object(ObjectState('dish', pos))
 
                 dishes_on_counters = self.get_counter_objects_dict(new_state)["dish"]
@@ -795,10 +717,10 @@ class OvercookedGridworld(object):
     def _move_if_direction(self, position, orientation, action):
         """Returns position and orientation that would 
         be obtained after executing action"""
-        if action not in Action.MOTION_ACTIONS:
+        if action == Action.INTERACT:
             return position, orientation
         new_pos = Action.move_in_direction(position, action)
-        new_orientation = orientation if action == Direction.STAY else action
+        new_orientation = orientation if action == Action.STAY else action
         if new_pos not in self.get_valid_player_positions():
             return position, new_orientation
         return new_pos, new_orientation
@@ -939,6 +861,8 @@ class OvercookedGridworld(object):
     # STATE ENCODINGS #
     ###################
 
+    # TODO: Clean encodings more?
+
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert type(debug) is bool
@@ -957,7 +881,7 @@ class OvercookedGridworld(object):
             other_agent_idx = 1 - primary_agent_idx
             ordered_player_features = ["player_{}_loc".format(primary_agent_idx), "player_{}_loc".format(other_agent_idx)] + \
                         ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
-                        for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.CARDINAL)]
+                        for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.ALL_DIRECTIONS)]
 
             LAYERS = ordered_player_features + base_map_features + variable_map_features
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
@@ -1138,7 +1062,7 @@ class OvercookedGridworld(object):
         ready_pots = pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
         cooking_pots = ready_pots + pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
         nearly_ready_pots = cooking_pots + pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
-        dishes_in_play = len(new_state.player_objects['dish'])
+        dishes_in_play = len(new_state.player_objects_by_type['dish'])
         for player_old, player_new in zip(state.players, new_state.players):
             # Linearly increase reward depending on vicinity to certain features, where distance of 10 achieves 0 reward
             max_dist = 8

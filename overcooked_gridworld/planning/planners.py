@@ -3,7 +3,8 @@ import numpy as np
 import pickle, time
 from overcooked_gridworld.utils import profile, pos_distance, manhattan_distance
 from overcooked_gridworld.planning.search import SearchTree, Graph, NotConnectedError
-from overcooked_gridworld.mdp.overcooked_mdp import Action, Direction, OvercookedState, PlayerState, OvercookedGridworld
+from overcooked_gridworld.mdp.actions import Action, Direction
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 
 # Run planning logic with additional checks and
@@ -92,7 +93,7 @@ class MotionPlanner(object):
         interaction action)."""
         # TODO: currently unused, pretty bad code. If used in future, clean up
         min_cost = np.Inf
-        for d1, d2 in itertools.product(Direction.CARDINAL, repeat=2):
+        for d1, d2 in itertools.product(Direction.ALL_DIRECTIONS, repeat=2):
             start = (pos1, d1)
             end = (pos2, d2)
             if self.is_valid_motion_start_goal_pair(start, end):
@@ -184,7 +185,7 @@ class MotionPlanner(object):
             next_pos = position_to_go.pop(0)
             action = Action.determine_action_for_change_in_pos(curr_pos, next_pos)
             action_plan.append(action)
-            curr_or = action if action != Direction.STAY else curr_or
+            curr_or = action if action != Action.STAY else curr_or
             pos_and_or_path.append((next_pos, curr_or))
             curr_pos = next_pos
         
@@ -292,7 +293,7 @@ class MotionPlanner(object):
         that could be used for motion planning to get to goal_pos"""
         goals = []
         valid_positions = self.mdp.get_valid_player_positions()
-        for d in Direction.CARDINAL:
+        for d in Direction.ALL_DIRECTIONS:
             adjacent_pos = Action.move_in_direction(goal_pos, d)
             if adjacent_pos in valid_positions:
                 goal_orientation = Direction.OPPOSITE_DIRECTIONS[d]
@@ -522,12 +523,12 @@ class JointMotionPlanner(object):
                 if wait_agent_idx == 0:
                     curr_pos_or0 = curr_pos_or0 # Agent 0 will wait, stays the same
                     curr_pos_or1 = next_pos_or1
-                    curr_joint_action = [Direction.STAY, agent1_plan_original[idx1]]
+                    curr_joint_action = [Action.STAY, agent1_plan_original[idx1]]
                     idx1 += 1
                 elif wait_agent_idx == 1:
                     curr_pos_or0 = next_pos_or0
                     curr_pos_or1 = curr_pos_or1 # Agent 1 will wait, stays the same
-                    curr_joint_action = [agent0_plan_original[idx0], Direction.STAY]
+                    curr_joint_action = [agent0_plan_original[idx0], Action.STAY]
                     idx0 += 1
 
                 curr_positions = (curr_pos_or0[0], curr_pos_or1[0])
@@ -659,7 +660,7 @@ class JointMotionPlanner(object):
 
     def _graph_joint_action_cost(self, joint_action):
         """The cost used in the graph shortest-path problem for a certain joint-action"""
-        num_of_non_stay_actions = len([a for a in joint_action if a != Direction.STAY])
+        num_of_non_stay_actions = len([a for a in joint_action if a != Action.STAY])
         # NOTE: Removing the possibility of having 0 cost joint_actions
         if num_of_non_stay_actions == 0:
             return 1
@@ -669,7 +670,7 @@ class JointMotionPlanner(object):
         """Get all joint positions that can be reached by a joint action.
         NOTE: this DOES NOT include joint positions with superimposed agents."""
         successor_joint_positions = {}
-        joint_motion_actions = itertools.product(Direction.ALL_DIRECTIONS, Direction.ALL_DIRECTIONS)
+        joint_motion_actions = itertools.product(Action.MOTION_ACTIONS, Action.MOTION_ACTIONS)
         
         # Under assumption that orientation doesn't matter
         dummy_orientation = Direction.NORTH
@@ -704,7 +705,7 @@ class JointMotionPlanner(object):
             self.mdp.step_environment_effects(end_state)
 
         # Interacts
-        last_joint_action = tuple(a if a == Action.INTERACT else Direction.STAY for a in action_plans[-1])
+        last_joint_action = tuple(a if a == Action.INTERACT else Action.STAY for a in action_plans[-1])
 
         self.mdp.resolve_interacts(end_state, last_joint_action)
         self.mdp.resolve_movement(end_state, last_joint_action)
@@ -911,31 +912,34 @@ class MediumLevelPlanner(object):
     @staticmethod
     def from_params(mdp_params, mlp_params, force_compute=False):
         layout_name = mdp_params["LAYOUT_NAME"]
-        mdp = OvercookedGridworld(mdp_params)
+        mdp = OvercookedGridworld(**mdp_params)
         return MediumLevelPlanner.from_pickle_or_compute(layout_name + "_am.pkl", mdp, mlp_params, force_compute)
 
     @staticmethod
     def from_pickle_or_compute(filename, mdp, mlp_params, force_compute=False):
-        # TODO: Clean this up!! Have all relevant params somewhere easily accessible
         if force_compute:
-            print("Computing MediumLevelPlanner to be saved in {}".format(PLANNERS_DIR + filename))
-            start_time = time.time()
-            mlp = MediumLevelPlanner(mdp, params=mlp_params)
-            print("It took {} seconds to create mlp".format(time.time() - start_time))
-            mlp.ml_action_manager.save_to_file(PLANNERS_DIR + filename)
+            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+        
         try:
             mlp = MediumLevelPlanner.from_action_manager_file(filename)
-            assert mlp.ml_action_manager.params == mlp_params, "Saved params and intended params are different:\nSaved: {} \t Intended: {}"\
-                .format(mlp.ml_action_manager.params, mlp_params)
-            assert np.array_equal(mlp.mdp.terrain_mtx, mdp.terrain_mtx)
-            assert mlp.mdp.mdp_config == mdp.mdp_config # TODO: Deep verify
-            print("Loaded MediumLevelPlanner from {}".format(PLANNERS_DIR + filename))
-        except FileNotFoundError:
-            print("No file found, computing MediumLevelPlanner from scratch")
-            mlp = MediumLevelPlanner.from_pickle_or_compute(filename, mdp, mlp_params, force_compute=True)
-        except (ModuleNotFoundError, AssertionError, EOFError):
-            print("Saved settings were not the same as loaded ones, computing MediumLevelPlanner from scratch")
-            mlp = MediumLevelPlanner.from_pickle_or_compute(filename, mdp, mlp_params, force_compute=True)
+        except (FileNotFoundError, ModuleNotFoundError, EOFError):
+            print("No mlp or corrupt mlp file found, computing MediumLevelPlanner from scratch")
+            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+
+        if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
+            print("Mlp with different params or mdp found, computing from scratch")
+            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+
+        print("Loaded MediumLevelPlanner from {}".format(PLANNERS_DIR + filename))
+        return mlp
+
+    @staticmethod
+    def compute_mlp(filename, mdp, mlp_params):
+        print("Computing MediumLevelPlanner to be saved in {}".format(PLANNERS_DIR + filename))
+        start_time = time.time()
+        mlp = MediumLevelPlanner(mdp, params=mlp_params)
+        print("It took {} seconds to create mlp".format(time.time() - start_time))
+        mlp.ml_action_manager.save_to_file(PLANNERS_DIR + filename)
         return mlp
 
     def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
@@ -1131,7 +1135,7 @@ class HighLevelAction:
         for goal in self.motion_goals:
             assert len(goal) == 2
             pos, orient = goal
-            assert orient in Direction.CARDINAL
+            assert orient in Direction.ALL_DIRECTIONS
             assert type(pos) is tuple
             assert len(pos) == 2
 
@@ -1350,8 +1354,8 @@ class Heuristic(object):
         forward_cost = 0
 
         # Obtaining useful quantities
-        objects_dict = state.objects_by_type
-        player_objects = state.player_objects
+        objects_dict = state.unowned_objects_by_type
+        player_objects = state.player_objects_by_type
         pot_states_dict = self.mdp.get_pot_states(state)
         min_pot_delivery_cost = self.heuristic_cost_dict['pot-delivery']
         min_dish_to_pot_cost = self.heuristic_cost_dict['dish-pot']
@@ -1502,8 +1506,8 @@ class Heuristic(object):
     
     def simple_heuristic(self, state, time=0, debug=False):
         """Simpler heuristic that tends to run faster than current one"""
-        objects_dict = state.objects_by_type
-        player_objects = state.player_objects
+        objects_dict = state.unowned_objects_by_type
+        player_objects = state.player_objects_by_type
         pot_states_dict = self.mdp.get_pot_states(state)
 
         # num_onion_deliveries_to_go = [item for item in state.order_list if item == 'onion']
@@ -1551,7 +1555,7 @@ class Heuristic(object):
         if debug:
             env = OvercookedEnv(self.mdp)
             env.state = state
-            print("\n" + "#"*35)
+            print("\n" + "#" * 35)
             print("Current state: (ml timestep {})\n".format(time))
 
             print("# in transit: \t\t Soups {} \t Dishes {} \t Onions {}".format(

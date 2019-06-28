@@ -42,11 +42,14 @@ def save_dict_to_file(dic, filename):
     f.write(str(dic))
     f.close()
 
-def load_dict_from_file(filename):
-    f = open(filename + '.txt','r')
+def load_dict_from_file(filepath):
+    f = open(filepath,'r')
     data=f.read()
     f.close()
     return eval(data)
+
+def load_dict_from_txt(filename):
+    return load_dict_from_file(filename + ".txt")
 
 def delete_dir_if_exists(dir_path, verbose=False):
     if os.path.exists(dir_path):
