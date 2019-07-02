@@ -4,7 +4,7 @@ import tqdm
 import numpy as np
 from argparse import ArgumentParser
 
-from overcooked_gridworld.utils import load_dict_from_file, get_max_iter, save_pickle, load_pickle, cumulative_rewards_from_rew_list
+from overcooked_gridworld.utils import load_dict_from_file, save_pickle, load_pickle, cumulative_rewards_from_rew_list
 from overcooked_gridworld.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner, NO_COUNTERS_START_OR_PARAMS
 from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
 from overcooked_gridworld.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
@@ -17,58 +17,48 @@ class AgentEvaluator(object):
     Class used to get trajectory rollouts of agents trained with a variety of methods
     """
 
-    def __init__(self, layout_name, order_goal=['any'] * 100, explosion_time=500, start_state=None, horizon=400, force_compute=False, debug=False):
-        self.layout_name = layout_name
-        self.order_goal = order_goal
-        self.explosion_time = explosion_time
-        self.start_state = start_state
-        self.horizon = horizon
+    # TODO: Discontinue variable MDP in AgentEvaluator
+    def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=None, debug=False):
+        if mdp_fn_params is None:
+            self.variable_mdp = False
+            self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)
+        else:
+            self.variable_mdp = True
+            self.mdp_fn = OvercookedEnv.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
+            
+        self.env = OvercookedEnv(self.mdp_fn, **env_params)
         self.force_compute = force_compute
         self.debug = debug
+        self.mlp_params = mlp_params
         self._mlp = None
-        self._mdp = None
-        self._env = None
 
-    @staticmethod
-    def from_config(env_config, start_state=None):
-        ae = AgentEvaluator(
-            layout_name=env_config["FIXED_MDP"], 
-            order_goal=env_config["ORDER_GOAL"],
-            explosion_time=env_config["EXPLOSION_TIME"],
-            start_state=start_state,
-            horizon=env_config["ENV_HORIZON"]
-        )
-        from hr_coordination.pbt.pbt_utils import setup_mdp_env
-        ae._env = setup_mdp_env(display=False, **env_config)
-        ae._mdp = ae._env.mdp
-        ae.config = env_config
-        return ae
+    # @staticmethod
+    # def from_config(mdp_params, env_params):
+    #     ae = AgentEvaluator(
+    #         layout_name=env_config["fixed_mdp"],
+    #         order_goal=env_config["ORDER_GOAL"],
+    #         start_state_fn=start_state_fn,
+    #         horizon=env_config["horizon"]
+    #     )
+    #     from hr_coordination.pbt.pbt_utils import setup_mdp_env
+    #     ae._env = setup_mdp_env(display=False, **env_config)
+    #     ae._mdp = ae._env.mdp
+    #     ae.config = env_config
+    #     return ae
 
-    @staticmethod
-    def from_pbt_dir(run_dir, start_state=None):
-        from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_config_from_pbt_dir
-        config = get_config_from_pbt_dir(run_dir)
-        return AgentEvaluator.from_config(config, start_state)
-
-    @property
-    def mdp(self):
-        if self._mdp is None:
-            if self.debug: print("Computing Mdp")
-            self._mdp = OvercookedGridworld.from_file(self.layout_name, self.order_goal, self.explosion_time, rew_shaping_params=None)
-        return self._mdp
-
-    @property
-    def env(self):
-        if self._env is None:
-            if self.debug: print("Computing Env")
-            self._env = OvercookedEnv(self.mdp, start_state=self.start_state, horizon=self.horizon, random_start_objs=False, random_start_pos=False)
-        return self._env
+    # @staticmethod
+    # def from_pbt_dir(run_dir, start_state=None):
+    #     from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_config_from_pbt_dir
+    #     config = get_config_from_pbt_dir(run_dir)
+    #     return AgentEvaluator.from_config(config, start_state)
 
     @property
     def mlp(self):
+        assert not self.variable_mdp, "Variable mdp is not currently supported for planning"
         if self._mlp is None:
+            mlp_params = self.mlp_params if self.mlp_params is not None else NO_COUNTERS_PARAMS
             if self.debug: print("Computing Planner")
-            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.layout_name + "_am.pkl", self.mdp, NO_COUNTERS_PARAMS, force_compute=self.force_compute)
+            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, mlp_params, force_compute=self.force_compute)
         return self._mlp
 
     def evaluate_human_model_pair(self, display=True):
@@ -101,19 +91,7 @@ class AgentEvaluator(object):
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_agent_pair(self, agent_pair, num_games=1, display=False):
-        agent_pair.set_mdp(self.mdp)
         return self.env.get_rollouts(agent_pair, num_games, display=display)
-
-    def get_pbt_agents_trajectories(self, agent0_idx, agent1_idx, num_trajectories, display=False):
-        # TODO: Remove this from here and put in PBT utils
-        from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_pbt_agent_from_config
-        assert self.config, "Class instance has to be initialized with from_pbt_dir"
-
-        agent0 = get_pbt_agent_from_config(self.config, agent0_idx)
-        agent1 = get_pbt_agent_from_config(self.config, agent1_idx)
-
-        mdp_env = setup_mdp_env(display=False, **self.config)
-        return mdp_env.get_rollouts(AgentPair(agent0, agent1), num_trajectories, display=display, processed=True, final_state=False)
 
     @staticmethod
     def cumulative_rewards_from_trajectory(trajectory):
@@ -166,16 +144,16 @@ class AgentEvaluator(object):
         self.check_trajectories(traj)
         return traj
 
-    @staticmethod
-    def save_traj_in_baselines_format(rollout_trajs, filename):
-        """Useful for GAIL and behavioral cloning"""
-        np.savez(
-            filename,
-            obs=rollout_trajs["ep_observations"],
-            acs=rollout_trajs["ep_actions"],
-            ep_lens=rollout_trajs["ep_lengths"],
-            ep_rets=rollout_trajs["ep_returns"],
-        )
+    # @staticmethod
+    # def save_traj_in_baselines_format(rollout_trajs, filename):
+    #     """Useful for GAIL and behavioral cloning"""
+    #     np.savez(
+    #         filename,
+    #         obs=rollout_trajs["ep_observations"],
+    #         acs=rollout_trajs["ep_actions"],
+    #         ep_lens=rollout_trajs["ep_lengths"],
+    #         ep_rets=rollout_trajs["ep_returns"],
+    #     )
     
     @staticmethod
     def save_traj_in_stable_baselines_format(rollout_trajs, filename):
@@ -195,38 +173,38 @@ class AgentEvaluator(object):
         stable_baselines_trajs_dict = { k:np.array(v) for k, v in stable_baselines_trajs_dict.items() }
         np.savez(filename, **stable_baselines_trajs_dict)
 
-    def save_action_traj_for_viz(self, trajectory, path):
-        """
-        Trajectory will be a list of state-action pairs (s_t, a_t, r_t).
-        NOTE: Used mainly to visualize trajectories in overcooked-js repo.
-        """
-        # Add trajectory to json
-        traj = []
+    # def save_action_traj_for_viz(self, trajectory, path):
+    #     """
+    #     Trajectory will be a list of state-action pairs (s_t, a_t, r_t).
+    #     NOTE: Used mainly to visualize trajectories in overcooked-js repo.
+    #     """
+    #     # Add trajectory to json
+    #     traj = []
 
-        # NOTE: Assumes only one trajectory
-        for a_t in trajectory['ep_actions'][0]:
-            a_modified = [a if a != Action.INTERACT else a.upper() for a in a_t]
-            if all([a is not None for a in a_t]):
-                traj.append(a_modified)
+    #     # NOTE: Assumes only one trajectory
+    #     for a_t in trajectory['ep_actions'][0]:
+    #         a_modified = [a if a != Action.INTERACT else a.upper() for a in a_t]
+    #         if all([a is not None for a in a_t]):
+    #             traj.append(a_modified)
 
-        json_traj = {}
-        json_traj["traj"] = traj
+    #     json_traj = {}
+    #     json_traj["traj"] = traj
 
-        # Add layout grid to json
-        mdp_grid = []
-        for row in self.mdp.terrain_mtx:
-            mdp_grid.append("".join(row))
+    #     # Add layout grid to json
+    #     mdp_grid = []
+    #     for row in self.mdp.terrain_mtx:
+    #         mdp_grid.append("".join(row))
 
-        for i, start_pos in enumerate(self.mdp.start_player_positions):
-            x, y = start_pos
-            row_string = mdp_grid[y]
-            new_row_string = row_string[:x] + str(i + 1) + row_string[x+1:]
-            mdp_grid[y] = new_row_string
+    #     for i, start_pos in enumerate(self.mdp.start_player_positions):
+    #         x, y = start_pos
+    #         row_string = mdp_grid[y]
+    #         new_row_string = row_string[:x] + str(i + 1) + row_string[x+1:]
+    #         mdp_grid[y] = new_row_string
 
-        json_traj["mdp_grid"] = mdp_grid
+    #     json_traj["mdp_grid"] = mdp_grid
 
-        with open(path + '.json', 'w') as filename:  
-            json.dump(json_traj, filename)
+    #     with open(path + '.json', 'w') as filename:  
+    #         json.dump(json_traj, filename)
 
     # Clean this if unnecessary
     # trajectory, time_taken = self.env.run_agents(agent_pair, display=display)
@@ -234,14 +212,17 @@ class AgentEvaluator(object):
     # return tot_rewards, time_taken, trajectory
 
     @staticmethod
-    def interactive_from_traj(trajs, traj_idx):
-        """Displays ith trajectory of trajs interactively in a Jupyter notebook"""
+    def interactive_from_traj(trajectories, traj_idx=0):
+        """
+        Displays ith trajectory of trajectories (in standard format) 
+        interactively in a Jupyter notebook.
+        """
         from ipywidgets import widgets, interactive_output
 
-        states = trajs["ep_observations"][traj_idx]
-        joint_actions = trajs["ep_actions"][traj_idx]
-        cumulative_rewards = cumulative_rewards_from_rew_list(trajs["ep_rewards"][traj_idx])
-        layout_name = trajs["layout_name"]
+        states = trajectories["ep_observations"][traj_idx]
+        joint_actions = trajectories["ep_actions"][traj_idx]
+        cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
+        layout_name = trajectories["layout_name"]
         env = AgentEvaluator(layout_name).env
 
         def update(t = 1.0):

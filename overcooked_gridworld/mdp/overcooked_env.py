@@ -1,8 +1,19 @@
 import gym
 import tqdm
 import numpy as np
+from overcooked_gridworld.utils import mean_and_std_err, rnd_int_uniform, rnd_uniform
 from overcooked_gridworld.mdp.actions import Action
 from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld
+from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
+
+
+DEFAULT_ENV_PARAMS = {
+    "horizon": 400,
+    "random_start_pos": False,
+    "random_start_objs_p": False
+}
+
+MAX_HORIZON = 10e10
 
 class OvercookedEnv(object):
     """An environment containing a single agent that can take actions.
@@ -11,38 +22,66 @@ class OvercookedEnv(object):
     it as the agent takes actions, and provides rewards to the agent.
     """
 
-    def __init__(self, mdp, start_state_fn=None, horizon=float('inf'), random_start_pos=False, random_start_objs_p=0.0):
+    def __init__(self, mdp, start_state_fn=None, horizon=MAX_HORIZON, random_start_pos=False, random_start_objs_p=0.0, debug=False):
         """
-        start_state_fn (OvercookedState): function that returns start state, called at each environment reset
+        # TODO
+        start_state_fn (OvercookedState): function that returns start state given an mdp, called at each environment reset
         horizon (float): number of steps before the environment returns True to .is_done()
         """
-        self.mdp = mdp
+        if isinstance(mdp, OvercookedGridworld):
+            self.mdp_generator_fn = lambda: mdp
+        elif callable(mdp) and isinstance(mdp(), OvercookedGridworld):
+            self.mdp_generator_fn = mdp
+        else:
+            raise ValueError("Mdp should be either OvercookedGridworld instance or a generating function")
+        
         self.horizon = horizon
+        self.start_state_fn = start_state_fn
         self.random_start_pos = random_start_pos
         self.random_start_objs_p = random_start_objs_p
-
-        if start_state_fn is None:
-            self.start_state_fn = lambda: self.mdp.get_start_state(
-                random_start_pos=random_start_pos, rnd_obj_prob_thresh=random_start_objs_p
-            )
-        else:
-            self.start_state_fn = start_state_fn
-
         self.reset()
 
-    @staticmethod
-    def from_config(env_config, start_state=None):
-        mdp = OvercookedGridworld(**env_config["mdp_config"])
-        return OvercookedEnv(
-            mdp,
-            start_state_fn=None,
-            horizon=env_config["env_horizon"],
-            random_start_pos=env_config["rnd_starting_position"],
-            random_start_objs_p=env_config["rnd_starting_objs"]
-        )
+    def get_start_state(self):
+        """Assumes self.mdp has already been set"""
+        if self.start_state_fn is not None:
+            return self.start_state_fn()
+        else:
+            return self.mdp.get_start_state(
+                random_start_pos=self.random_start_pos, 
+                rnd_obj_prob_thresh=self.random_start_objs_p
+            )    
+
+    # @staticmethod
+    # def from_mdp_params(env_config, start_state=None):
+    #     # TODO: decide what the standard is here
+    #     mdp = OvercookedGridworld(**env_config["mdp_params"])
+    #     return OvercookedEnv(
+    #         mdp,
+    #         start_state_fn=None,
+    #         horizon=env_config["horizon"],
+    #         random_start_pos=env_config["rnd_starting_pos"],
+    #         random_start_objs_p=env_config["rnd_starting_objs_p"]
+    #     )
 
     def __repr__(self):
         return self.mdp.state_string(self.state)
+
+    def print_state_transition(self, a_t, r_t, info):
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}".format(
+            self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["shaped_r"], self)
+        )
+
+    def display_states(self, *states):
+        old_state = self.state
+        for s in states:
+            self.state = s
+            print(self)
+        self.state = old_state
+
+    @staticmethod
+    def print_state(mdp, s):
+        e = OvercookedEnv(mdp, s)
+        print(e)
 
     def copy(self):
         return OvercookedEnv(
@@ -84,36 +123,39 @@ class OvercookedEnv(object):
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
-        self.state = self.start_state_fn()
+        self.mdp = self.mdp_generator_fn()
+        self.state = self.get_start_state()
         self.cumulative_sparse_rewards = 0
         self.cumulative_shaped_rewards = 0
         self.t = 0
+        assert not (self.horizon >= MAX_HORIZON and self.state.order_list is None), "Should not have no order list and infinite environment horizon (no terminal states)"
 
     def is_done(self):
         """Returns True if the episode is over and the agent cannot act."""
         return self.t >= self.horizon or self.mdp.is_terminal(self.state)
 
-    @staticmethod
-    def execute_plan(mdp, start_state, action_plan, display=False, horizon=np.Inf):
+    def execute_plan(self, start_state, action_plan, display=False):
         """Executes action_plan (a list of joint actions) from a start state in 
         the mdp and returns resulting state."""
-        env = OvercookedEnv(mdp, lambda: start_state, horizon=horizon)
-        env.state = start_state
-        if display: print("Starting state\n{}".format(env))
+        self.state = start_state
+        done = False
+        if display: print("Starting state\n{}".format(self))
         for a in action_plan:
-            env.step(a)
-            if display: print(env)
-            if env.is_done():
-                break
-        successor_state = env.state
-        return successor_state, env.is_done()
+            self.step(a)
+            done = self.is_done()
+            if display: print(self)
+            if done: break
+        successor_state = self.state
+        self.reset()
+        return successor_state, done
 
-    def run_agents(self, agent_pair, display=False, displayEnd=False, final_state=False, joint_actions=False, displayUntil=np.Inf):
+    def run_agents(self, agent_pair, include_final_state=False, display=False, display_until=np.Inf):
         """
         Trajectory returned will a list of state-action pairs (s_t, a_t, r_t, d_t), in which
         the last element will be the last state visited and a None joint action.
         Therefore, there will be t + 1 tuples in the trajectory list.
         """
+        assert self.cumulative_sparse_rewards == self.cumulative_shaped_rewards == 0, "Did not reset environment before running agents"
         trajectory = []
         done = False
 
@@ -129,28 +171,25 @@ class OvercookedEnv(object):
             s_tp1, r_t, done, info = self.step(a_t)
             trajectory.append((s_t, a_t, r_t, done))
 
-            if display or (done and displayEnd):
-                # Cutting amount to display
-                if self.t < displayUntil:
-                    print("Timestep: {}\nJoint action: {} \t Reward: {} + shape * {} \n{}".format(self.t, a_t, r_t, info["dense_r"], self))
+            if display and self.t < display_until:
+                self.print_state_transition(a_t, r_t, info)
+
+        assert len(trajectory) == self.t, "{} vs {}".format(len(trajectory), self.t)
 
         # Add final state
-        # TODO: Clean up
-        if final_state:
+        if include_final_state:
             trajectory.append((s_tp1, (None, None), 0, True))
-            assert len(trajectory) == self.t + 1, "{} vs {}".format(len(trajectory), self.t)
-        else:
-            assert len(trajectory) == self.t, "{} vs {}".format(len(trajectory), self.t)
-        
-        time_taken, tot_sparse_rewards, tot_shaped_rewards = self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
 
-        # Reset environment
+        # Store useful variables before reset
+        t, cumul_sparse_r, cumul_shaped_r = self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
+
+        # Reset environment and agents
         self.reset()
         agent_pair.reset()
         trajectory = np.array(trajectory)
-        return trajectory, time_taken, tot_sparse_rewards, tot_shaped_rewards
+        return trajectory, t, cumul_sparse_r, cumul_shaped_r
 
-    def get_rollouts(self, agent_pair, num_games, display=False, displayEnd=False, processed=False, final_state=False, agent_idx=0, reward_shaping=0.0):
+    def get_rollouts(self, agent_pair, num_games, display=False, processed=False, final_state=False, agent_idx=0, reward_shaping=0.0):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -174,18 +213,22 @@ class OvercookedEnv(object):
             "ep_lengths": [], # Lengths of each episode
             
             # With shape (1, ):
-            # "layout_name", included at the end
+            # "layout_name": Name of the layout, added after array pre-processing
         }
 
         for _ in tqdm.trange(num_games):
             agent_pair.set_mdp(self.mdp)
 
-            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, displayEnd=displayEnd, final_state=final_state)
+            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state)
 
             obs, actions, rews, dones = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3]
+
+            # TODO: Remove this?
             if processed:
+                print("WE ACTUALLY USE THIS")
                 # NOTE: only actions and observations for agent `agent_idx`
-                obs = np.array([self.mdp.preprocess_observation(state)[agent_idx] for state in obs])
+                # NOTE: In variable MDP envs this self.mdp call is stale as the mdp will have been reset in run_agents
+                obs = np.array([self.mdp.lossless_state_encoding(state)[agent_idx] for state in obs])
                 actions = np.array([np.array([Action.ACTION_TO_INDEX[joint_action[agent_idx]]]) for joint_action in actions]).astype(int)
 
             trajectories["ep_observations"].append(obs)
@@ -196,47 +239,17 @@ class OvercookedEnv(object):
             trajectories["ep_returns_sparse"].append(tot_rews_sparse)
             trajectories["ep_lengths"].append(time_taken)
 
-        print("Avg reward {} (std: {}) over {} games of avg length {}".format(
-            np.mean(trajectories["ep_returns"]), np.std(trajectories["ep_returns"]), num_games, np.mean(trajectories["ep_lengths"])))
+        mu, se = mean_and_std_err(trajectories["ep_returns"])
+        print("Avg reward {:.2f} (std: {:.2f}, se: {:.2f}) over {} games of avg length {}".format(
+            mu, np.std(trajectories["ep_returns"]), se, num_games, np.mean(trajectories["ep_lengths"]))
+        )
 
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
+        # NOTE: In variable MDP envs this will not work
         trajectories['layout_name'] = self.mdp.layout_name
         return trajectories
 
-    def display_states(self, *states):
-        old_state = self.state
-
-        for s in states:
-            self.state = s
-            print(self)
-        
-        self.state = old_state
-
-    @staticmethod
-    def print_state(mdp, s):
-        e = OvercookedEnv(mdp, s)
-        print(e)
-
-class VariableOvercookedEnv(OvercookedEnv):
-    """Wrapper for Env class which changes mdp at each reset from a mdp_generator function"""
-
-    def __init__(self, mdp_generator_fn, horizon=float('inf')):
-        """
-        start_state (OvercookedState): what the environemt resets to when calling reset
-        horizon (float): number of steps before the environment returns True to .is_done()
-        """
-        self.mdp_generator_fn = mdp_generator_fn
-        self.horizon = horizon
-        self.reset()
-
-    def reset(self):
-        self.mdp = self.mdp_generator_fn()
-        self.start_state = self.mdp.get_start_state()
-        self.state = self.start_state
-        self.cumulative_rewards = 0
-        self.cumulative_shaped_rewards = 0
-        self.t = 0
 
 class Overcooked(gym.Env):
     """Wrapper for the Env class above that is compatible with gym API
@@ -245,37 +258,26 @@ class Overcooked(gym.Env):
     to be standard input for the main agent policy. The index of the main agent in the mdp 
     is randomized at each reset of the environment, and is kept track of by the self.agent_idx
     attribute.
-    
-    One can use the switch_player function to change the observation to be in standard 
-    format for the secondary agent policy.
     """
 
-    def custom_init(self, base_env, joint_actions=False, featurize_fn=None):
+    def custom_init(self, base_env, featurize_fn):
         """
+        # TODO: documentation
         base_env_fn: a function that when called will return a initialized version of the
                      Env class. Can be called again to reset the environment.
         """
         self.base_env = base_env
-        self.joint_actions = joint_actions
-
-        dummy_state = self.base_env.mdp.get_start_state()
-
-        if featurize_fn is None:
-            self.featurize_fn = self.base_env.mdp.preprocess_observation
-            obs_shape = self.base_env.mdp.preprocess_observation(dummy_state)[0].shape
-            high = np.ones(obs_shape) * 5
-        else:
-            self.featurize_fn = featurize_fn
-            obs_shape = featurize_fn(dummy_state)[0].shape
-            high = np.ones(obs_shape) * 10 # NOTE: arbitrary right now
-
-        self.observation_space = gym.spaces.Box(high * 0, high, dtype=np.float32)
-
-        if self.joint_actions:
-            self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS)**2)
-        else:
-            self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
+        self.mdp = base_env.mdp
+        self.featurize_fn = featurize_fn
+        self.observation_space = self._setup_observation_space()
+        self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.reset()
+
+    def _setup_observation_space(self):
+        dummy_state = self.mdp.get_start_state()
+        obs_shape = self.featurize_fn(dummy_state)[0].shape
+        high = np.ones(obs_shape) * max(self.mdp.soup_cooking_time, self.mdp.num_items_for_soup, 5)
+        return gym.spaces.Box(high * 0, high, dtype=np.float32)
 
     def step(self, action):
         """
@@ -286,10 +288,7 @@ class Overcooked(gym.Env):
         returns:
             observation: formatted to be standard input for self.agent_idx's policy
         """
-        if self.joint_actions:
-            action = Action.INDEX_TO_ACTION_INDEX_PAIRS[action]
-        else:
-            assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
+        assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
         agent_action, other_agent_action = [Action.INDEX_TO_ACTION[a] for a in action]
 
         if self.agent_idx == 0:
@@ -304,6 +303,7 @@ class Overcooked(gym.Env):
         else:
             both_agents_ob = (ob_p1, ob_p0)
         return (both_agents_ob, (next_state, 1 - self.agent_idx)), reward, done, info
+        # TODO: maybe extra data to info
 
     def reset(self):
         """

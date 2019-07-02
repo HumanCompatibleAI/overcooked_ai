@@ -4,27 +4,23 @@ import unittest
 import numpy as np
 
 from overcooked_gridworld.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, StayAgent, RandomAgent, GreedyHumanModel
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState, Direction, Action
+from overcooked_gridworld.mdp.actions import Direction, Action
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 from overcooked_gridworld.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
-from overcooked_gridworld.utils import save_as_json
 from overcooked_gridworld.agents.benchmarking import AgentEvaluator
 
 np.random.seed(41)
 
 n, s = Direction.NORTH, Direction.SOUTH
 e, w = Direction.EAST, Direction.WEST
-stay, interact = Direction.STAY, Action.INTERACT
+stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
 
 force_compute_large = False
 force_compute = True
 DISPLAY = True
-am_filename = "corridor_am.pkl"
-start_order_list = ["any"]
-explosion_time = 500
-r_shaping = 0
-large_mdp = OvercookedGridworld.from_file("corridor", start_order_list, explosion_time, rew_shaping_params=None)
+large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
 
 class TestAgents(unittest.TestCase):
 
@@ -32,14 +28,14 @@ class TestAgents(unittest.TestCase):
         a0 = FixedPlanAgent([s, e, n, w])
         a1 = FixedPlanAgent([s, w, n, e])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp, start_state=large_mdp.get_start_state())
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(large_mdp)
+        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(time_taken, 4)
         self.assertEqual(env.mdp.get_start_state().player_positions, end_state.player_positions)
 
     def test_two_coupled_agents(self):
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(am_filename, large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
+        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
         a0 = CoupledPlanningAgent(mlp_large)
         a1 = CoupledPlanningAgent(mlp_large)
         agent_pair = AgentPair(a0, a1)
@@ -47,25 +43,25 @@ class TestAgents(unittest.TestCase):
             [P((2, 2), n),
              P((2, 1), n)],
             {}, order_list=['any'])
-        env = OvercookedEnv(large_mdp, start_state=start_state)
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(large_mdp, start_state_fn=lambda: start_state)
+        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(end_state.order_list, [])
     
     def test_one_coupled_one_fixed(self):
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(am_filename, large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
+        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
         a0 = CoupledPlanningAgent(mlp_large)
         a1 = FixedPlanAgent([s, e, n, w])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp, start_state=large_mdp.get_start_state())
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(large_mdp)
+        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         self.assertEqual(time_taken, 4)
 
     def test_one_coupled_one_greedy_human(self):
         # Even though in the first ~10 timesteps it seems like agent 1 is wasting time
         # it turns out that this is actually not suboptimal as the true bottleneck is 
         # going to be agent 0 later on (when it goes to get the 3rd onion)
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(am_filename, large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
+        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
         a0 = GreedyHumanModel(mlp_large)
         a1 = CoupledPlanningAgent(mlp_large)
         agent_pair = AgentPair(a0, a1)
@@ -73,14 +69,14 @@ class TestAgents(unittest.TestCase):
             [P((2, 1), s),
              P((1, 1), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(large_mdp, start_state=start_state)
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(large_mdp, start_state_fn=lambda: start_state)
+        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(end_state.order_list, [])
 
     def test_two_greedy_human_open_map(self):
-        scenario_2_mdp = OvercookedGridworld.from_file("scenario2", start_order_list=start_order_list, explosion_time=10, rew_shaping_params=None)
-        mlp = MediumLevelPlanner.from_pickle_or_compute("scenario2_am.pkl", scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)        
+        scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2', start_order_list=['any'], cook_time=5)
+        mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)        
         a0 = GreedyHumanModel(mlp)
         a1 = GreedyHumanModel(mlp)
         agent_pair = AgentPair(a0, a1)
@@ -88,11 +84,10 @@ class TestAgents(unittest.TestCase):
             [P((8, 1), s),
              P((1, 1), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_2_mdp, start_state=start_state, horizon=100)
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
+        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
-        self.assertEqual(len(end_state.order_list), 1)
-        self.assertTrue(end_state.pot_explosion)
+        self.assertEqual(len(end_state.order_list), 0)
 
 # TODO: could reformat all of these tests, but currently probably not worth the time
 class TestScenarios(unittest.TestCase):
@@ -135,9 +130,8 @@ class TestScenarios(unittest.TestCase):
         # for R to pass. H however, starts going through the tunnel
         # and they get stuck. The H plan is a bit extreme (it would probably
         # realize that it should retrace it's steps at some point)
-
-        scenario_1_mdp = OvercookedGridworld.from_file("small_corridor", start_order_list, explosion_time, rew_shaping_params=None)
-        mlp = MediumLevelPlanner.from_pickle_or_compute("scenario1_am.pkl", scenario_1_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
+        scenario_1_mdp = OvercookedGridworld.from_layout_name('small_corridor', start_order_list=['any'], cook_time=5)
+        mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_1_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
         a0 = GreedyHumanModel(mlp)
         a1 = CoupledPlanningAgent(mlp)
         agent_pair = AgentPair(a0, a1)
@@ -145,15 +139,14 @@ class TestScenarios(unittest.TestCase):
             [P((2, 1), s, Obj('onion', (2, 1))),
              P((10, 2), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_1_mdp, start_state=start_state)
-        env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(scenario_1_mdp, start_state_fn=lambda: start_state)
+        env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
     def test_scenario_1_s(self):
         # ≈ Scenario 1 on the Google Doc
         #
-
-        scenario_1_mdp = OvercookedGridworld.from_file("scenario1_s", start_order_list, explosion_time, rew_shaping_params=None)
-        mlp = MediumLevelPlanner.from_pickle_or_compute("scenario1_s_am.pkl", scenario_1_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
+        scenario_1_mdp = OvercookedGridworld.from_layout_name('scenario1_s', start_order_list=['any'], cook_time=5)
+        mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_1_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
         a0 = GreedyHumanModel(mlp)
         a1 = CoupledPlanningAgent(mlp)
         agent_pair = AgentPair(a0, a1)
@@ -161,8 +154,8 @@ class TestScenarios(unittest.TestCase):
             [P((2, 1), s, Obj('onion', (2, 1))),
              P((4, 2), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_1_mdp, start_state=start_state)
-        trajectory, time_taken_hr, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        env = OvercookedEnv(scenario_1_mdp, start_state_fn=lambda: start_state)
+        trajectory, time_taken_hr, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
         print("\n"*5)
         print("-"*50)
@@ -171,7 +164,7 @@ class TestScenarios(unittest.TestCase):
         a1 = CoupledPlanningAgent(mlp)
         agent_pair = AgentPair(a0, a1)
         env.reset()
-        trajectory, time_taken_rr, _, _ = env.run_agents(agent_pair, final_state=True, display=DISPLAY)
+        trajectory, time_taken_rr, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
         print("H+R time taken: ", time_taken_hr)
         print("R+R time taken: ", time_taken_rr)
@@ -200,8 +193,9 @@ class TestScenarios(unittest.TestCase):
             {(6, 3): Obj('soup', (6, 3), ('onion', 2, 0))},
             order_list=['onion'])
 
-        eva = AgentEvaluator(layout_name="scenario2", start_state=start_state)
-        eva.mdp.COOK_TIME = 5
+        mdp_params = {"layout_name": "scenario2", "cook_time": 5}
+        env_params = {"start_state_fn": lambda: start_state}
+        eva = AgentEvaluator(mdp_params, env_params)
         self.compare_times(eva)
 
     def test_scenario_3(self):
@@ -222,13 +216,11 @@ class TestScenarios(unittest.TestCase):
         # assumes H will go and get the dish. Once H has picked up the onion,
         # R realizes that it should go and get the dish itself. This leads to
         # less time wasted compared to the R-R case
-
-        eva = AgentEvaluator(layout_name="scenario3")
-        eva.mdp.COOK_TIME = 5
-        start_state = eva.mdp.get_start_state()
+        mdp_params = {"layout_name": "scenario3", "cook_time": 5}
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        start_state = mdp.get_start_state()
         start_state.objects = {(8, 1): Obj('soup', (8, 1), ('onion', 2, 0))}
         start_state.order_list = ['onion']
-        eva.start_state = start_state
 
         valid_counters = [(5, 3)]
         one_counter_params = {
@@ -239,8 +231,9 @@ class TestScenarios(unittest.TestCase):
             'counter_pickup': [],
             'same_motion_goals': True
         }
-        mlp = MediumLevelPlanner.from_pickle_or_compute("scenario3_am.pkl", eva.mdp, one_counter_params, force_compute=force_compute)
-        eva.lazy_mlp = mlp
+
+        env_params = {"start_state_fn": lambda: start_state, "horizon": 1000}
+        eva = AgentEvaluator(mdp_params, env_params, mlp_params=one_counter_params)
 
         self.compare_times(eva)
 
@@ -260,12 +253,15 @@ class TestScenarios(unittest.TestCase):
         # Similar to scenario 3, just keeping for reference for now. 
         # In this case we only have human suboptimality, and R
         # assuming H optimality does not end up to be a problem
-        eva = AgentEvaluator(layout_name="scenario4", force_compute=force_compute)
-        eva.mdp.COOK_TIME = 5
-        start_state = eva.mdp.get_start_state()
+        mdp_params = {"layout_name": "scenario4", "cook_time": 5}
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        
+        start_state = mdp.get_start_state()
         start_state.objects = {(8, 1): Obj('soup', (8, 1), ('onion', 2, 5))}
         start_state.order_list = ['onion']
-        eva.start_state = start_state
+
+        env_params = {"start_state_fn": lambda: start_state, "horizon": 1000}
+        eva = AgentEvaluator(mdp_params, env_params, force_compute=force_compute)
         self.compare_times(eva)
 
     # def test_schelling(self): # TODO: we already have schelling_s
@@ -294,8 +290,8 @@ class TestScenarios(unittest.TestCase):
     def test_schelling_s(self):
         # Schelling failure scenario
         #
-        eva = AgentEvaluator(layout_name="schelling_s", order_goal=["any", "any"], force_compute=force_compute)
-        start_state = eva.mdp.get_start_state()
+        eva = AgentEvaluator({"layout_name": "schelling_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
+        start_state = eva.env.mdp.get_start_state()
         start_state.objects = {(2, 0): Obj('soup', (2, 0), ('onion', 2, 5)),
                                (2, 4): Obj('soup', (2, 4), ('onion', 2, 5))}
         eva.start_state = start_state
@@ -325,8 +321,8 @@ class TestScenarios(unittest.TestCase):
         # going for the onion, wasting quite a lot of time.
 
         # TODO: fix this?
-        eva = AgentEvaluator(layout_name="unident", order_goal=["any", "any"], force_compute=force_compute)
-        start_state = eva.mdp.get_start_state()
+        eva = AgentEvaluator({"layout_name": "unident", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
+        start_state = eva.env.mdp.get_start_state()
         start_state.objects = {(5, 2): Obj('soup', (5, 2), ('onion', 2, 0)),
                                (5, 3): Obj('soup', (5, 3), ('onion', 3, 5))}
         eva.start_state = start_state
@@ -337,8 +333,8 @@ class TestScenarios(unittest.TestCase):
         #
 
         # TODO: fix this?
-        eva = AgentEvaluator(layout_name="unident_s", order_goal=["any", "any"], force_compute=force_compute)
-        start_state = eva.mdp.get_start_state()
+        eva = AgentEvaluator({"layout_name": "unident_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
+        start_state = eva.env.mdp.get_start_state()
         start_state.objects = {(4, 2): Obj('soup', (4, 2), ('onion', 2, 0)),
                                (4, 3): Obj('soup', (4, 3), ('onion', 3, 5))}
         eva.start_state = start_state

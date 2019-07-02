@@ -609,7 +609,7 @@ class JointMotionPlanner(object):
         finishing_times = tuple(len(plan) for plan in action_plans)
         trimmed_action_plans = self._fix_plan_lengths(action_plans)
         joint_action_plan = list(zip(*trimmed_action_plans))
-        end_pos_and_orientations = self._rollout_end_pos_and_or(joint_action_plan, joint_start_state)
+        end_pos_and_orientations = self._rollout_end_pos_and_or(joint_start_state, joint_action_plan)
         return joint_action_plan, end_pos_and_orientations, finishing_times
 
     def _fix_plan_lengths(self, plans):
@@ -623,14 +623,15 @@ class JointMotionPlanner(object):
             long_plan = long_plan[:min(finishing_times)]
         return plans
 
-    def _rollout_end_pos_and_or(self, joint_action_plan, joint_start_state):
+    def _rollout_end_pos_and_or(self, joint_start_state, joint_action_plan):
         """Execute plan in environment to determine ending positions and orientations"""
         # Assumes that final pos and orientations only depend on initial ones
         # (not on objects and other aspects of state).
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
         dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, order_list=['any', 'any'])
-        successor_state, is_done = OvercookedEnv.execute_plan(self.mdp, dummy_state, joint_action_plan)
+        env = OvercookedEnv(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
+        successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
         return successor_state.players_pos_and_or
 
@@ -894,10 +895,10 @@ class MediumLevelPlanner(object):
     A* search problem.
     """
 
-    def __init__(self, mdp, params, ml_action_manager=None):
+    def __init__(self, mdp, mlp_params, ml_action_manager=None):
         self.mdp = mdp
-        self.params = params
-        self.ml_action_manager = ml_action_manager if ml_action_manager else MediumLevelActionManager(mdp, params)
+        self.params = mlp_params
+        self.ml_action_manager = ml_action_manager if ml_action_manager else MediumLevelActionManager(mdp, mlp_params)
         self.jmp = self.ml_action_manager.joint_motion_planner
         self.mp = self.jmp.motion_planner
 
@@ -909,14 +910,17 @@ class MediumLevelPlanner(object):
             params = mlp_action_manager.params
             return MediumLevelPlanner(mdp, params, mlp_action_manager)
     
-    @staticmethod
-    def from_params(mdp_params, mlp_params, force_compute=False):
-        layout_name = mdp_params["LAYOUT_NAME"]
-        mdp = OvercookedGridworld(**mdp_params)
-        return MediumLevelPlanner.from_pickle_or_compute(layout_name + "_am.pkl", mdp, mlp_params, force_compute)
+    # @staticmethod
+    # def from_params(mdp_params, mlp_params, force_compute=False):
+    #     mdp = OvercookedGridworld(**mdp_params)
+    #     return MediumLevelPlanner.from_pickle_or_compute(mdp.layout_name + "_am.pkl", mdp, mlp_params, force_compute)
 
     @staticmethod
-    def from_pickle_or_compute(filename, mdp, mlp_params, force_compute=False):
+    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False):
+        assert isinstance(mdp, OvercookedGridworld)
+
+        filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
+
         if force_compute:
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
         
@@ -937,7 +941,7 @@ class MediumLevelPlanner(object):
     def compute_mlp(filename, mdp, mlp_params):
         print("Computing MediumLevelPlanner to be saved in {}".format(PLANNERS_DIR + filename))
         start_time = time.time()
-        mlp = MediumLevelPlanner(mdp, params=mlp_params)
+        mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
         print("It took {} seconds to create mlp".format(time.time() - start_time))
         mlp.ml_action_manager.save_to_file(PLANNERS_DIR + filename)
         return mlp

@@ -2,6 +2,7 @@ import itertools
 import numpy as np
 from collections import defaultdict
 from overcooked_gridworld.utils import pos_distance, load_dict_from_file
+from overcooked_gridworld.data.layouts import read_layout_dict
 from overcooked_gridworld.mdp.actions import Action, Direction
 
 
@@ -317,14 +318,14 @@ class OvercookedGridworld(object):
                 self.layout_name == other.layout_name
 
     @staticmethod
-    def from_layout_name(layout_name, params_to_overwrite={}):
+    def from_layout_name(layout_name, **params_to_overwrite):
         """
         Generates a OvercookedGridworld instance from a layout file.
 
         One can overwrite the default mdp configuration using partial_mdp_config.
         """
         params_to_overwrite = params_to_overwrite.copy()
-        base_layout_params = load_dict_from_file(LAYOUTS_DIR + layout_name + '.layout')
+        base_layout_params = read_layout_dict(layout_name)
 
         grid = base_layout_params['grid']
         del base_layout_params['grid']
@@ -427,6 +428,8 @@ class OvercookedGridworld(object):
 
     def is_terminal(self, state):
         # There is a finite horizon, handled by the environment.
+        if state.order_list is None:
+            return False
         return len(state.order_list) == 0
 
     def get_valid_player_positions(self):
@@ -438,7 +441,7 @@ class OvercookedGridworld(object):
         all_joint_positions = itertools.product(valid_positions, valid_positions)
         valid_joint = [(pos0, pos1) for pos0, pos1 in all_joint_positions if pos0 != pos1]
         return valid_joint
-                
+
     def get_valid_player_positions_and_orientations(self):
         valid_states = []
         for pos in self.get_valid_player_positions():
@@ -455,7 +458,7 @@ class OvercookedGridworld(object):
             p0_pos, p1_pos = pos_and_or_0[0], pos_and_or_1[0]
             if p0_pos != p1_pos:
                 valid_joint_player_states.append((pos_and_or_0, pos_and_or_1))
-        
+
         return valid_joint_player_states
 
     def get_adjacent_features(self, player):
@@ -644,25 +647,38 @@ class OvercookedGridworld(object):
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':
-                    soup_type, num_items, cook_time = obj.state
-                    assert soup_type in ObjectState.SOUP_TYPES
-                    assert num_items == self.num_items_for_soup
-                    assert cook_time >= self.soup_cooking_time, "Cook time {} mdp cook time {}".format(cook_time, self.soup_cooking_time)
-                    player.remove_object()
 
-                    # If the delivered soup is the one currently required
-                    assert len(new_state.order_list) != 0
-
-                    current_order = new_state.order_list[0]
-                    if current_order == 'any' or soup_type == current_order:
-                        new_state.order_list = new_state.order_list[1:]
-                        sparse_reward += self.delivery_reward
+                    new_state, delivery_rew = self.deliver_soup(new_state, player, obj)
+                    sparse_reward += delivery_rew                        
 
                     # If last soup necessary was delivered, stop resolving interacts
-                    if len(new_state.order_list) == 0:
+                    if new_state.order_list is not None and len(new_state.order_list) == 0:
                         break
 
         return sparse_reward, shaped_reward
+
+    def deliver_soup(self, state, player, soup_obj):
+        """
+        Deliver the soup, and get reward if there is no order list
+        or if the type of the delivered soup matches the next order.
+        """
+        soup_type, num_items, cook_time = soup_obj.state
+        assert soup_type in ObjectState.SOUP_TYPES
+        assert num_items == self.num_items_for_soup
+        assert cook_time >= self.soup_cooking_time, "Cook time {} mdp cook time {}".format(cook_time, self.soup_cooking_time)
+        player.remove_object()
+
+        if state.order_list is None:
+            return state, self.delivery_reward
+    
+        # If the delivered soup is the one currently required
+        assert not self.is_terminal(state)
+        current_order = state.order_list[0]
+        if current_order == 'any' or soup_type == current_order:
+            state.order_list = state.order_list[1:]
+            return state, self.delivery_reward
+        
+        return state, 0
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
@@ -862,6 +878,15 @@ class OvercookedGridworld(object):
     ###################
 
     # TODO: Clean encodings more?
+
+    # def preprocess_observation(self, overcooked_state, debug=False):
+    #     if hasattr(self, 'gave_deprecated_warning'):
+    #         pass
+    #     else:
+    #         print("USING DEPRECATED METHOD CALL preprocess_observation")
+    #         self.gave_deprecated_warning = True
+        
+    #     return self.lossless_state_encoding(overcooked_state, debug)
 
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
@@ -1110,4 +1135,3 @@ class OvercookedGridworld(object):
                     distance_based_shaped_reward += self.reward_shaping_params["SOUP_DISTANCE_REW"] * (1 - min(min_dist_to_s_new / max_dist, 1))
 
         return distance_based_shaped_reward
-

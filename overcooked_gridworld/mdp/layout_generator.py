@@ -1,6 +1,8 @@
 import time
 import numpy as np
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, Direction
+from overcooked_gridworld.utils import rnd_int_uniform, rnd_uniform
+from overcooked_gridworld.mdp.actions import Action, Direction
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld
 
 EMPTY = ' '
 COUNTER = 'X'
@@ -58,8 +60,8 @@ class Grid(object):
     def get_near_locations(self, location):
         """Get neighbouring locations to the passed in location"""
         near_locations = []
-        for d in Direction.CARDINAL:
-            new_location = Direction.move_in_direction(location, d)
+        for d in Direction.ALL_DIRECTIONS:
+            new_location = Action.move_in_direction(location, d)
             if self.is_in_bounds(new_location):
                 near_locations.append(new_location)                
         return near_locations
@@ -144,11 +146,42 @@ class Grid(object):
 
 class LayoutGenerator(object):
 
-    def __init__(self, outer_shape, start_order_list, explosion_time, rew_shaping_params):
+    def __init__(self, outer_shape, mdp_params):
         self.outer_shape = np.array(outer_shape)
-        self.start_order_list = start_order_list
-        self.explosion_time = explosion_time
-        self.rew_shaping_params = rew_shaping_params
+        self.mdp_params = mdp_params
+
+    @staticmethod
+    def mdp_gen_fn_from_dict(mdp_params={}, mdp_choices=None, size_bounds=((4, 7), (4, 7)), 
+                                prop_empty=(0.6, 0.8), prop_feats=(0.1, 0.2), display=False):
+
+        if mdp_choices is not None:
+            assert type(mdp_choices) is list
+            
+            # If list of MDPs, randomly choose one at each reset
+            mdp_sizes = []
+            for mdp_name in mdp_choices:
+                mdp = OvercookedGridworld.from_layout_name(mdp_name, **mdp_params)
+                mdp_sizes.append([mdp.width, mdp.height])
+            widths, heights = np.array(mdp_sizes).T
+            min_padding = max(widths), max(heights)            
+            
+            def mdp_generator_fn():
+                chosen_mdp = np.random.choice(mdp_choices)
+                mdp = OvercookedGridworld.from_layout_name(chosen_mdp, **mdp_params)
+                lg = LayoutGenerator(min_padding, mdp_params)
+                mdp_padded = lg.padded_mdp(mdp)
+                return mdp_padded
+        else:
+            min_padding = (size_bounds[0][1], size_bounds[1][1])
+            layout_generator = LayoutGenerator(min_padding, mdp_params)
+            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
+                inner_shape=[rnd_int_uniform(*dim) for dim in size_bounds],
+                prop_empty=rnd_uniform(*prop_empty),
+                prop_features=rnd_uniform(*prop_feats),
+                display=display
+            )
+        
+        return mdp_generator_fn
 
     def padded_mdp(self, mdp, display=False):
         """Returns a padded MDP from an MDP"""
@@ -168,7 +201,8 @@ class LayoutGenerator(object):
             x, y = pos
             mdp_grid[y][x] = str(i + 1)
         
-        return OvercookedGridworld.from_grid(mdp_grid, self.start_order_list, self.explosion_time, self.rew_shaping_params)
+        # TODO: !!!
+        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
 
     def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True):        
         grid = Grid(inner_shape)
@@ -189,7 +223,8 @@ class LayoutGenerator(object):
             x, y = pos
             mdp_grid[y][x] = str(i + 1)
 
-        return OvercookedGridworld.from_grid(mdp_grid, self.start_order_list, self.explosion_time, self.rew_shaping_params)
+        # TODO: !!!
+        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
 
     def embed_grid(self, grid):
         """Randomly embeds a smaller grid in a grid of size self.outer_shape"""

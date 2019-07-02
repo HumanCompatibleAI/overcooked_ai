@@ -4,7 +4,7 @@ from overcooked_gridworld.mdp.actions import Direction, Action
 from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 
-force_compute = False
+force_compute = True
 force_compute_large = False
 
 n, s = Direction.NORTH, Direction.SOUTH
@@ -14,7 +14,7 @@ P, Obj = PlayerState, ObjectState
 
 
 # Simple MDP Setup
-simple_mdp = OvercookedGridworld.from_layout_name('simple_tomato', {'start_order_list': ['any'], 'cook_time': 20})
+simple_mdp = OvercookedGridworld.from_layout_name('simple_tomato', start_order_list=['any'], cook_time=5)
 
 base_params = {
     'start_orientations': False,
@@ -23,10 +23,10 @@ base_params = {
     'counter_drop': simple_mdp.terrain_pos_dict['X'][1:2],
     'counter_pickup': [],
     'same_motion_goals': True
-} 
+}
 action_manger_filename = "simple_1_am.pkl"
 ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
-    action_manger_filename, simple_mdp, mlp_params=base_params, force_compute=force_compute)
+    simple_mdp, mlp_params=base_params, custom_filename=action_manger_filename, force_compute=force_compute)
 ml_planner_simple.env = OvercookedEnv(simple_mdp)
 
 base_params_start_or = {
@@ -39,11 +39,11 @@ base_params_start_or = {
 }
 action_manger_filename = "simple_2_am.pkl"
 or_ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
-    action_manger_filename, simple_mdp, mlp_params=base_params_start_or, force_compute=force_compute)
+    simple_mdp, mlp_params=base_params_start_or, custom_filename=action_manger_filename, force_compute=force_compute)
 
 
 # Large MDP Setup
-large_mdp = OvercookedGridworld.from_layout_name('corridor', {'start_order_list': ['any'], 'cook_time': 20})
+large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
 
 no_counters_params = {
     'start_orientations': False,
@@ -55,7 +55,7 @@ no_counters_params = {
 }
 action_manger_filename = "corridor_no_shared_motion_goals_am.pkl"
 ml_planner_large_no_shared = MediumLevelPlanner.from_pickle_or_compute(
-    action_manger_filename, large_mdp, no_counters_params, force_compute=force_compute_large)
+    large_mdp, no_counters_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
 
 same_goals_params = {
     'start_orientations': False,
@@ -67,7 +67,7 @@ same_goals_params = {
 }
 action_manger_filename = "corridor_am.pkl"
 ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
-    action_manger_filename, large_mdp, same_goals_params, force_compute=force_compute_large)
+    large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
 
 hlam = HighLevelActionManager(ml_planner_large)
 hlp = HighLevelPlanner(hlam)
@@ -148,7 +148,8 @@ class TestMotionPlanner(unittest.TestCase):
         self.assertEqual(plan_cost, graph_plan_cost)
 
         joint_action_plan = [(a, stay) for a in action_plan]
-        resulting_state, _ = OvercookedEnv.execute_plan(motion_planner.mdp, start_state, joint_action_plan)
+        env = OvercookedEnv(motion_planner.mdp, horizon=1000)
+        resulting_state, _ = env.execute_plan(start_state, joint_action_plan)
         self.assertEqual(resulting_state.players_pos_and_or[0], goal_pos_and_or)
 
         if expected_length is not None: 
@@ -306,7 +307,8 @@ class TestJointMotionPlanner(unittest.TestCase):
         if debug: print("Start state: {}, Goal state: {}, Action plan: {}".format(start, goal, action_plan))
 
         start_state = OvercookedState([P(*start[0]), P(*start[1])], {}, order_list=['any', 'any'])
-        resulting_state, _ = OvercookedEnv.execute_plan(joint_motion_planner.mdp, start_state, action_plan, display=display)
+        env = OvercookedEnv(joint_motion_planner.mdp, horizon=1000)
+        resulting_state, _ = env.execute_plan(start_state, action_plan, display=display)
 
         self.assertTrue(any([agent_goal in resulting_state.players_pos_and_or for agent_goal in goal]))
         self.assertEqual(resulting_state.players_pos_and_or, end_pos_and_orients)
@@ -422,7 +424,8 @@ class TestMediumLevelPlanner(unittest.TestCase):
     def check_full_plan(self, start_state, planner, debug=False):
         heuristic = Heuristic(planner.mp)
         joint_action_plan = planner.get_low_level_action_plan(start_state, heuristic.simple_heuristic, debug=debug, goal_info=debug)
-        resulting_state, _ = OvercookedEnv.execute_plan(planner.mdp, start_state, joint_action_plan, display=False)
+        env = OvercookedEnv(planner.mdp, horizon=1000)
+        resulting_state, _ = env.execute_plan(start_state, joint_action_plan, display=False)
         self.assertEqual(len(resulting_state.order_list), 0)
         
 

@@ -1,8 +1,10 @@
 import unittest
+import numpy as np
 
 from overcooked_gridworld.mdp.actions import Action, Direction
 from overcooked_gridworld.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
+from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
+from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
 
 START_ORDER_LIST = ["any"]
 
@@ -27,8 +29,8 @@ class TestDirection(unittest.TestCase):
 class TestGridworld(unittest.TestCase):
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name(
-            "mdp_test", 
-            {'cook_time': 5, 'start_order_list': ['onion', 'any']}
+            "mdp_test",
+            **{'cook_time': 5, 'start_order_list': ['onion', 'any']}
         )
 
     def test_constructor_invalid_inputs(self):
@@ -294,10 +296,97 @@ class TestGridworld(unittest.TestCase):
             {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0)),
              (2, 3): Obj('soup', (2, 3), ('tomato', 1, 0))}, 
             order_list=['any']))
-                
-class TestEnvironment(unittest.TestCase):
-    # TODO: Here
-    pass
+
+
+from overcooked_gridworld.agents.agent import AgentPair, RandomAgent
+
+def random_joint_action():
+    num_actions = len(Action.ALL_ACTIONS)
+    a_idx0, a_idx1 = np.random.randint(low=0, high=num_actions, size=2)
+    return (Action.INDEX_TO_ACTION[a_idx0], Action.INDEX_TO_ACTION[a_idx1])
+
+
+class TestOvercookedEnvironment(unittest.TestCase):
+    
+    # TODO: 
+    def setUp(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.rnd_agent_pair = AgentPair(RandomAgent(), RandomAgent())
+        np.random.seed(0)
+
+    def test_constructor(self):
+        OvercookedEnv(self.base_mdp, horizon=10)
+
+        with self.assertRaises(AssertionError):
+            # Infinite horizon and unlimited orders
+            OvercookedEnv(self.base_mdp, **{"horizon": np.Inf})
+
+        with self.assertRaises(TypeError):
+            OvercookedEnv(self.base_mdp, **{"invalid_env_param": None})
+
+    def test_step_fn(self):
+        for _ in range(10):
+            joint_action = random_joint_action()
+            self.env.step(joint_action)
+
+    def test_execute_plan(self):
+        action_plan = [random_joint_action() for _ in range(10)]
+        self.env.execute_plan(self.base_mdp.get_start_state(), action_plan)
+
+    def test_run_agents(self):
+        self.env.run_agents(self.rnd_agent_pair)
+    
+    def test_rollouts(self):
+        self.env.get_rollouts(self.rnd_agent_pair, 5, processed=False)
+        self.env.get_rollouts(self.rnd_agent_pair, 5, processed=True)
+
+    def test_multiple_mdp_env(self):
+        mdp0 = OvercookedGridworld.from_layout_name("simple")
+        mdp1 = OvercookedGridworld.from_layout_name("random0")
+        mdp_fn = lambda: np.random.choice([mdp0, mdp1])
+        
+        # Default env
+        env = OvercookedEnv(mdp_fn, horizon=100)
+        env.get_rollouts(self.rnd_agent_pair, 5)
+
+    def test_random_layout(self):
+
+        with self.assertRaises(TypeError):
+            mdp_gen_params = {"none": None}
+            mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
+            OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+
+        mdp_gen_params = {"prop_feats": (1, 1)}
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
+        env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+        start_terrain = env.mdp.terrain_mtx
+
+        for _ in range(3):
+            env.reset()
+            print(env)
+            curr_terrain = env.mdp.terrain_mtx
+            self.assertFalse(np.array_equal(start_terrain, curr_terrain))
+
+        mdp_gen_params = {"mdp_choices": ['simple', 'unident_s']}
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
+        env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+        start_terrain = env.mdp.terrain_mtx
+
+        for _ in range(3):
+            env.reset()
+            print(env)
+            curr_terrain = env.mdp.terrain_mtx
+            self.assertFalse(np.array_equal(start_terrain, curr_terrain))
+        
+        
+class TestGymEnvironment(unittest.TestCase):
+
+    def setUp(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.rnd_agent_pair = AgentPair(RandomAgent(), RandomAgent())
+        np.random.seed(0)
 
 if __name__ == '__main__':
     unittest.main()

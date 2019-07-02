@@ -3,7 +3,8 @@ import itertools
 import numpy as np
 from collections import defaultdict
 
-from overcooked_gridworld.mdp.overcooked_mdp import Action, Direction, OvercookedState
+from overcooked_gridworld.mdp.actions import Action, Direction
+from overcooked_gridworld.mdp.overcooked_mdp import OvercookedState
 from overcooked_gridworld.planning.planners import MediumLevelPlanner, Heuristic
 
 
@@ -41,8 +42,8 @@ class AgentFromPolicy(Agent):
         self.history.append(state)
         try:
             return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
-        except AttributeError:
-            raise AttributeError("Need to set the agent_index or mdp of the Agent before using it")
+        except AttributeError as e:
+            raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
 
     def direct_action(self, obs):
         """
@@ -78,10 +79,10 @@ class StayAgent(Agent):
         self.sim_threads = sim_threads
     
     def action(self, state):
-        return Direction.STAY
+        return Action.STAY
 
     def direct_action(self, obs):
-        return [Action.ACTION_TO_INDEX[Direction.STAY]] * self.sim_threads
+        return [Action.ACTION_TO_INDEX[Action.STAY]] * self.sim_threads
 
 
 class FixedPlanAgent(Agent):
@@ -114,18 +115,20 @@ class CoupledPlanningAgent(Agent):
         except TimeoutError:
             print("COUPLED PLANNING FAILURE")
             self.mlp.failures += 1
-            return Direction.CARDINAL[np.random.randint(4)]
+            return Direction.ALL_DIRECTIONS[np.random.randint(4)]
         return joint_action_plan[0][self.agent_index] if len(joint_action_plan) > 0 else None
 
 
 class EmbeddedPlanningAgent(Agent):
 
-    def __init__(self, other_agent, mlp, delivery_horizon=2):
+    def __init__(self, other_agent, mlp, env, delivery_horizon=2, debug=False):
         """other_agent_policy returns highest prob action"""
         self.other_agent = other_agent
         self.delivery_horizon = delivery_horizon
         self.mlp = mlp
+        self.env = env
         self.h_fn = Heuristic(mlp.mp).simple_heuristic
+        self.debug = debug
 
     def action(self, state):
         from overcooked_gridworld.planning.search import SearchTree
@@ -226,15 +229,15 @@ class GreedyHumanModel(Agent):
         # change the player positions if the other player were not to move
         if self.prev_state is not None and state.players_pos_and_or == self.prev_state.players_pos_and_or:
             if self.agent_index == 0:
-                joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Direction.STAY]))
+                joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
             elif self.agent_index == 1:
-                joint_actions = list(itertools.product([Direction.STAY], Action.ALL_ACTIONS))
+                joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
             else:
                 raise ValueError("Player index not recognized")
 
             unblocking_joint_actions = []
             for j_a in joint_actions:
-                new_state, reward = self.mlp.mdp.get_transition_states_and_probs(state, j_a)[0][0]
+                new_state, _, _ = self.mlp.mdp.get_transition_states_and_probs(state, j_a)
                 if new_state.player_positions != self.prev_state.player_positions:
                     unblocking_joint_actions.append(j_a)
 
