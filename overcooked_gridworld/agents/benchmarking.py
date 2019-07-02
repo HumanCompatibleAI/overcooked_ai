@@ -14,43 +14,22 @@ from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 
 class AgentEvaluator(object):
     """
-    Class used to get trajectory rollouts of agents trained with a variety of methods
+    Class used to get rollouts and evaluate performance of various types of agents.
     """
 
-    # TODO: Discontinue variable MDP in AgentEvaluator
     def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=None, debug=False):
         if mdp_fn_params is None:
             self.variable_mdp = False
             self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)
         else:
             self.variable_mdp = True
-            self.mdp_fn = OvercookedEnv.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
+            self.mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
             
         self.env = OvercookedEnv(self.mdp_fn, **env_params)
         self.force_compute = force_compute
         self.debug = debug
         self.mlp_params = mlp_params
         self._mlp = None
-
-    # @staticmethod
-    # def from_config(mdp_params, env_params):
-    #     ae = AgentEvaluator(
-    #         layout_name=env_config["fixed_mdp"],
-    #         order_goal=env_config["ORDER_GOAL"],
-    #         start_state_fn=start_state_fn,
-    #         horizon=env_config["horizon"]
-    #     )
-    #     from hr_coordination.pbt.pbt_utils import setup_mdp_env
-    #     ae._env = setup_mdp_env(display=False, **env_config)
-    #     ae._mdp = ae._env.mdp
-    #     ae.config = env_config
-    #     return ae
-
-    # @staticmethod
-    # def from_pbt_dir(run_dir, start_state=None):
-    #     from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_config_from_pbt_dir
-    #     config = get_config_from_pbt_dir(run_dir)
-    #     return AgentEvaluator.from_config(config, start_state)
 
     @property
     def mlp(self):
@@ -107,21 +86,22 @@ class AgentEvaluator(object):
             self.check_trajectory(trajectories, i)
 
     def check_trajectory(self, trajectories, idx):
+        """
+        Check consistency of trajectory with idx `idx` with mdp dynamics.
+        NOTE: does not check dones positions, lengths consistency, order lists reducing if not None
+        """
         states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
 
         assert len(states) == len(actions)
-        # TODO: check dones positions, lengths consistency
 
         # Checking that actions would give rise to same behaviour in current MDP
         simulation_env = self.env.copy()
         for i in range(len(states)):
             curr_state = states[i]
-            curr_state.order_list = ["onion"] * 3 # NOTE: hack that should be fixed upstream in mdp code
             simulation_env.state = curr_state
 
             if i + 1 < len(states):
                 next_state, reward, done, info = simulation_env.step(actions[i])
-                next_state.order_list = ["onion"] * 3 # NOTE: same as above
 
                 assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
                     simulation_env.display_states(states[i + 1], next_state)
@@ -143,17 +123,6 @@ class AgentEvaluator(object):
         traj = load_pickle(filename)
         self.check_trajectories(traj)
         return traj
-
-    # @staticmethod
-    # def save_traj_in_baselines_format(rollout_trajs, filename):
-    #     """Useful for GAIL and behavioral cloning"""
-    #     np.savez(
-    #         filename,
-    #         obs=rollout_trajs["ep_observations"],
-    #         acs=rollout_trajs["ep_actions"],
-    #         ep_lens=rollout_trajs["ep_lengths"],
-    #         ep_rets=rollout_trajs["ep_returns"],
-    #     )
     
     @staticmethod
     def save_traj_in_stable_baselines_format(rollout_trajs, filename):
@@ -173,43 +142,7 @@ class AgentEvaluator(object):
         stable_baselines_trajs_dict = { k:np.array(v) for k, v in stable_baselines_trajs_dict.items() }
         np.savez(filename, **stable_baselines_trajs_dict)
 
-    # def save_action_traj_for_viz(self, trajectory, path):
-    #     """
-    #     Trajectory will be a list of state-action pairs (s_t, a_t, r_t).
-    #     NOTE: Used mainly to visualize trajectories in overcooked-js repo.
-    #     """
-    #     # Add trajectory to json
-    #     traj = []
-
-    #     # NOTE: Assumes only one trajectory
-    #     for a_t in trajectory['ep_actions'][0]:
-    #         a_modified = [a if a != Action.INTERACT else a.upper() for a in a_t]
-    #         if all([a is not None for a in a_t]):
-    #             traj.append(a_modified)
-
-    #     json_traj = {}
-    #     json_traj["traj"] = traj
-
-    #     # Add layout grid to json
-    #     mdp_grid = []
-    #     for row in self.mdp.terrain_mtx:
-    #         mdp_grid.append("".join(row))
-
-    #     for i, start_pos in enumerate(self.mdp.start_player_positions):
-    #         x, y = start_pos
-    #         row_string = mdp_grid[y]
-    #         new_row_string = row_string[:x] + str(i + 1) + row_string[x+1:]
-    #         mdp_grid[y] = new_row_string
-
-    #     json_traj["mdp_grid"] = mdp_grid
-
-    #     with open(path + '.json', 'w') as filename:  
-    #         json.dump(json_traj, filename)
-
-    # Clean this if unnecessary
-    # trajectory, time_taken = self.env.run_agents(agent_pair, display=display)
-    # tot_rewards = self.cumulative_rewards_from_trajectory(trajectory)
-    # return tot_rewards, time_taken, trajectory
+    ### VIZUALIZATION METHODS ###
 
     @staticmethod
     def interactive_from_traj(trajectories, traj_idx=0):
@@ -234,34 +167,3 @@ class AgentEvaluator(object):
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})
         display(out, t)
-
-
-
-
-
-# SAMPLE SCRIPTS    
-
-# Getting Trajs From Optimal Planner
-# eva = AgentEvaluator("scenario2")
-# tot_rewards, time_taken, trajectory = eva.evaluate_optimal_pair(["any"] * 3)
-# eva.dump_trajectory_as_json(trajectory, "../overcooked-js/simple_rr")
-# print("done")
-
-# Getting Trajs from pbt Agent
-# eva = AgentEvaluator.from_pbt_dir(run_dir="2019_03_20-10_53_03_scenario2_no_rnd_objs", seed_idx=0)
-# ep_rews, ep_lens, ep_obs, ep_acts = eva.get_pbt_agents_trajectories(agent0_idx=0, agent1_idx=0, num_trajectories=1)
-# eva.dump_trajectory_as_json(trajectory, "data/agent_runs/")
-
-
-# if __name__ == "__main__" :
-#     parser = ArgumentParser()
-#     parser.add_argument("-t", "--type", dest="type",
-#                         help="type of run: ['rollouts', 'ppo']", required=True)
-#     parser.add_argument("-r", "--run_name", dest="run",
-#                         help="name of run in data/*_runs/", required=True)
-#     parser.add_argument("-a", "--agent_num", dest="agent_num", default=0)
-#     parser.add_argument("-i", "--idx", dest="idx", default=0)
-
-#     args = parser.parse_args()
-
-#     run_type, run_name, player_idx, agent_num = args.type, args.run, int(args.idx), int(args.agent_num)

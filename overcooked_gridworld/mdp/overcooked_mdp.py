@@ -1,12 +1,10 @@
-import itertools
+import itertools, copy
 import numpy as np
 from collections import defaultdict
 from overcooked_gridworld.utils import pos_distance, load_dict_from_file
 from overcooked_gridworld.data.layouts import read_layout_dict
 from overcooked_gridworld.mdp.actions import Action, Direction
 
-
-LAYOUTS_DIR = "data/layouts/"
 
 class PlayerState(object):
     """
@@ -284,12 +282,12 @@ class OvercookedGridworld(object):
     """An MDP grid world based off of the Overcooked game."""
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
 
-    def __init__(self, terrain, starting_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
+    def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
-        starting_player_positions: tuple of positions for both players' starting positions
-        start_order_list: either a list of orders or None if there is not specific list
+        start_player_positions: tuple of positions for both players' starting positions
+        start_order_list: either a tuple of orders or None if there is not specific list
         cook_time: amount of timesteps required for a soup to cook
         delivery_reward: amount of reward given per delivery
         rew_shaping_params: reward given for completion of specific subgoals
@@ -299,7 +297,7 @@ class OvercookedGridworld(object):
         self.shape = (self.width, self.height)
         self.terrain_mtx = terrain
         self.terrain_pos_dict = self._get_terrain_type_pos_dict()
-        self.start_player_positions = starting_player_positions
+        self.start_player_positions = start_player_positions
         self.start_order_list = start_order_list
         self.soup_cooking_time = cook_time
         self.num_items_for_soup = num_items_for_soup
@@ -316,6 +314,18 @@ class OvercookedGridworld(object):
                 self.delivery_reward == other.delivery_reward and \
                 self.reward_shaping_params == other.reward_shaping_params and \
                 self.layout_name == other.layout_name
+    
+    def copy(self):
+        return OvercookedGridworld(
+            terrain=self.terrain_mtx.copy(),
+            start_player_positions=self.start_player_positions,
+            start_order_list=list(self.start_order_list),
+            cook_time=self.soup_cooking_time,
+            num_items_for_soup=self.num_items_for_soup,
+            delivery_reward=self.delivery_reward,
+            rew_shaping_params=copy.deepcopy(self.reward_shaping_params),
+            layout_name=self.layout_name
+        )
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -361,7 +371,7 @@ class OvercookedGridworld(object):
 
         assert all(position is not None for position in player_positions), 'A player was missing'
 
-        mdp_config["starting_player_positions"] = player_positions
+        mdp_config["start_player_positions"] = player_positions
 
         for k, v in params_to_overwrite.items():
             curr_val = mdp_config[k]
@@ -390,41 +400,48 @@ class OvercookedGridworld(object):
             if p_action not in p_legal_actions:
                 raise ValueError('Invalid action')
 
-    def get_start_state(self, random_start_pos=False, rnd_obj_prob_thresh=0.0):
-        """Returns the start state."""
-        if random_start_pos:
-            valid_positions = self.get_valid_joint_player_positions()
-            start_pos = valid_positions[np.random.choice(len(valid_positions))]
-        else:
-            start_pos = self.start_player_positions
-
-        start_state = OvercookedState.from_player_positions(start_pos, order_list=self.start_order_list)
-
-        if rnd_obj_prob_thresh != 0:
-            return start_state
-        
-        # Arbitrary hard-coding for randomization of objects
-        # For each pot, add a random amount of onions with prob rnd_obj_prob_thresh
-        pots = self.get_pot_states(start_state)["empty"]
-        for pot_loc in pots:
-            p = np.random.rand()
-            if p < rnd_obj_prob_thresh:
-                n = int(np.random.randint(low=1, high=4))
-                start_state.objects[pot_loc] = ObjectState("soup", pot_loc, ('onion', n, 0))
-
-        # For each player, add a random object with prob rnd_obj_prob_thresh
-        for player in start_state.players:
-            p = np.random.rand()
-            if p < rnd_obj_prob_thresh:
-                # Different objects have different probabilities
-                obj = np.random.choice(["dish", "onion", "soup"], p=[0.2, 0.6, 0.2])
-                if obj == "soup":
-                    player.set_object(
-                        ObjectState(obj, player.position, ('onion', self.num_items_for_soup, self.soup_cooking_time))
-                    )
-                else:
-                    player.set_object(ObjectState(obj, player.position))
+    def get_standard_start_state(self):
+        start_state = OvercookedState.from_player_positions(
+            self.start_player_positions, order_list=self.start_order_list
+        )
         return start_state
+
+    def get_random_start_state_fn(self, random_start_pos=False, rnd_obj_prob_thresh=0.0):
+        def start_state_fn():
+            if random_start_pos:
+                valid_positions = self.get_valid_joint_player_positions()
+                start_pos = valid_positions[np.random.choice(len(valid_positions))]
+            else:
+                start_pos = self.start_player_positions
+
+            start_state = OvercookedState.from_player_positions(start_pos, order_list=self.start_order_list)
+
+            if rnd_obj_prob_thresh != 0:
+                return start_state
+            
+            # Arbitrary hard-coding for randomization of objects
+            # For each pot, add a random amount of onions with prob rnd_obj_prob_thresh
+            pots = self.get_pot_states(start_state)["empty"]
+            for pot_loc in pots:
+                p = np.random.rand()
+                if p < rnd_obj_prob_thresh:
+                    n = int(np.random.randint(low=1, high=4))
+                    start_state.objects[pot_loc] = ObjectState("soup", pot_loc, ('onion', n, 0))
+
+            # For each player, add a random object with prob rnd_obj_prob_thresh
+            for player in start_state.players:
+                p = np.random.rand()
+                if p < rnd_obj_prob_thresh:
+                    # Different objects have different probabilities
+                    obj = np.random.choice(["dish", "onion", "soup"], p=[0.2, 0.6, 0.2])
+                    if obj == "soup":
+                        player.set_object(
+                            ObjectState(obj, player.position, ('onion', self.num_items_for_soup, self.soup_cooking_time))
+                        )
+                    else:
+                        player.set_object(ObjectState(obj, player.position))
+            return start_state
+        return start_state_fn
 
     def is_terminal(self, state):
         # There is a finite horizon, handled by the environment.
@@ -877,17 +894,6 @@ class OvercookedGridworld(object):
     # STATE ENCODINGS #
     ###################
 
-    # TODO: Clean encodings more?
-
-    # def preprocess_observation(self, overcooked_state, debug=False):
-    #     if hasattr(self, 'gave_deprecated_warning'):
-    #         pass
-    #     else:
-    #         print("USING DEPRECATED METHOD CALL preprocess_observation")
-    #         self.gave_deprecated_warning = True
-        
-    #     return self.lossless_state_encoding(overcooked_state, debug)
-
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert type(debug) is bool
@@ -1066,9 +1072,9 @@ class OvercookedGridworld(object):
     def get_deltas_to_closest_location(self, player, locations, mlp):
         _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
         if closest_loc is None:
-            # TODO: think about what this entails. I think this can be thought of
-            # as "any object that does not exist or I am carrying is going to give me a (0,0)
-            # but I can disambiguate by looking at the features for what kind of object I'm carrying"
+            # "any object that does not exist or I am carrying is going to show up as a (0,0)
+            # but I can disambiguate the two possibilities by looking at the features 
+            # for what kind of object I'm carrying"
             return (0, 0)
         dy_loc, dx_loc = pos_distance(closest_loc, player.position)
         return dy_loc, dx_loc

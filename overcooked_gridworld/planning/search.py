@@ -14,7 +14,7 @@ class SearchTree(object):
         heuristic_fn (func): Takes in a state and returns a heuristic value
     """
 
-    def __init__(self, root, goal_fn, expand_fn, heuristic_fn, max_iter_count=1000000, debug=False):
+    def __init__(self, root, goal_fn, expand_fn, heuristic_fn, max_iter_count=10e6, debug=False):
         self.debug = debug
         self.root = root
         self.is_goal = goal_fn
@@ -30,10 +30,6 @@ class SearchTree(object):
         iter_count = 0
         seen = set()
         pq = PriorityQueue()
-        
-        # TODO: add debug flag?
-        # self.env.state = self.root
-        # print(self.env)
 
         root_node = SearchNode(self.root, action=None, parent=None, action_cost=0, debug=self.debug)
         pq.push(root_node, self.estimated_total_cost(root_node))
@@ -47,29 +43,13 @@ class SearchTree(object):
 
             curr_state = curr_node.state
 
-            # onions = curr_state.all_objects_by_type['onion']
-            # if len(onions) > 0:
-            #     num_onions = onions
-            #     if num_onions == 3:
-            #         print("SEEN\n", self.env)
-
-            # soups = curr_state.all_objects_by_type['soup']
-            # if len(soups) > 0:
-            #     num_onions = soups[0].state[1]
-            #     if num_onions == 3:
-            #         print("SEEN\n", self.env)
-
             if curr_state in seen:
-                # self.env.state = curr_state
                 continue
 
             seen.add(curr_state)
             if iter_count > self.max_iter_count:
                 print("Expanded more than the maximum number of allowed states")
                 raise TimeoutError("Too many states expanded expanded")
-
-            # self.env.state = curr_state
-            # print("PREV UNSEEN\n", self.env)
 
             if self.is_goal(curr_state):
                 elapsed_time = time.time() - start_time
@@ -78,10 +58,6 @@ class SearchTree(object):
                 return curr_node.get_path(), curr_node.backwards_cost
             
             successors = self.expand(curr_state)
-
-            # if len(successors) == 0:
-            #     self.env.state = curr_state
-            #     print("No successors!!", self.env)
 
             for action, child, cost in successors:
                 child_node = SearchNode(child, action, parent=curr_node, action_cost=cost, debug=self.debug)

@@ -15,6 +15,168 @@ SERVING_LOC = 'S'
 CODE_TO_TYPE = { 0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 4: POT, 5: DISH_DISPENSER, 6: SERVING_LOC}
 TYPE_TO_CODE = { v:k for k, v in CODE_TO_TYPE.items() }
 
+
+class LayoutGenerator(object):
+    # NOTE: This class hasn't been tested extensively.
+
+    def __init__(self, outer_shape, mdp_params):
+        """
+        Defines a layout generator that will return OvercoookedGridworld instances 
+        with layout of size `outer_shape`
+        """
+        self.outer_shape = np.array(outer_shape)
+        self.mdp_params = mdp_params
+
+    @staticmethod
+    def mdp_gen_fn_from_dict(mdp_params={}, mdp_choices=None, size_bounds=((4, 7), (4, 7)), 
+                                prop_empty=(0.6, 0.8), prop_feats=(0.1, 0.2), display=False):
+        """Returns an MDP generator with the passed in properties."""
+
+        if mdp_choices is not None:
+            assert type(mdp_choices) is list
+            
+            # If list of MDPs, randomly choose one at each reset
+            mdp_sizes = []
+            for mdp_name in mdp_choices:
+                mdp = OvercookedGridworld.from_layout_name(mdp_name, **mdp_params)
+                mdp_sizes.append([mdp.width, mdp.height])
+            widths, heights = np.array(mdp_sizes).T
+            min_padding = max(widths), max(heights)            
+            
+            def mdp_generator_fn():
+                chosen_mdp = np.random.choice(mdp_choices)
+                mdp = OvercookedGridworld.from_layout_name(chosen_mdp, **mdp_params)
+                lg = LayoutGenerator(min_padding, mdp_params)
+                mdp_padded = lg.padded_mdp(mdp)
+                return mdp_padded
+        else:
+            min_padding = (size_bounds[0][1], size_bounds[1][1])
+            layout_generator = LayoutGenerator(min_padding, mdp_params)
+            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
+                inner_shape=[rnd_int_uniform(*dim) for dim in size_bounds],
+                prop_empty=rnd_uniform(*prop_empty),
+                prop_features=rnd_uniform(*prop_feats),
+                display=display
+            )
+        
+        return mdp_generator_fn
+
+    def padded_mdp(self, mdp, display=False):
+        """Returns a padded MDP from an MDP"""
+        grid = Grid.from_mdp(mdp)
+        padded_grid = self.embed_grid(grid)
+
+        start_positions = self.get_random_starting_positions(padded_grid)
+        mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
+        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
+
+    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True):        
+        grid = Grid(inner_shape)
+        self.dig_space_with_disjoint_sets(grid, prop_empty)
+        self.add_features(grid, prop_features)
+
+        padded_grid = self.embed_grid(grid)
+        start_positions = self.get_random_starting_positions(padded_grid)
+        mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
+        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
+
+    def padded_grid_to_layout_grid(self, padded_grid, start_positions, display=False):
+        if display:
+            print("Generated layout")
+            print(padded_grid)
+
+        # Start formatting to actual OvercookedGridworld input type
+        mdp_grid = padded_grid.convert_to_string()
+
+        for i, pos in enumerate(start_positions):
+            x, y = pos
+            mdp_grid[y][x] = str(i + 1)
+        
+        return mdp_grid
+
+    def embed_grid(self, grid):
+        """Randomly embeds a smaller grid in a grid of size self.outer_shape"""
+        # Check that smaller grid fits
+        assert all(grid.shape <= self.outer_shape)
+
+        padded_grid = Grid(self.outer_shape)
+        x_leeway, y_leeway = self.outer_shape - grid.shape
+        starting_x = np.random.randint(0, x_leeway) if x_leeway else 0
+        starting_y = np.random.randint(0, y_leeway) if y_leeway else 0
+
+        for x in range(grid.shape[0]):
+            for y in range(grid.shape[1]):
+                item = grid.terrain_at_loc((x, y))
+                # Abstraction violation
+                padded_grid.mtx[x + starting_x][y + starting_y] = item
+
+        return padded_grid
+
+    def dig_space_with_disjoint_sets(self, grid, prop_empty):
+        dsets = DisjointSets([])
+        while not (grid.proportion_empty() > prop_empty and dsets.num_sets == 1):
+            valid_dig_location = False
+            while not valid_dig_location:
+                loc = grid.get_random_interior_location()
+                valid_dig_location = grid.is_valid_dig_location(loc)
+
+            grid.dig(loc)
+            dsets.add_singleton(loc)
+
+            for neighbour in grid.get_near_locations(loc):
+                if dsets.contains(neighbour):
+                    dsets.union(neighbour, loc)
+
+    def make_fringe_expansion_layout(self, shape, prop_empty=0.1):
+        grid = Grid(shape)
+        self.dig_space_with_fringe_expansion(grid, prop_empty)
+        self.add_features(grid)
+        print(grid)
+    
+    def dig_space_with_fringe_expansion(self, grid, prop_empty=0.1):
+        starting_location = grid.get_random_interior_location()
+        fringe = Fringe(grid)
+        fringe.add(starting_location)
+
+        while grid.proportion_empty() < prop_empty:
+            curr_location = fringe.pop()
+            grid.dig(curr_location)
+
+            for location in grid.get_near_locations(curr_location):
+                if grid.is_valid_dig_location(location):
+                    fringe.add(location)
+
+    def add_features(self, grid, prop_features=0):
+        """
+        Places one round of basic features and then adds random features 
+        until prop_features of valid locations are filled"""
+        feature_types = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC] # NOTE: currently disabled TOMATO_DISPENSER
+
+        valid_locations = grid.valid_feature_locations()
+        np.random.shuffle(valid_locations)
+        assert len(valid_locations) > len(feature_types)
+
+        num_features_placed = 0
+        for location in valid_locations:
+            current_prop = num_features_placed / len(valid_locations)
+            if num_features_placed < len(feature_types):
+                grid.add_feature(location, feature_types[num_features_placed])
+            elif current_prop >= prop_features:
+                break
+            else:
+                random_feature = np.random.choice(feature_types)
+                grid.add_feature(location, random_feature)
+            num_features_placed += 1
+
+    def get_random_starting_positions(self, grid, divider_x=None):
+        pos0 = grid.get_random_empty_location()
+        pos1 = grid.get_random_empty_location()
+        # NOTE: Assuming more than 1 empty location, hacky code
+        while pos0 == pos1:
+            pos0 = grid.get_random_empty_location()
+        return pos0, pos1
+
+
 class Grid(object):
     
     def __init__(self, shape):
@@ -143,173 +305,6 @@ class Grid(object):
                 s += " "
             s += "\n"
         return s
-
-class LayoutGenerator(object):
-
-    def __init__(self, outer_shape, mdp_params):
-        self.outer_shape = np.array(outer_shape)
-        self.mdp_params = mdp_params
-
-    @staticmethod
-    def mdp_gen_fn_from_dict(mdp_params={}, mdp_choices=None, size_bounds=((4, 7), (4, 7)), 
-                                prop_empty=(0.6, 0.8), prop_feats=(0.1, 0.2), display=False):
-
-        if mdp_choices is not None:
-            assert type(mdp_choices) is list
-            
-            # If list of MDPs, randomly choose one at each reset
-            mdp_sizes = []
-            for mdp_name in mdp_choices:
-                mdp = OvercookedGridworld.from_layout_name(mdp_name, **mdp_params)
-                mdp_sizes.append([mdp.width, mdp.height])
-            widths, heights = np.array(mdp_sizes).T
-            min_padding = max(widths), max(heights)            
-            
-            def mdp_generator_fn():
-                chosen_mdp = np.random.choice(mdp_choices)
-                mdp = OvercookedGridworld.from_layout_name(chosen_mdp, **mdp_params)
-                lg = LayoutGenerator(min_padding, mdp_params)
-                mdp_padded = lg.padded_mdp(mdp)
-                return mdp_padded
-        else:
-            min_padding = (size_bounds[0][1], size_bounds[1][1])
-            layout_generator = LayoutGenerator(min_padding, mdp_params)
-            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
-                inner_shape=[rnd_int_uniform(*dim) for dim in size_bounds],
-                prop_empty=rnd_uniform(*prop_empty),
-                prop_features=rnd_uniform(*prop_feats),
-                display=display
-            )
-        
-        return mdp_generator_fn
-
-    def padded_mdp(self, mdp, display=False):
-        """Returns a padded MDP from an MDP"""
-        grid = Grid.from_mdp(mdp)
-        padded_grid = self.embed_grid(grid)
-
-        start_positions = self.get_random_starting_positions(padded_grid)
-
-        if display:
-            print("Generated layout")
-            print(padded_grid)
-
-        # Start formatting to actual OvercookedGridworld input type
-        mdp_grid = padded_grid.convert_to_string()
-
-        for i, pos in enumerate(start_positions):
-            x, y = pos
-            mdp_grid[y][x] = str(i + 1)
-        
-        # TODO: !!!
-        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
-
-    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True):        
-        grid = Grid(inner_shape)
-        self.dig_space_with_disjoint_sets(grid, prop_empty)
-        self.add_features(grid, prop_features)
-
-        padded_grid = self.embed_grid(grid)
-        start_positions = self.get_random_starting_positions(padded_grid)
-
-        if display:
-            print("Generated layout")
-            print(padded_grid)
-
-        # Start formatting to actual OvercookedGridworld input type
-        mdp_grid = padded_grid.convert_to_string()
-
-        for i, pos in enumerate(start_positions):
-            x, y = pos
-            mdp_grid[y][x] = str(i + 1)
-
-        # TODO: !!!
-        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
-
-    def embed_grid(self, grid):
-        """Randomly embeds a smaller grid in a grid of size self.outer_shape"""
-        # Check that smaller grid fits
-        assert all(grid.shape <= self.outer_shape)
-
-        padded_grid = Grid(self.outer_shape)
-        x_leeway, y_leeway = self.outer_shape - grid.shape
-        starting_x = np.random.randint(0, x_leeway) if x_leeway else 0
-        starting_y = np.random.randint(0, y_leeway) if y_leeway else 0
-
-        for x in range(grid.shape[0]):
-            for y in range(grid.shape[1]):
-                item = grid.terrain_at_loc((x, y))
-                # Abstraction violation
-                padded_grid.mtx[x + starting_x][y + starting_y] = item
-
-        return padded_grid
-
-    def dig_space_with_disjoint_sets(self, grid, prop_empty):
-        dsets = DisjointSets([])
-        while not (grid.proportion_empty() > prop_empty and dsets.num_sets == 1):
-            valid_dig_location = False
-            while not valid_dig_location:
-                loc = grid.get_random_interior_location()
-                valid_dig_location = grid.is_valid_dig_location(loc)
-
-            grid.dig(loc)
-            dsets.add_singleton(loc)
-
-            for neighbour in grid.get_near_locations(loc):
-                if dsets.contains(neighbour):
-                    dsets.union(neighbour, loc)
-
-    def make_fringe_expansion_layout(self, shape, prop_empty=0.1):
-        grid = Grid(shape)
-        self.dig_space_with_fringe_expansion(grid, prop_empty)
-        self.add_features(grid)
-        print(grid)
-    
-    def dig_space_with_fringe_expansion(self, grid, prop_empty=0.1):
-        starting_location = grid.get_random_interior_location()
-        fringe = Fringe(grid)
-        fringe.add(starting_location)
-
-        while grid.proportion_empty() < prop_empty:
-            curr_location = fringe.pop()
-            grid.dig(curr_location)
-
-            for location in grid.get_near_locations(curr_location):
-                if grid.is_valid_dig_location(location):
-                    fringe.add(location)
-
-    def add_features(self, grid, prop_features=0):
-        """
-        Places one round of basic features and then adds random features 
-        until prop_features of valid locations are filled"""
-        feature_types = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC] # NOTE: currently disabled TOMATO_DISPENSER
-
-        valid_locations = grid.valid_feature_locations()
-        np.random.shuffle(valid_locations)
-        assert len(valid_locations) > len(feature_types)
-
-        num_features_placed = 0
-        for location in valid_locations:
-            current_prop = num_features_placed / len(valid_locations)
-            if num_features_placed < len(feature_types):
-                grid.add_feature(location, feature_types[num_features_placed])
-            elif current_prop >= prop_features:
-                break
-            else:
-                random_feature = np.random.choice(feature_types)
-                grid.add_feature(location, random_feature)
-            num_features_placed += 1
-
-    def get_random_starting_positions(self, grid, divider_x=None):
-        pos0 = grid.get_random_empty_location()
-        pos1 = grid.get_random_empty_location()
-        # NOTE: Assuming more than 1 empty location
-        while pos0 == pos1:
-            pos0 = grid.get_random_empty_location()
-
-        # if divider_x is not None and pos0[0] < divider_x and pos1 < divider_x:
-        #     return self.get_random_starting_positions(grid, divider_x=divider_x)
-        return pos0, pos1
 
 
 class Fringe(object):

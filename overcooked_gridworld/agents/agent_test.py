@@ -10,7 +10,7 @@ from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
 from overcooked_gridworld.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
 from overcooked_gridworld.agents.benchmarking import AgentEvaluator
 
-np.random.seed(41)
+np.random.seed(42)
 
 n, s = Direction.NORTH, Direction.SOUTH
 e, w = Direction.EAST, Direction.WEST
@@ -32,7 +32,7 @@ class TestAgents(unittest.TestCase):
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(time_taken, 4)
-        self.assertEqual(env.mdp.get_start_state().player_positions, end_state.player_positions)
+        self.assertEqual(env.mdp.get_standard_start_state().player_positions, end_state.player_positions)
 
     def test_two_coupled_agents(self):
         mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
@@ -89,7 +89,12 @@ class TestAgents(unittest.TestCase):
         end_state = trajectory[-1][0]
         self.assertEqual(len(end_state.order_list), 0)
 
-# TODO: could reformat all of these tests, but currently probably not worth the time
+
+class TestAgentEvaluator(unittest.TestCase):
+    pass
+
+
+# TODO: could reformat all of these tests to use AgentEvaluator
 class TestScenarios(unittest.TestCase):
 
     """
@@ -218,7 +223,7 @@ class TestScenarios(unittest.TestCase):
         # less time wasted compared to the R-R case
         mdp_params = {"layout_name": "scenario3", "cook_time": 5}
         mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-        start_state = mdp.get_start_state()
+        start_state = mdp.get_standard_start_state()
         start_state.objects = {(8, 1): Obj('soup', (8, 1), ('onion', 2, 0))}
         start_state.order_list = ['onion']
 
@@ -256,7 +261,7 @@ class TestScenarios(unittest.TestCase):
         mdp_params = {"layout_name": "scenario4", "cook_time": 5}
         mdp = OvercookedGridworld.from_layout_name(**mdp_params)
         
-        start_state = mdp.get_start_state()
+        start_state = mdp.get_standard_start_state()
         start_state.objects = {(8, 1): Obj('soup', (8, 1), ('onion', 2, 5))}
         start_state.order_list = ['onion']
 
@@ -264,34 +269,24 @@ class TestScenarios(unittest.TestCase):
         eva = AgentEvaluator(mdp_params, env_params, force_compute=force_compute)
         self.compare_times(eva)
 
-    # def test_schelling(self): # TODO: we already have schelling_s
-    #     # Schelling failure scenario
-    #     #
-    #     # X X S P-D X X
-    #     # X     ↓R    X
-    #     # X     X     X
-    #     # O           O
-    #     # X     X     X
-    #     # X     ↓H    X
-    #     # X X D P-S X X
-    #     #
-    #     # The layout is completely symmetric. Both pots need 2 more onions,
-    #     # and only one delivery is left. The best thing to do would be to split up
-    #     # towards the different pots, but the agents must somehow coordinate on the
-    #     # first step. In the H+R case, this doesn't work, but in the R+R it does.
-        
-    #     eva = AgentEvaluator(layout_name="schelling", order_goal=["any", "any"], force_compute=force_compute)
-    #     start_state = eva.mdp.get_start_state()
-    #     start_state.objects = {(3, 0): Obj('soup', (3, 0), ('onion', 2, 5)),
-    #                            (3, 6): Obj('soup', (3, 6), ('onion', 2, 5))}
-    #     eva.start_state = start_state
-        # self.compare_times(eva, h_idx=0)
-
     def test_schelling_s(self):
         # Schelling failure scenario
         #
+        # X X S P-D X X
+        # X     ↓R    X
+        # X     X     X
+        # O           O
+        # X     X     X
+        # X     ↓H    X
+        # X X D P-S X X
+        #
+        # The layout is completely symmetric. Both pots need 2 more onions,
+        # and only one delivery is left. The best thing to do would be to split up
+        # towards the different pots, but the agents must somehow coordinate on the
+        # first step. In the H+R case, this doesn't work, but in the R+R it does.
+        #
         eva = AgentEvaluator({"layout_name": "schelling_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
-        start_state = eva.env.mdp.get_start_state()
+        start_state = eva.env.mdp.get_standard_start_state()
         start_state.objects = {(2, 0): Obj('soup', (2, 0), ('onion', 2, 5)),
                                (2, 4): Obj('soup', (2, 4), ('onion', 2, 5))}
         eva.start_state = start_state
@@ -320,21 +315,18 @@ class TestScenarios(unittest.TestCase):
         # that H has decided to get a dish, so the optimal action now becomes
         # going for the onion, wasting quite a lot of time.
 
-        # TODO: fix this?
         eva = AgentEvaluator({"layout_name": "unident", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
-        start_state = eva.env.mdp.get_start_state()
+        start_state = eva.env.mdp.get_standard_start_state()
         start_state.objects = {(5, 2): Obj('soup', (5, 2), ('onion', 2, 0)),
                                (5, 3): Obj('soup', (5, 3), ('onion', 3, 5))}
         eva.start_state = start_state
         self.compare_times(eva, h_idx=0)
 
     def test_unidentifiable_s(self):
-        # Human plan unidentifiable
-        #
+        # Human plan unidentifiable, with smaller map
 
-        # TODO: fix this?
         eva = AgentEvaluator({"layout_name": "unident_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
-        start_state = eva.env.mdp.get_start_state()
+        start_state = eva.env.mdp.get_standard_start_state()
         start_state.objects = {(4, 2): Obj('soup', (4, 2), ('onion', 2, 0)),
                                (4, 3): Obj('soup', (4, 3), ('onion', 3, 5))}
         eva.start_state = start_state

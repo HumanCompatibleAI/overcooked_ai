@@ -90,14 +90,14 @@ class TestGridworld(unittest.TestCase):
     def test_start_positions(self):
         expected_start_state = OvercookedState(
             [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['onion', 'any'])
-        actual_start_state = self.base_mdp.get_start_state()
+        actual_start_state = self.base_mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
         mdp = OvercookedGridworld.from_layout_name('corridor')
         expected_start_state = OvercookedState(
             [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {}, order_list=None)
-        actual_start_state = mdp.get_start_state()
+        actual_start_state = mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_actions(self):
@@ -106,7 +106,7 @@ class TestGridworld(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.base_mdp.get_actions(bad_state)
 
-        self.assertEqual(self.base_mdp.get_actions(self.base_mdp.get_start_state()),
+        self.assertEqual(self.base_mdp.get_actions(self.base_mdp.get_standard_start_state()),
                          [Action.ALL_ACTIONS, Action.ALL_ACTIONS])
 
     def test_transitions_and_environment(self):
@@ -332,14 +332,13 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_execute_plan(self):
         action_plan = [random_joint_action() for _ in range(10)]
-        self.env.execute_plan(self.base_mdp.get_start_state(), action_plan)
+        self.env.execute_plan(self.base_mdp.get_standard_start_state(), action_plan)
 
     def test_run_agents(self):
         self.env.run_agents(self.rnd_agent_pair)
     
     def test_rollouts(self):
-        self.env.get_rollouts(self.rnd_agent_pair, 5, processed=False)
-        self.env.get_rollouts(self.rnd_agent_pair, 5, processed=True)
+        self.env.get_rollouts(self.rnd_agent_pair, 5)
 
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("simple")
@@ -349,6 +348,12 @@ class TestOvercookedEnvironment(unittest.TestCase):
         # Default env
         env = OvercookedEnv(mdp_fn, horizon=100)
         env.get_rollouts(self.rnd_agent_pair, 5)
+
+    def test_starting_position_randomization(self):
+        pass
+
+    def test_starting_obj_randomization(self):
+        pass
 
     def test_random_layout(self):
 
@@ -371,13 +376,13 @@ class TestOvercookedEnvironment(unittest.TestCase):
         mdp_gen_params = {"mdp_choices": ['simple', 'unident_s']}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
         env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
-        start_terrain = env.mdp.terrain_mtx
-
-        for _ in range(3):
+        
+        layouts_seen = []
+        for _ in range(10):
+            layouts_seen.append(env.mdp.terrain_mtx)
             env.reset()
-            print(env)
-            curr_terrain = env.mdp.terrain_mtx
-            self.assertFalse(np.array_equal(start_terrain, curr_terrain))
+        all_same_layout = all([np.array_equal(env.mdp.terrain_mtx, terrain) for terrain in layouts_seen])
+        self.assertFalse(all_same_layout)
         
         
 class TestGymEnvironment(unittest.TestCase):

@@ -1,4 +1,4 @@
-import itertools
+import itertools, os
 import numpy as np
 import pickle, time
 from overcooked_gridworld.utils import profile, pos_distance, manhattan_distance
@@ -6,12 +6,12 @@ from overcooked_gridworld.planning.search import SearchTree, Graph, NotConnected
 from overcooked_gridworld.mdp.actions import Action, Direction
 from overcooked_gridworld.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
 from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
+from overcooked_gridworld.data.planners import load_saved_action_manager, PLANNERS_DIR
 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
 SAFE_RUN = False
 
-PLANNERS_DIR = "data/planners/"
 
 NO_COUNTERS_PARAMS = {
         'start_orientations': False,
@@ -31,14 +31,6 @@ NO_COUNTERS_START_OR_PARAMS = {
     'same_motion_goals': True
 }
 
-# NO_COUNTERS_PARAMS = {
-#     'start_orientations': True,
-#     'wait_allowed': False,
-#     'counter_goals': [(2, 1), (2, 2), (2, 3)],
-#     'counter_drop': [(2, 1), (2, 2), (2, 3)],
-#     'counter_pickup': [(2, 1), (2, 2), (2, 3)],
-#     'same_motion_goals': True
-# }
 
 class MotionPlanner(object):
     """A planner that computes optimal plans for a single agent to 
@@ -904,17 +896,11 @@ class MediumLevelPlanner(object):
 
     @staticmethod
     def from_action_manager_file(filename):
-        with open(PLANNERS_DIR + filename, 'rb') as f:
-            mlp_action_manager = pickle.load(f)
-            mdp = mlp_action_manager.mdp
-            params = mlp_action_manager.params
-            return MediumLevelPlanner(mdp, params, mlp_action_manager)
+        mlp_action_manager = load_saved_action_manager(filename)
+        mdp = mlp_action_manager.mdp
+        params = mlp_action_manager.params
+        return MediumLevelPlanner(mdp, params, mlp_action_manager)
     
-    # @staticmethod
-    # def from_params(mdp_params, mlp_params, force_compute=False):
-    #     mdp = OvercookedGridworld(**mdp_params)
-    #     return MediumLevelPlanner.from_pickle_or_compute(mdp.layout_name + "_am.pkl", mdp, mlp_params, force_compute)
-
     @staticmethod
     def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False):
         assert isinstance(mdp, OvercookedGridworld)
@@ -934,16 +920,17 @@ class MediumLevelPlanner(object):
             print("Mlp with different params or mdp found, computing from scratch")
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
-        print("Loaded MediumLevelPlanner from {}".format(PLANNERS_DIR + filename))
+        print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
         return mlp
 
     @staticmethod
     def compute_mlp(filename, mdp, mlp_params):
-        print("Computing MediumLevelPlanner to be saved in {}".format(PLANNERS_DIR + filename))
+        final_filepath = os.path.join(PLANNERS_DIR, filename)
+        print("Computing MediumLevelPlanner to be saved in {}".format(final_filepath))
         start_time = time.time()
         mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
         print("It took {} seconds to create mlp".format(time.time() - start_time))
-        mlp.ml_action_manager.save_to_file(PLANNERS_DIR + filename)
+        mlp.ml_action_manager.save_to_file(final_filepath)
         return mlp
 
     def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):

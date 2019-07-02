@@ -25,14 +25,6 @@ class Direction(object):
             return [Direction.NORTH, Direction.SOUTH]
         raise ValueError('Invalid direction: %s' % direction)
 
-    # TODO: Clean this?
-    # @staticmethod
-    # def get_number_from_direction(direction):
-    #     return Direction.DIRECTION_TO_INDEX[direction]
-
-    # @staticmethod
-    # def get_direction_from_number(number):
-    #     return Direction.INDEX_TO_DIRECTION[number]
 
 class Action(object):
     """
