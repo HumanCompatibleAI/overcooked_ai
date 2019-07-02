@@ -393,5 +393,7 @@ class TestGymEnvironment(unittest.TestCase):
         self.rnd_agent_pair = AgentPair(RandomAgent(), RandomAgent())
         np.random.seed(0)
 
+    # TODO: write more tests here
+
 if __name__ == '__main__':
     unittest.main()

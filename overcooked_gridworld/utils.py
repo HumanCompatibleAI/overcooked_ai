@@ -10,7 +10,6 @@ import pstats
 import random
 import cProfile
 import numpy as np
-import tensorflow as tf
 import stable_baselines
 
 # I/O

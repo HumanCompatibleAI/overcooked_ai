@@ -3,7 +3,7 @@ import argparse
 
 def load_all_environment_tests(skip_planning):
     # Basics
-    from overcooked_gridworld.mdp.overcooked_test import TestDirection, TestGridworld
+    from overcooked_gridworld.mdp.overcooked_test import TestDirection, TestGridworld, TestOvercookedEnvironment, TestGymEnvironment
 
     # Evaluation
     # TODO: should add more evaluation, benchmarking class for example
