@@ -1,4 +1,4 @@
-# REPO_NAME
+# Overcooked-AI
 
 TODO: Change REPO_NAME
 
@@ -7,20 +7,20 @@ TODO: Change REPO_NAME
 When cloning the repo, make sure you also clone the submodules.
 
 ```
-git clone --recurse-submodules -j8 REPO_GITPATH
+git clone --recurse-submodules -j8 git@github.com:HumanCompatibleAI/overcooked_ai.git
 ```
 
 It is useful to setup a conda environment with Python 3.7:
 
 ```
-conda create -n REPO_NAME python=3.7
-conda activate REPO_NAME
+conda create -n overcooked_ai python=3.7
+conda activate overcooked_ai
 ```
 
 To complete the installation, run the following commands:
 
 ```
-cd REPO_NAME
+cd overcooked_ai
 pip setup.py develop
 pip install -r requirements.txt
 ```
