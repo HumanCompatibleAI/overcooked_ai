@@ -3,8 +3,6 @@
 <img src="overcooked_ai_js/images/screenshot.png" width="350">
 </p>
 
-TODO: Change REPO_NAME
-
 ## Installation
 
 When cloning the repo, make sure you also clone the submodules.
