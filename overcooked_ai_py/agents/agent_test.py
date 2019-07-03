@@ -3,12 +3,12 @@ import time
 import unittest
 import numpy as np
 
-from overcooked_gridworld.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, StayAgent, RandomAgent, GreedyHumanModel
-from overcooked_gridworld.mdp.actions import Direction, Action
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
-from overcooked_gridworld.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
-from overcooked_gridworld.agents.benchmarking import AgentEvaluator
+from overcooked_ai_py.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, StayAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.mdp.actions import Direction, Action
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 
 np.random.seed(42)
 

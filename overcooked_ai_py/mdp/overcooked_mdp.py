@@ -1,9 +1,75 @@
 import itertools, copy
 import numpy as np
 from collections import defaultdict
-from overcooked_gridworld.utils import pos_distance, load_dict_from_file
-from overcooked_gridworld.data.layouts import read_layout_dict
-from overcooked_gridworld.mdp.actions import Action, Direction
+from overcooked_ai_py.utils import pos_distance, load_dict_from_file, save_as_json, load_from_json
+from overcooked_ai_py.data.layouts import read_layout_dict
+from overcooked_ai_py.mdp.actions import Action, Direction
+
+
+class ObjectState(object):
+    """
+    State of an object in OvercookedGridworld.
+    """
+
+    SOUP_TYPES = ['onion', 'tomato']
+
+    def __init__(self, name, position, state=None):
+        """
+        name (str): The name of the object
+        position (int, int): Tuple for the current location of the object.
+        state (tuple or None):  
+            Extra information about the object. Is None for all objects 
+            except soups, for which `state` is a tuple:
+            (soup_type, num_items, cook_time)
+            where cook_time is how long the soup has been cooking for.
+        """
+        assert type(position) == tuple
+        self.name = name
+        self.position = position
+        if name == 'soup':
+            assert len(state) == 3
+        self.state = state
+
+    def is_valid(self):
+        if self.name in ['onion', 'tomato', 'dish']:
+            return self.state is None
+        elif self.name == 'soup':
+            soup_type, num_items, cook_time = self.state
+            valid_soup_type = soup_type in self.SOUP_TYPES
+            valid_item_num = (1 <= num_items <= 3)
+            valid_cook_time = (0 <= cook_time)
+            return valid_soup_type and valid_item_num and valid_cook_time
+        # Unrecognized object
+        return False
+
+    def deepcopy(self):
+        return ObjectState(self.name, self.position, self.state)
+
+    def __eq__(self, other):
+        return isinstance(other, ObjectState) and \
+            self.name == other.name and \
+            self.position == other.position and \
+            self.state == other.state
+
+    def __hash__(self):
+        return hash((self.name, self.position, self.state))
+
+    def __repr__(self):
+        if self.state is None:
+            return '{}@{}'.format(self.name, self.position)
+        return '{}@{} with state {}'.format(
+            self.name, self.position, str(self.state))
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "position": self.position,
+            "state": self.state
+        }
+
+    @staticmethod
+    def from_dict(obj_dict):
+        return ObjectState(**obj_dict)
 
 
 class PlayerState(object):
@@ -70,60 +136,19 @@ class PlayerState(object):
     def __repr__(self):
         return '{} facing {} holding {}'.format(
             self.position, self.orientation, str(self.held_object))
+    
+    def to_dict(self):
+        return {
+            "position": self.position,
+            "orientation": self.orientation,
+            "held_object": self.held_object.to_dict() if self.held_object is not None else None
+        }
 
-class ObjectState(object):
-    """
-    State of an object in OvercookedGridworld.
-    """
+    @staticmethod
+    def from_dict(player_dict):
+        player_dict["held_object"] = ObjectState.from_dict(player_dict["held_object"])
+        return PlayerState(**player_dict)
 
-    SOUP_TYPES = ['onion', 'tomato']
-
-    def __init__(self, name, position, state=None):
-        """
-        name (str): The name of the object
-        position (int, int): Tuple for the current location of the object.
-        state (tuple or None):  
-            Extra information about the object. Is None for all objects 
-            except soups, for which `state` is a tuple:
-            (soup_type, num_items, cook_time)
-            where cook_time is how long the soup has been cooking for.
-        """
-        assert type(position) == tuple
-        self.name = name
-        self.position = position
-        if name == 'soup':
-            assert len(state) == 3
-        self.state = state
-
-    def is_valid(self):
-        if self.name in ['onion', 'tomato', 'dish']:
-            return self.state is None
-        elif self.name == 'soup':
-            soup_type, num_items, cook_time = self.state
-            valid_soup_type = soup_type in self.SOUP_TYPES
-            valid_item_num = (1 <= num_items <= 3)
-            valid_cook_time = (0 <= cook_time)
-            return valid_soup_type and valid_item_num and valid_cook_time
-        # Unrecognized object
-        return False
-
-    def deepcopy(self):
-        return ObjectState(self.name, self.position, self.state)
-
-    def __eq__(self, other):
-        return isinstance(other, ObjectState) and \
-            self.name == other.name and \
-            self.position == other.position and \
-            self.state == other.state
-
-    def __hash__(self):
-        return hash((self.name, self.position, self.state))
-
-    def __repr__(self):
-        if self.state is None:
-            return '{}@{}'.format(self.name, self.position)
-        return '{}@{} with state {}'.format(
-            self.name, self.position, str(self.state))
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
@@ -258,6 +283,23 @@ class OvercookedState(object):
     def __str__(self):
         return 'Players: {}, Objects: {}, Order list: {}'.format( 
             str(self.players), str(list(self.objects.values())), str(self.order_list))
+
+    def to_dict(self):
+        return {
+            "players": [p.to_dict() for p in self.players],
+            "objects": [obj.to_dict() for obj in self.objects.values()],
+            "order_list": self.order_list
+        }
+
+    @staticmethod
+    def from_dict(state_dict):
+        state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
+        state_dict["objects"] = [ObjectState.from_dict(o) for o in state_dict["objects"]]
+        return OvercookedState(**state_dict)
+    
+    @staticmethod
+    def from_json(filename):
+        return load_from_json(filename)
 
 
 NO_REW_SHAPING_PARAMS = {

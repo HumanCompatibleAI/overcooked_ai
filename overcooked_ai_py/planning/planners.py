@@ -1,12 +1,12 @@
 import itertools, os
 import numpy as np
 import pickle, time
-from overcooked_gridworld.utils import profile, pos_distance, manhattan_distance
-from overcooked_gridworld.planning.search import SearchTree, Graph, NotConnectedError
-from overcooked_gridworld.mdp.actions import Action, Direction
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
-from overcooked_gridworld.data.planners import load_saved_action_manager, PLANNERS_DIR
+from overcooked_ai_py.utils import profile, pos_distance, manhattan_distance
+from overcooked_ai_py.planning.search import SearchTree, Graph, NotConnectedError
+from overcooked_ai_py.mdp.actions import Action, Direction
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
@@ -1002,7 +1002,10 @@ class MediumLevelPlanner(object):
             cost (int): A* Search cost
         """
         start_state = start_state.deepcopy()
-        start_state.order_list = start_state.order_list[:delivery_horizon]
+        if start_state.order_list is None:
+            start_state.order_list = ["any"] * delivery_horizon
+        else:
+            start_state.order_list = start_state.order_list[:delivery_horizon]
         
         expand_fn = lambda state: self.get_successor_states(state)
         goal_fn = lambda state: len(state.order_list) == 0
@@ -1503,7 +1506,8 @@ class Heuristic(object):
 
         # num_onion_deliveries_to_go = [item for item in state.order_list if item == 'onion']
         # num_tomato_deliveries_to_go = [item for item in state.order_list if item == 'tomato']
-        num_deliveries_to_go = len(state.order_list)
+        # TODO: change this arbitrary 4?
+        num_deliveries_to_go = 4 if state.order_list is None else len(state.order_list)
         
         full_soups_in_pots = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking'] \
                              + pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']

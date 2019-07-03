@@ -1,8 +1,4 @@
-import io
-import pickle
-import pstats
-import random
-import cProfile
+import io, json, pickle, pstats, cProfile
 import numpy as np
 
 # I/O
@@ -29,6 +25,14 @@ def save_dict_to_file(dic, filename):
 
 def load_dict_from_txt(filename):
     return load_dict_from_file(filename + ".txt")
+
+def save_as_json(filename, data):
+    with open(filename + ".json", 'w') as outfile:
+	    json.dump(data, outfile)
+
+def load_from_json(filename):
+    with open(filename + ".json", 'r') as json_file:
+	    return json.load(json_file)
 
 # MDP
 

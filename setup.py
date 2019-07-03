@@ -2,7 +2,7 @@
 
 from setuptools import setup, find_packages
 
-setup(name='overcooked_gridworld',
+setup(name='overcooked_ai',
       version='0.0.1',
       description='Cooperative multi-agent environment based on Overcooked',
       author='Micah Carroll',

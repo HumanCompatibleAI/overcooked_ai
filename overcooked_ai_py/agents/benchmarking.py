@@ -4,13 +4,14 @@ import tqdm
 import numpy as np
 from argparse import ArgumentParser
 
-from overcooked_gridworld.utils import load_dict_from_file, save_pickle, load_pickle, cumulative_rewards_from_rew_list
-from overcooked_gridworld.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner, NO_COUNTERS_START_OR_PARAMS
-from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
-from overcooked_gridworld.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, Action, NO_REW_SHAPING_PARAMS
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
+from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner, NO_COUNTERS_START_OR_PARAMS
+from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, NO_REW_SHAPING_PARAMS
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
+# TODO: Clean all unnecessary imports
 
 class AgentEvaluator(object):
     """
@@ -107,7 +108,7 @@ class AgentEvaluator(object):
                     simulation_env.display_states(states[i + 1], next_state)
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
-            
+
 
     ### I/O METHODS ###
 
@@ -123,7 +124,7 @@ class AgentEvaluator(object):
         traj = load_pickle(filename)
         self.check_trajectories(traj)
         return traj
-    
+
     @staticmethod
     def save_traj_in_stable_baselines_format(rollout_trajs, filename):
         # Converting episode dones to episode starts
@@ -141,6 +142,26 @@ class AgentEvaluator(object):
         }
         stable_baselines_trajs_dict = { k:np.array(v) for k, v in stable_baselines_trajs_dict.items() }
         np.savez(filename, **stable_baselines_trajs_dict)
+
+    @staticmethod
+    def save_traj_as_json(trajectory, filename, idx=0):
+        """Saves the `idx`th trajectory as a list of state action pairs"""
+        ep_actions = trajectory["ep_actions"][idx]
+        ep_observation = trajectory["ep_observations"][idx]
+        assert len(ep_actions) == len(ep_observation)
+        traj_dict = {
+            "state_action_traj": [],
+            "layout_name": trajectory["layout_name"]
+        }
+        for act, ob in zip(ep_actions, ep_observation):
+            traj_dict["state_action_traj"].append((act, ob.to_dict()))
+        
+        save_as_json(filename, traj_dict)
+
+    @staticmethod
+    def load_traj_from_json(filename):
+        traj_dict = load_from_json(filename)
+        print(traj_dict)
 
     ### VIZUALIZATION METHODS ###
 

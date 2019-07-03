@@ -3,9 +3,9 @@ import itertools
 import numpy as np
 from collections import defaultdict
 
-from overcooked_gridworld.mdp.actions import Action, Direction
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedState
-from overcooked_gridworld.planning.planners import MediumLevelPlanner, Heuristic
+from overcooked_ai_py.mdp.actions import Action, Direction
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, Heuristic
 
 
 class Agent(object):
@@ -131,7 +131,7 @@ class EmbeddedPlanningAgent(Agent):
         self.debug = debug
 
     def action(self, state):
-        from overcooked_gridworld.planning.search import SearchTree
+        from overcooked_ai_py.planning.search import SearchTree
         start_state = state.deepcopy()
         start_state.order_list = start_state.order_list[:self.delivery_horizon]
         other_agent_index = 1 - self.agent_index

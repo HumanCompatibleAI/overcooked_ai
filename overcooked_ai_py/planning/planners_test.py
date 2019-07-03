@@ -1,8 +1,8 @@
 import unittest, time, pickle
-from overcooked_gridworld.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
-from overcooked_gridworld.mdp.actions import Direction, Action
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
+from overcooked_ai_py.mdp.actions import Direction, Action
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 force_compute = True
 force_compute_large = False

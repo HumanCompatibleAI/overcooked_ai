@@ -6,12 +6,12 @@ from hr_coordination.pbt.pbt_utils import load_baselines_model, get_agent_from_s
 from hr_coordination.ppo.ppo import get_ppo_agent
 from hr_coordination.imitation.behavioural_cloning import get_bc_agent_from_saved
 
-from overcooked_gridworld.mdp.overcooked_mdp import OvercookedGridworld, Direction, Action
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv
-from overcooked_gridworld.agents.agent import StayAgent, RandomAgent, AgentFromPolicy, GreedyHumanModel
-from overcooked_gridworld.planning.planners import MediumLevelPlanner
-from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
-from overcooked_gridworld.utils import load_dict_from_file, get_max_iter
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Direction, Action
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.agents.agent import StayAgent, RandomAgent, AgentFromPolicy, GreedyHumanModel
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
+from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.utils import load_dict_from_file, get_max_iter
 
 UP = 273
 RIGHT = 275

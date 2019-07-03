@@ -1,0 +1,522 @@
+{
+    "state_action_traj": [
+        [
+            [
+                [
+                    0,
+                    -1
+                ],
+                [
+                    1,
+                    0
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            2
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": null
+                    }
+                ],
+                "objects": [],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    1,
+                    0
+                ],
+                "interact"
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": null
+                    }
+                ],
+                "objects": [],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    -1,
+                    0
+                ],
+                [
+                    -1,
+                    0
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                3,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                "interact",
+                [
+                    0,
+                    -1
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                2,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    0,
+                    0
+                ],
+                "interact"
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                1,
+                                1
+                            ],
+                            "state": null
+                        }
+                    },
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                2,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    1,
+                    0
+                ],
+                [
+                    1,
+                    0
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                1,
+                                1
+                            ],
+                            "state": null
+                        }
+                    },
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": null
+                    }
+                ],
+                "objects": [
+                    {
+                        "name": "soup",
+                        "position": [
+                            2,
+                            0
+                        ],
+                        "state": [
+                            "onion",
+                            1,
+                            0
+                        ]
+                    }
+                ],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    0,
+                    -1
+                ],
+                "interact"
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                2,
+                                1
+                            ],
+                            "state": null
+                        }
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": null
+                    }
+                ],
+                "objects": [
+                    {
+                        "name": "soup",
+                        "position": [
+                            2,
+                            0
+                        ],
+                        "state": [
+                            "onion",
+                            1,
+                            0
+                        ]
+                    }
+                ],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                "interact",
+                [
+                    0,
+                    0
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                2,
+                                1
+                            ],
+                            "state": null
+                        }
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                3,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [
+                    {
+                        "name": "soup",
+                        "position": [
+                            2,
+                            0
+                        ],
+                        "state": [
+                            "onion",
+                            1,
+                            0
+                        ]
+                    }
+                ],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                [
+                    -1,
+                    0
+                ],
+                [
+                    -1,
+                    0
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            0,
+                            -1
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            3,
+                            1
+                        ],
+                        "orientation": [
+                            1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                3,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [
+                    {
+                        "name": "soup",
+                        "position": [
+                            2,
+                            0
+                        ],
+                        "state": [
+                            "onion",
+                            2,
+                            0
+                        ]
+                    }
+                ],
+                "order_list": null
+            }
+        ],
+        [
+            [
+                "interact",
+                [
+                    0,
+                    -1
+                ]
+            ],
+            {
+                "players": [
+                    {
+                        "position": [
+                            1,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": null
+                    },
+                    {
+                        "position": [
+                            2,
+                            1
+                        ],
+                        "orientation": [
+                            -1,
+                            0
+                        ],
+                        "held_object": {
+                            "name": "onion",
+                            "position": [
+                                2,
+                                1
+                            ],
+                            "state": null
+                        }
+                    }
+                ],
+                "objects": [
+                    {
+                        "name": "soup",
+                        "position": [
+                            2,
+                            0
+                        ],
+                        "state": [
+                            "onion",
+                            2,
+                            0
+                        ]
+                    }
+                ],
+                "order_list": null
+            }
+        ]
+    ],
+    "layout_name": "simple"
+}

@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
 
-from overcooked_gridworld.mdp.actions import Action, Direction
-from overcooked_gridworld.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
-from overcooked_gridworld.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
-from overcooked_gridworld.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.mdp.actions import Action, Direction
+from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
+from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 
 START_ORDER_LIST = ["any"]
 
@@ -298,7 +298,7 @@ class TestGridworld(unittest.TestCase):
             order_list=['any']))
 
 
-from overcooked_gridworld.agents.agent import AgentPair, RandomAgent
+from overcooked_ai_py.agents.agent import AgentPair, RandomAgent
 
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)

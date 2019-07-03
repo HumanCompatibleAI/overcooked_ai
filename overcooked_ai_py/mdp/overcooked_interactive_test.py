@@ -1,6 +1,6 @@
 import unittest
-from overcooked_gridworld.utils import reset_tf
-from overcooked_gridworld.mdp.overcooked_interactive import setup_game
+from overcooked_ai_py.utils import reset_tf
+from overcooked_ai_py.mdp.overcooked_interactive import setup_game
 
 class TestInteractiveSetup(unittest.TestCase):
 
