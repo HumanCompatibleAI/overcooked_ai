@@ -912,8 +912,8 @@ class MediumLevelPlanner(object):
         
         try:
             mlp = MediumLevelPlanner.from_action_manager_file(filename)
-        except (FileNotFoundError, ModuleNotFoundError, EOFError):
-            print("No mlp or corrupt mlp file found, computing MediumLevelPlanner from scratch")
+        except (FileNotFoundError, ModuleNotFoundError, EOFError) as e:
+            print("{}. Computing MediumLevelPlanner from scratch".format(e))
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
         if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
