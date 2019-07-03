@@ -1,3 +1,10 @@
+
+<p align="center">
+<img src="images/screenshot.png" width="350">
+</p>
+  
+
+
 # Overcooked-AI
 
 TODO: Change REPO_NAME
@@ -33,7 +40,7 @@ To verify your installation, you can try running the following command from the 
 python run_tests.py -f
 ```
 
-## Repo Structure Overview
+## Python Repo Structure Overview
 
 `mdp/`:
 - `overcooked_mdp.py`: main Overcooked game logic
@@ -50,3 +57,27 @@ python run_tests.py -f
 - `search.py`: A* search and shortest path logic
 
 `run_tests.py`: script to run all tests
+
+# Javascript Visualizations
+
+In `REPO_NAME` there is a javascript implementation of the Overcooked MDP and game visualizer.
+
+## Visualization Demo
+To run a simple demo that plays a trajectory demonstrating the
+transitions in the game:
+```
+$ open http://localhost:8123/demo.html; python2.7 -m SimpleHTTPServer 8123
+```
+
+Or if you have npm installed (recommended):
+```
+$ npm run demo
+```
+
+## Development
+Set up the package with `npm install`.
+
+Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
+`npm run build-window` should be run before running modified tests.
+
+`overcooked-window.js` is used for the demo and testing.
