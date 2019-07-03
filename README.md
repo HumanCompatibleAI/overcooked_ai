@@ -1,6 +1,6 @@
 # Overcooked-AI
 <p align="center">
-<img src="overcooked_js/images/screenshot.png" width="350">
+<img src="overcooked_ai_js/images/screenshot.png" width="350">
 </p>
 
 TODO: Change REPO_NAME
@@ -30,13 +30,13 @@ pip install -r requirements.txt
 
 ## Verify Installation
 
-To verify your installation, you can try running the following command from the inner `REPO_NAME` folder (with flag `-f` for a quick run, and without for a more comprehensive suite that will take approximately 5/10 minutes to run):
+To verify your installation, you can try running the following command from the inner `overcooked_ai_py` folder (with flag `-f` for a quick run, and without for a more comprehensive suite that will take approximately 5/10 minutes to run):
 
 ```
 python run_tests.py -f
 ```
 
-## Python Repo Structure Overview
+## `overcooked_ai_py` Structure Overview
 
 `mdp/`:
 - `overcooked_mdp.py`: main Overcooked game logic
@@ -56,7 +56,7 @@ python run_tests.py -f
 
 # Javascript Visualizations
 
-In `REPO_NAME` there is a javascript implementation of the Overcooked MDP and game visualizer.
+In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
 
 ## Visualization Demo
 To run a simple demo that plays a trajectory demonstrating the
