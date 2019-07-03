@@ -1,11 +1,7 @@
-
-<p align="center">
-<img src="images/screenshot.png" width="350">
-</p>
-  
-
-
 # Overcooked-AI
+<p align="center">
+<img src="overcooked_js/images/screenshot.png" width="350">
+</p>
 
 TODO: Change REPO_NAME
 
