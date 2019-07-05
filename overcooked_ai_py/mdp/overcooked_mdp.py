@@ -924,9 +924,7 @@ class OvercookedGridworld(object):
 
             grid_string += "\n"
         
-        if state.order_list is None:
-            grid_string += "No order goal!"
-        else:
+        if state.order_list is not None:
             grid_string += "Current orders: {}/{} are any's\n".format(
                 len(state.order_list), len([order == "any" for order in state.order_list])
             )

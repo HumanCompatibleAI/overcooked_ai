@@ -43,7 +43,7 @@ class OvercookedEnv(object):
         return self.mdp.state_string(self.state)
 
     def print_state_transition(self, a_t, r_t, info):
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}".format(
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}\n".format(
             self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["shaped_r"], self)
         )
 
