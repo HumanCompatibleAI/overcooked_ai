@@ -318,10 +318,6 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_constructor(self):
         OvercookedEnv(self.base_mdp, horizon=10)
 
-        with self.assertRaises(AssertionError):
-            # Infinite horizon and unlimited orders
-            OvercookedEnv(self.base_mdp, **{"horizon": np.Inf})
-
         with self.assertRaises(TypeError):
             OvercookedEnv(self.base_mdp, **{"invalid_env_param": None})
 
