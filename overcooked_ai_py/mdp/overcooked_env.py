@@ -36,6 +36,8 @@ class OvercookedEnv(object):
         self.horizon = horizon
         self.start_state_fn = start_state_fn
         self.reset()
+        if self.horizon >= MAX_HORIZON and self.state.order_list is None and debug:
+            print("Environment has (near-)infinite horizon and no terminal states")
 
     def __repr__(self):
         """Standard way to view the state of an environment programatically
@@ -101,8 +103,6 @@ class OvercookedEnv(object):
         self.cumulative_sparse_rewards = 0
         self.cumulative_shaped_rewards = 0
         self.t = 0
-        assert not (self.horizon >= MAX_HORIZON and self.state.order_list is None), \
-            "Should not have no order list and infinite environment horizon (no terminal states)"
 
     def is_done(self):
         """Whether the episode is over."""

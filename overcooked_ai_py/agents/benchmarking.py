@@ -5,10 +5,10 @@ import numpy as np
 from argparse import ArgumentParser
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
-from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner, NO_COUNTERS_START_OR_PARAMS
+from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, NO_REW_SHAPING_PARAMS
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 # TODO: Clean all unnecessary imports
@@ -166,7 +166,7 @@ class AgentEvaluator(object):
     ### VIZUALIZATION METHODS ###
 
     @staticmethod
-    def interactive_from_traj(trajectories, traj_idx=0):
+    def interactive_from_traj(trajectories, traj_idx=0, mdp_params={}, env_params={}):
         """
         Displays ith trajectory of trajectories (in standard format) 
         interactively in a Jupyter notebook.
@@ -177,7 +177,9 @@ class AgentEvaluator(object):
         joint_actions = trajectories["ep_actions"][traj_idx]
         cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
         layout_name = trajectories["layout_name"]
-        env = AgentEvaluator(layout_name).env
+        assert "layout_name" not in mdp_params.keys() or (mdp_params["layout_name"] == layout_name), "{} vs {}".format(mdp_params["layout_name"], layout_name)
+        mdp_params["layout_name"] = layout_name
+        env = AgentEvaluator(mdp_params).env
 
         def update(t = 1.0):
             env.state = states[int(t)]

@@ -361,7 +361,7 @@ class OvercookedGridworld(object):
         return OvercookedGridworld(
             terrain=self.terrain_mtx.copy(),
             start_player_positions=self.start_player_positions,
-            start_order_list=list(self.start_order_list),
+            start_order_list=None if self.start_order_list is None else list(self.start_order_list),
             cook_time=self.soup_cooking_time,
             num_items_for_soup=self.num_items_for_soup,
             delivery_reward=self.delivery_reward,
