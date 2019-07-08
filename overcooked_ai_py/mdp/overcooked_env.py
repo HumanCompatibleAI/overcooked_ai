@@ -49,6 +49,13 @@ class OvercookedEnv(object):
             self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["shaped_r"], self)
         )
 
+    @property
+    def env_params(self):
+        return {
+            "start_state_fn": self.start_state_fn,
+            "horizon": self.horizon
+        }
+
     def display_states(self, *states):
         old_state = self.state
         for s in states:
@@ -186,9 +193,8 @@ class OvercookedEnv(object):
             "ep_returns": [], # Sum of dense and sparse rewards across each episode
             "ep_returns_sparse": [], # Sum of sparse rewards across each episode
             "ep_lengths": [], # Lengths of each episode
-            
-            # With shape (1, ):
-            # "layout_name": Name of the layout, added after array pre-processing
+            "mdp_params": [], # Custom MDP params to for each episode
+            "env_params": [] # Custom Env params for each episode
         }
 
         for _ in tqdm.trange(num_games):
@@ -203,6 +209,8 @@ class OvercookedEnv(object):
             trajectories["ep_returns"].append(tot_rews_sparse + tot_rews_shaped * reward_shaping)
             trajectories["ep_returns_sparse"].append(tot_rews_sparse)
             trajectories["ep_lengths"].append(time_taken)
+            trajectories["mdp_params"].append(self.mdp.mdp_params)
+            trajectories["env_params"].append(self.env_params)
 
         mu, se = mean_and_std_err(trajectories["ep_returns"])
         print("Avg reward {:.2f} (std: {:.2f}, se: {:.2f}) over {} games of avg length {}".format(
@@ -211,8 +219,6 @@ class OvercookedEnv(object):
 
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
-        # NOTE: In variable MDP envs this will not work
-        trajectories['layout_name'] = self.mdp.layout_name
         return trajectories
 
 

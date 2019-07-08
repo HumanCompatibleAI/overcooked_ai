@@ -369,6 +369,19 @@ class OvercookedGridworld(object):
             layout_name=self.layout_name
         )
 
+    @property
+    def mdp_params(self):
+        return {
+            "layout_name": self.layout_name,
+            "terrain": self.terrain_mtx,
+            "start_player_positions": self.start_player_positions,
+            "start_order_list": self.start_order_list,
+            "cook_time": self.soup_cooking_time,
+            "num_items_for_soup": self.num_items_for_soup,
+            "delivery_reward": self.delivery_reward,
+            "rew_shaping_params": copy.deepcopy(self.reward_shaping_params)
+        }
+
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
         """

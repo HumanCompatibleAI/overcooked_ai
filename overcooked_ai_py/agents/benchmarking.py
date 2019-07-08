@@ -90,6 +90,8 @@ class AgentEvaluator(object):
         """
         Check consistency of trajectory with idx `idx` with mdp dynamics.
         NOTE: does not check dones positions, lengths consistency, order lists reducing if not None
+
+        TODO: Should also check signature!!!
         """
         states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
 
@@ -148,10 +150,12 @@ class AgentEvaluator(object):
         """Saves the `idx`th trajectory as a list of state action pairs"""
         ep_actions = trajectory["ep_actions"][idx]
         ep_observation = trajectory["ep_observations"][idx]
+
         assert len(ep_actions) == len(ep_observation)
         traj_dict = {
             "state_action_traj": [],
-            "layout_name": trajectory["layout_name"]
+            "mdp_params": trajectory["mdp_params"][idx],
+            "env_params": trajectory["env_params"][idx]
         }
         for act, ob in zip(ep_actions, ep_observation):
             traj_dict["state_action_traj"].append((act, ob.to_dict()))
@@ -166,7 +170,7 @@ class AgentEvaluator(object):
     ### VIZUALIZATION METHODS ###
 
     @staticmethod
-    def interactive_from_traj(trajectories, traj_idx=0, mdp_params={}, env_params={}):
+    def interactive_from_traj(trajectories, traj_idx=0):
         """
         Displays ith trajectory of trajectories (in standard format) 
         interactively in a Jupyter notebook.
@@ -176,16 +180,16 @@ class AgentEvaluator(object):
         states = trajectories["ep_observations"][traj_idx]
         joint_actions = trajectories["ep_actions"][traj_idx]
         cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
-        layout_name = trajectories["layout_name"]
-        assert "layout_name" not in mdp_params.keys() or (mdp_params["layout_name"] == layout_name), "{} vs {}".format(mdp_params["layout_name"], layout_name)
-        mdp_params["layout_name"] = layout_name
-        env = AgentEvaluator(mdp_params).env
+        mdp_params = trajectories["mdp_params"][traj_idx]
+        env_params = trajectories["env_params"][traj_idx]
+        env = AgentEvaluator(mdp_params, env_params=env_params).env
 
         def update(t = 1.0):
             env.state = states[int(t)]
+            joint_action = joint_actions[int(t - 1)] if t > 0 else (Action.STAY, Action.STAY)
             print(env)
-            joint_action = joint_actions[int(t)]
             print("Joint Action: {} \t Score: {}".format(Action.joint_action_to_char(joint_action), cumulative_rewards[t]))
+            
             
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})

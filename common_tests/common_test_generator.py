@@ -45,7 +45,17 @@ traj = {
     "ep_actions": [[s_a_r[1] for s_a_r in s_a_r_pairs]],
     "ep_observations": [[s_a_r[0] for s_a_r in s_a_r_pairs]],
     "ep_rewards": [[s_a_r[2] for s_a_r in s_a_r_pairs]],
-    "layout_name": "mdp_test"
+    "mdp_params": [{
+        "layout_name": "mdp_test",
+        "cook_time": 5,
+        "start_order_list": ["onion", "any"],
+        "num_items_for_soup": 3,
+        "rew_shaping_params": None
+    }],
+    "env_params": [{
+        "horizon": 100,
+        "start_state_fn": None
+    }]
 }
 
 AgentEvaluator.save_traj_as_json(traj, "test_traj")
