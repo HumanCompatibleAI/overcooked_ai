@@ -240,11 +240,18 @@ class Overcooked(gym.Env):
     what agent index it has in the environment (as encodings will be index dependent).
     """
 
-    def custom_init(self, base_env, featurize_fn):
+    def custom_init(self, base_env, featurize_fn, baselines=False):
         """
         base_env: OvercookedEnv
         featurize_fn: what function is used to featurize states returned in the 'both_agent_obs' field
         """
+        if baselines:
+            # NOTE: To prevent the randomness of choosing agent indexes
+            # from leaking when using subprocess-vec-env in baselines (which 
+            # seeding does not) reach, we set the same seed internally to all
+            # environments. The effect is negligible, as all other randomness
+            # is controlled by the actual run seeds
+            np.random.seed(0)
         self.base_env = base_env
         self.mdp = base_env.mdp
         self.featurize_fn = featurize_fn
