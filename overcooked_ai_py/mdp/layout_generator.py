@@ -1,8 +1,8 @@
-import time
 import numpy as np
 from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+
 
 EMPTY = ' '
 COUNTER = 'X'

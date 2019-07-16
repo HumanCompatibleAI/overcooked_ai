@@ -1,5 +1,6 @@
 import itertools
 
+
 class Direction(object):
     """
     The four possible directions a player can be facing.

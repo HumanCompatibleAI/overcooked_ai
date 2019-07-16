@@ -14,7 +14,6 @@ defusedxml==0.6.0
 entrypoints==0.3
 future==0.17.1
 gym==0.12.1
--e git+https://github.com/HumanCompatibleAI/hr_coordination@595f73ff6660558b47adbff850cfeed14e23bd56#egg=hr_coordination
 idna==2.8
 ipykernel==5.1.0
 ipython==7.4.0
@@ -34,7 +33,6 @@ nbconvert==5.4.1
 nbformat==4.4.0
 notebook==5.7.8
 numpy==1.16.3
--e git+git@github.com:HumanCompatibleAI/overcooked_gridworld.git@a5409d74007d2ebb0524fd1cb86baa03eb7a9c97#egg=overcooked_gridworld
 pandocfilters==1.4.2
 parso==0.4.0
 pexpect==4.7.0

@@ -1,11 +1,8 @@
-import scipy
 import itertools
 import numpy as np
-from collections import defaultdict
 
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, Heuristic
+from overcooked_ai_py.planning.planners import Heuristic
 
 
 class Agent(object):

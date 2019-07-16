@@ -1,8 +1,5 @@
-import os
 import json
-import tqdm
 import numpy as np
-from argparse import ArgumentParser
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
@@ -11,7 +8,6 @@ from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, Rando
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
-# TODO: Clean all unnecessary imports
 
 class AgentEvaluator(object):
     """

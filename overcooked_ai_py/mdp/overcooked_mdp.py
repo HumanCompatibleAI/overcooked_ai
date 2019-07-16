@@ -1,7 +1,7 @@
 import itertools, copy
 import numpy as np
 from collections import defaultdict
-from overcooked_ai_py.utils import pos_distance, save_as_json, load_from_json
+from overcooked_ai_py.utils import pos_distance, load_from_json
 from overcooked_ai_py.data.layouts import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
 

@@ -1,8 +1,8 @@
 import itertools, os
 import numpy as np
 import pickle, time
-from overcooked_ai_py.utils import profile, pos_distance, manhattan_distance
-from overcooked_ai_py.planning.search import SearchTree, Graph, NotConnectedError
+from overcooked_ai_py.utils import pos_distance, manhattan_distance
+from overcooked_ai_py.planning.search import SearchTree, Graph
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv

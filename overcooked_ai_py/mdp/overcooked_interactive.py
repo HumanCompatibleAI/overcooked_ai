@@ -2,7 +2,7 @@ import pygame
 from argparse import ArgumentParser
 
 # TODO: Think about how to deal with this
-from hr_coordination.pbt.pbt_utils import load_baselines_model, get_agent_from_saved_model, setup_mdp_env, get_config_from_pbt_dir
+from hr_coordination.baselines_utils import load_baselines_model, get_agent_from_saved_model, setup_mdp_env, get_config_from_pbt_dir
 from hr_coordination.ppo.ppo import get_ppo_agent
 from hr_coordination.imitation.behavioural_cloning import get_bc_agent_from_saved
 
