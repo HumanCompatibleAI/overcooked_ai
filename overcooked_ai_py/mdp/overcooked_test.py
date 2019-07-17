@@ -5,6 +5,9 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.agents.agent import AgentPair, RandomAgent
+from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+
 
 START_ORDER_LIST = ["any"]
 
@@ -297,8 +300,10 @@ class TestGridworld(unittest.TestCase):
              (2, 3): Obj('soup', (2, 3), ('tomato', 1, 0))}, 
             order_list=['any']))
 
+    def test_common_mdp(self):
+        trajectories = AgentEvaluator.load_traj_from_json('common_tests/test_traj')
+        AgentEvaluator.check_trajectories(trajectories)
 
-from overcooked_ai_py.agents.agent import AgentPair, RandomAgent
 
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)

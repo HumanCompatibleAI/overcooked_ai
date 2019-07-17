@@ -1,12 +1,15 @@
-import json
+import json, copy
 import numpy as np
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+
+
+DEFAULT_TRAJ_KEYS = ["ep_observations", "ep_actions", "ep_rewards", "ep_dones", "ep_returns", "ep_returns_sparse", "ep_lengths", "mdp_params", "env_params"]
 
 
 class AgentEvaluator(object):
@@ -77,35 +80,34 @@ class AgentEvaluator(object):
             cumulative_rew += r_t
         return cumulative_rew
 
-    def check_trajectories(self, trajectories):
-        """Checks consistency of trajectories in standard format with dynamics of mdp."""
-        for i in range(len(trajectories["ep_observations"])):
-            self.check_trajectory(trajectories, i)
-
-    def check_trajectory(self, trajectories, idx):
+    @staticmethod
+    def check_trajectories(trajectories):
         """
-        Check consistency of trajectory with idx `idx` with mdp dynamics.
+        Checks consistency of trajectories in standard format with dynamics of mdp.
+        
         NOTE: does not check dones positions, lengths consistency, order lists reducing if not None
 
         TODO: Should also check signature!!!
         """
-        states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+        for idx in range(len(trajectories["ep_observations"])):
+            states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+            mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
 
-        assert len(states) == len(actions)
+            assert len(states) == len(actions)
 
-        # Checking that actions would give rise to same behaviour in current MDP
-        simulation_env = self.env.copy()
-        for i in range(len(states)):
-            curr_state = states[i]
-            simulation_env.state = curr_state
+            # Checking that actions would give rise to same behaviour in current MDP
+            simulation_env = OvercookedEnv(OvercookedGridworld.from_layout_name(**mdp_params), **env_params)
+            for i in range(len(states)):
+                curr_state = states[i]
+                simulation_env.state = curr_state
 
-            if i + 1 < len(states):
-                next_state, reward, done, info = simulation_env.step(actions[i])
+                if i + 1 < len(states):
+                    next_state, reward, done, info = simulation_env.step(actions[i])
 
-                assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
-                    simulation_env.display_states(states[i + 1], next_state)
-                )
-                assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
+                    assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
+                        simulation_env.display_states(states[i + 1], next_state)
+                    )
+                    assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
 
 
     ### I/O METHODS ###
@@ -142,26 +144,22 @@ class AgentEvaluator(object):
         np.savez(filename, **stable_baselines_trajs_dict)
 
     @staticmethod
-    def save_traj_as_json(trajectory, filename, idx=0):
+    def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
-        ep_actions = trajectory["ep_actions"][idx]
-        ep_observation = trajectory["ep_observations"][idx]
+        assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
 
-        assert len(ep_actions) == len(ep_observation)
-        traj_dict = {
-            "state_action_traj": [],
-            "mdp_params": trajectory["mdp_params"][idx],
-            "env_params": trajectory["env_params"][idx]
-        }
-        for act, ob in zip(ep_actions, ep_observation):
-            traj_dict["state_action_traj"].append((act, ob.to_dict()))
-        
-        save_as_json(filename, traj_dict)
+        dict_traj = copy.deepcopy(trajectory)
+        dict_traj["ep_observations"] = [[ob.to_dict() for ob in one_ep_obs] for one_ep_obs in trajectory["ep_observations"]]
+
+        save_as_json(filename, dict_traj)
 
     @staticmethod
     def load_traj_from_json(filename):
         traj_dict = load_from_json(filename)
-        print(traj_dict)
+        traj_dict["ep_observations"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_observations"]]
+        traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
+        return traj_dict
+
 
     ### VIZUALIZATION METHODS ###
 

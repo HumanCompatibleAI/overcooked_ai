@@ -23,12 +23,11 @@ class ObjectState(object):
             (soup_type, num_items, cook_time)
             where cook_time is how long the soup has been cooking for.
         """
-        assert type(position) == tuple
         self.name = name
-        self.position = position
+        self.position = tuple(position)
         if name == 'soup':
             assert len(state) == 3
-        self.state = state
+        self.state = None if state is None else tuple(state)
 
     def is_valid(self):
         if self.name in ['onion', 'tomato', 'dish']:
@@ -69,6 +68,7 @@ class ObjectState(object):
 
     @staticmethod
     def from_dict(obj_dict):
+        obj_dict = copy.deepcopy(obj_dict)
         return ObjectState(**obj_dict)
 
 
@@ -82,15 +82,14 @@ class PlayerState(object):
                  None if there is no such object.
     """
     def __init__(self, position, orientation, held_object=None):
-        assert type(position) == tuple
-        assert orientation in Direction.ALL_DIRECTIONS
-        if held_object is not None:
-            assert isinstance(held_object, ObjectState)
-            assert held_object.position == position
-
-        self.position = position
-        self.orientation = orientation
+        self.position = tuple(position)
+        self.orientation = tuple(orientation)
         self.held_object = held_object
+
+        assert self.orientation in Direction.ALL_DIRECTIONS
+        if self.held_object is not None:
+            assert isinstance(self.held_object, ObjectState)
+            assert self.held_object.position == self.position
 
     @property
     def pos_and_or(self):
@@ -146,7 +145,10 @@ class PlayerState(object):
 
     @staticmethod
     def from_dict(player_dict):
-        player_dict["held_object"] = ObjectState.from_dict(player_dict["held_object"])
+        player_dict = copy.deepcopy(player_dict)
+        held_obj = player_dict["held_object"]
+        if held_obj is not None:
+            player_dict["held_object"] = ObjectState.from_dict(held_obj)
         return PlayerState(**player_dict)
 
 
@@ -293,8 +295,10 @@ class OvercookedState(object):
 
     @staticmethod
     def from_dict(state_dict):
+        state_dict = copy.deepcopy(state_dict)
         state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
-        state_dict["objects"] = [ObjectState.from_dict(o) for o in state_dict["objects"]]
+        object_list = [ObjectState.from_dict(o) for o in state_dict["objects"]]
+        state_dict["objects"] = { ob.position : ob for ob in object_list }
         return OvercookedState(**state_dict)
     
     @staticmethod
