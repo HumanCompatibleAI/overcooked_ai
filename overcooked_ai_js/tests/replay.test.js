@@ -2,7 +2,7 @@ import _ from 'lodash';
 import $ from "jquery";
 
 require("overcooked-window.js");
-var trajectoryData = require("tests/test_traj.json");
+var trajectoryData = require("../../common_tests/test_traj.json");
 // to get a test that should fail, run with "tests/failing_traj.json";
 
 let OvercookedMDP = window.Overcooked.OvercookedMDP;
