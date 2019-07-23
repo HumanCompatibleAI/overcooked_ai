@@ -3,7 +3,7 @@ import $ from "jquery";
 
 require("overcooked-window.js");
 var trajectoryData = require("../../common_tests/test_traj.json");
-// to get a test that should fail, run with "tests/failing_traj.json";
+// to get a test that should fail, run with "../../common_tests/failing_traj.json";
 
 let OvercookedMDP = window.Overcooked.OvercookedMDP;
 let OvercookedGame = window.Overcooked.OvercookedGame.OvercookedGame;

@@ -40,8 +40,8 @@
               1
             ],
             "orientation": [
-              0,
-              -1
+              1,
+              0
             ],
             "held_object": null
           },
@@ -68,11 +68,11 @@
           {
             "position": [
               1,
-              2 // state modified here to fail
+              2
             ],
             "orientation": [
-              -1,
-              0
+              0,
+              -1
             ],
             "held_object": null
           },
