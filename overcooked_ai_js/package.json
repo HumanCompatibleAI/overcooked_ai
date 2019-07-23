@@ -36,6 +36,8 @@
   "jest": {
     "setupFiles": [
       "jest-canvas-mock"
-    ]
+    ], 
+    "verbose": false, 
+    "modulePaths":  ["<rootDir>"]
   }
 }

@@ -294,7 +294,7 @@ export function lookupActions(actions_arr) {
         if (item == "interact") {
             item = Action.INTERACT; 
         }
-        if (item == "stay") {
+        if (arraysEqual(Direction.STAY, item) || item == "stay") {
             item = Direction.STAY;
         }
         actions.push(item);
@@ -302,6 +302,18 @@ export function lookupActions(actions_arr) {
         )
     return actions;
     
+}
+
+function arraysEqual(a, b) {
+    // Stolen from https://stackoverflow.com/questions/3115982/how-to-check-if-two-arrays-are-equal-with-javascript
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; ++i) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+
 }
 /*
 
@@ -327,7 +339,6 @@ export class OvercookedGridworld {
         this.DELIVERY_REWARD = DELIVERY_REWARD
         this.always_serve = always_serve;
         this.num_items_for_soup = num_items_for_soup;
-        console.log(this.num_items_for_soup);
     }
 
     get_start_state (order_list) {
@@ -388,7 +399,6 @@ export class OvercookedGridworld {
 
         //finally, environment effects
         this.step_environment_effects(new_state);
-
         return [[new_state, 1.0], reward]
     }
 
@@ -543,7 +553,8 @@ export class OvercookedGridworld {
         }
         let new_pos = Direction.move_in_direction(position, action);
         let new_orientation;
-        if (action === Direction.STAY) {
+
+        if (_.isEqual(Direction.STAY, action)) {
             new_orientation = orientation;
         }
         else {
@@ -639,7 +650,7 @@ export class OvercookedGridworld {
                         (this.terrain_mtx[y][x] === 'P') &&
                         (cook_time < this.explosion_time) &&
                         (num_items === this.num_items_for_soup)) {
-                    obj.state = [soup_type, num_items, cook_time + 1];
+                    obj.state = [soup_type, num_items, Math.min(cook_time + 1, this.COOK_TIME)];
                 }
                 if ((obj.state[2] === this.explosion_time) && (num_items === this.num_items_for_soup)) {
                     state.pot_explosion = true

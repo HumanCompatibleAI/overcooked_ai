@@ -1,10 +1,12 @@
 import _ from 'lodash';
 import $ from "jquery";
 
-require("../overcooked-window.js");
+require("overcooked-window.js");
+var trajectoryData = require("tests/test_traj.json");
+// to get a test that should fail, run with "tests/failing_traj.json";
 
 let OvercookedMDP = window.Overcooked.OvercookedMDP;
-
+let OvercookedGame = window.Overcooked.OvercookedGame.OvercookedGame;
 let PlayerState = OvercookedMDP.PlayerState;
 let ObjectState = OvercookedMDP.ObjectState;
 let Direction = OvercookedMDP.Direction;
@@ -38,61 +40,70 @@ expect.extend({
     }
 });
 
-const trajectoryPath = "../../common_tests/test_traj.json"
 
-
+let player_colors = {};
+	player_colors[0] = 'green';
+	player_colors[1] = 'blue';
 
 test('States and rewards are equivalent between python and JS', () => {
 
-	$.getJSON(trajectoryPath, function(trajectoryData) {
-	game = new OvercookedGame({
-        start_grid,
-        container_id,
-        assets_loc: "assets/",
-        ANIMATION_DURATION: 200*.9,
-        tileSize: 80,
-        COOK_TIME: 5,
-        explosion_time: Number.MAX_SAFE_INTEGER,
-        DELIVERY_REWARD: DELIVERY_REWARD,
-        always_serve: always_serve,
-        player_colors: player_colors
-    });
+			let game = new OvercookedGame({
+		        start_grid: [
+							    "XXPXX", 
+							    "O  2O", 
+							    "T1  T", 
+							    "XDPSX"
+							    ],
+		        container_id: "overcooked",
+		        assets_loc: "assets/",
+		        ANIMATION_DURATION: 200*.9,
+		        tileSize: 80,
+		        COOK_TIME: 5,
+		        explosion_time: Number.MAX_SAFE_INTEGER,
+		        DELIVERY_REWARD: 20,
+		        player_colors: player_colors
+		    });
 
-	let alignedStates = []; 
-	let alignedRewards = [];
+			let alignedStates = []; 
+			let alignedRewards = [];
 
-	let observations = trajectory.ep_observations[0];
-    let actions = trajectory.ep_actions[0];
-    let rewards = trajectory.ep_rewards[0];
+			let observations = trajectoryData.ep_observations[0];
+		    let actions = trajectoryData.ep_actions[0];
+		    let rewards = trajectoryData.ep_rewards[0];
 
-    let current_state = dictToState(observations[0]);
+		    let current_state = dictToState(observations[0]);
 
-    let i = 0; 
-    while (i < observations.length - 2) {
-    	let joint_action = lookupActions(actions[i]); 
-    	let trajectory_reward = rewards[i]
-    	let  [[next_transitioned_state, prob], transitioned_reward] =
-                    game.mdp.get_transition_states_and_probs({
-                        state: current_state,
-                        joint_action: joint_action
-                    }); 
-        let next_trajectory_state = dictToState(observations[i+1])
-        alignedStates.push({'trajectory': next_trajectory_state,  'transitioned': next_transitioned_state}); 
-        alignedRewards.push({'trajectory': trajectory_reward, 'transitioned': transitioned_reward})
-    	i += 1; 
-    }
+		    let i = 0; 
+		    while (i < observations.length - 2) {
+		    	let joint_action = lookupActions(actions[i]); 
+		    	let trajectory_reward = rewards[i]
+		    	let  [[next_transitioned_state, prob], transitioned_reward] =
+		                    game.mdp.get_transition_states_and_probs({
+		                        state: current_state,
+		                        joint_action: joint_action
+		                    }); 
+		        let next_trajectory_state = dictToState(observations[i+1]);
+		        // console.log("Current state index: " + i )
+		        // console.log("Started from: " + JSON.stringify(current_state));
+		        // console.log("Took action: " + joint_action);
+		        // console.log("Got to state: " + JSON.stringify(next_transitioned_state))
 
-	console.log(alignedStates); 
-	console.log(alignedRewards);
-	alignedStates.forEach(function(item, index) {
-		expect(item['trajectory']).toEqualState(item['transitioned'])
-	})
-	alignedRewards.forEach(function(item, index) {
-		expect(item['trajectory']).toBe(item['transitioned'])
-	})
+		        alignedStates.push({'trajectory': next_trajectory_state,  'transitioned': next_transitioned_state}); 
+		        alignedRewards.push({'trajectory': trajectory_reward, 'transitioned': transitioned_reward})
+		        current_state = next_trajectory_state
 
-		}); 
+		    	i += 1; 
+		    }
 
+			alignedStates.forEach(function(item, index) {
+				//console.log("Reached state index " + index)
+				expect(item['trajectory']).toEqualState(item['transitioned'])
+			})
+			alignedRewards.forEach(function(item, index) {
+				expect(item['trajectory']).toBe(item['transitioned'])
+			})
+		
+	//}); 	
 });
 
 
