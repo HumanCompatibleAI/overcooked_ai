@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "build-test": "npm run build; jest",
-    "build-window-test": "npm run build-window; jest",
+    "build-test": "npm run build-window; jest",
     "build-window": "browserify index-window.js -o overcooked-window.js -t babelify",
     "build": "browserify index.js -o overcooked.js -t babelify",
     "demo": "open http://localhost:8123/demo.html; python2.7 -m SimpleHTTPServer 8123"
