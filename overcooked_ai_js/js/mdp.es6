@@ -246,6 +246,63 @@ export class OvercookedState {
     }
 }
 
+export function dictToState(state_dict) {
+    let object_dict = {}
+    if (state_dict['objects'].length > 0) {
+        state_dict['objects'].forEach(function (item, index) {
+            object_dict[item['position']] = dictToObjectState(item)
+            })
+        }
+    state_dict['objects'] = object_dict
+
+    return new OvercookedState({
+        players: [dictToPlayerState(state_dict['players'][0]), dictToPlayerState(state_dict['players'][1])], 
+        objects: state_dict['objects'], 
+        order_list: state_dict['order_list']
+    })
+}
+
+export function dictToPlayerState(player_dict) {
+    if (player_dict['held_object'] == null) {
+        player_dict['held_object'] = undefined
+    }
+    else {
+        player_dict['held_object'] = dictToObjectState(player_dict['held_object'])
+     }
+     return new PlayerState({
+        position: player_dict['position'], 
+        orientation: player_dict['orientation'], 
+        held_object: player_dict['held_object']
+     })
+    }
+
+export function dictToObjectState(object_dict) {
+    if (object_dict['state'] == null) {
+        object_dict['state'] = undefined;
+    }
+    return new ObjectState(
+        {name: object_dict['name'],
+        position: object_dict['position'], 
+        state: object_dict['state']
+        })
+}
+
+
+export function lookupActions(actions_arr) {
+    let actions = []; 
+    actions_arr.forEach(function (item, index) {
+        if (item == "interact") {
+            item = Action.INTERACT; 
+        }
+        if (item == "stay") {
+            item = Direction.STAY;
+        }
+        actions.push(item);
+    }
+        )
+    return actions;
+    
+}
 /*
 
     Main MDP Class
@@ -259,6 +316,7 @@ export class OvercookedGridworld {
         explosion_time=Number.MAX_SAFE_INTEGER,
         COOK_TIME = OvercookedGridworld.COOK_TIME,
         DELIVERY_REWARD = OvercookedGridworld.DELIVERY_REWARD,
+        //num_items_for_soup = 3,
         always_serve = false //when this is set to a string, its what's always served
     }) {
         this.terrain_mtx = terrain;
@@ -268,6 +326,7 @@ export class OvercookedGridworld {
         this.COOK_TIME = COOK_TIME
         this.DELIVERY_REWARD = DELIVERY_REWARD
         this.always_serve = always_serve;
+        // = num_items_for_soup
     }
 
     get_start_state (order_list) {

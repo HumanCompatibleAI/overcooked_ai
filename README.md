@@ -71,6 +71,9 @@ $ npm run demo
 ## Development
 Set up the package with `npm install`.
 
+To get nodemon installed and usable as a bash command, you'll need to run `npm install -g nodemon` to globally install, and then make sure whatever 
+path it displays as the install path is part of your $PATH. 
+
 Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
 `npm run build-window` should be run before running modified tests.
 
