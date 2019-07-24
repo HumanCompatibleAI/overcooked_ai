@@ -119,7 +119,7 @@ export class ObjectState {
         this.name = name;
         this.position = position;
         if (name === 'soup') {
-            assert(state.length === 3)
+            assert(state.length === OvercookedGridworld.num_items_for_soup)
         }
         this.state = state;
     }
@@ -246,6 +246,75 @@ export class OvercookedState {
     }
 }
 
+export function dictToState(state_dict) {
+    let object_dict = {}
+    if (state_dict['objects'].length > 0) {
+        state_dict['objects'].forEach(function (item, index) {
+            object_dict[item['position']] = dictToObjectState(item)
+            })
+        }
+    state_dict['objects'] = object_dict
+
+    return new OvercookedState({
+        players: [dictToPlayerState(state_dict['players'][0]), dictToPlayerState(state_dict['players'][1])], 
+        objects: state_dict['objects'], 
+        order_list: state_dict['order_list']
+    })
+}
+
+export function dictToPlayerState(player_dict) {
+    if (player_dict['held_object'] == null) {
+        player_dict['held_object'] = undefined
+    }
+    else {
+        player_dict['held_object'] = dictToObjectState(player_dict['held_object'])
+     }
+     return new PlayerState({
+        position: player_dict['position'], 
+        orientation: player_dict['orientation'], 
+        held_object: player_dict['held_object']
+     })
+    }
+
+export function dictToObjectState(object_dict) {
+    if (object_dict['state'] == null) {
+        object_dict['state'] = undefined;
+    }
+    return new ObjectState(
+        {name: object_dict['name'],
+        position: object_dict['position'], 
+        state: object_dict['state']
+        })
+}
+
+
+export function lookupActions(actions_arr) {
+    let actions = []; 
+    actions_arr.forEach(function (item, index) {
+        if (item == "interact") {
+            item = Action.INTERACT; 
+        }
+        if (arraysEqual(Direction.STAY, item) || item == "stay") {
+            item = Direction.STAY;
+        }
+        actions.push(item);
+    }
+        )
+    return actions;
+    
+}
+
+function arraysEqual(a, b) {
+    // Stolen from https://stackoverflow.com/questions/3115982/how-to-check-if-two-arrays-are-equal-with-javascript
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; ++i) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+
+}
 /*
 
     Main MDP Class
@@ -259,6 +328,7 @@ export class OvercookedGridworld {
         explosion_time=Number.MAX_SAFE_INTEGER,
         COOK_TIME = OvercookedGridworld.COOK_TIME,
         DELIVERY_REWARD = OvercookedGridworld.DELIVERY_REWARD,
+        num_items_for_soup = OvercookedGridworld.num_items_for_soup,
         always_serve = false //when this is set to a string, its what's always served
     }) {
         this.terrain_mtx = terrain;
@@ -268,6 +338,7 @@ export class OvercookedGridworld {
         this.COOK_TIME = COOK_TIME
         this.DELIVERY_REWARD = DELIVERY_REWARD
         this.always_serve = always_serve;
+        this.num_items_for_soup = num_items_for_soup;
     }
 
     get_start_state (order_list) {
@@ -328,7 +399,6 @@ export class OvercookedGridworld {
 
         //finally, environment effects
         this.step_environment_effects(new_state);
-
         return [[new_state, 1.0], reward]
     }
 
@@ -372,7 +442,7 @@ export class OvercookedGridworld {
                         let obj = new_state.get_object(i_pos);
                         assert(obj.name === 'soup', "Object in pot was not soup");
                         let [temp, num_items, cook_time] = obj.state;
-                        if ((num_items === 3) && (cook_time >= this.COOK_TIME)) {
+                        if ((num_items === this.num_items_for_soup) && (cook_time >= this.COOK_TIME)) {
                             player.remove_object(); //turnt he dish into the soup
                             player.set_object(new_state.remove_object(i_pos));
                         }
@@ -393,7 +463,7 @@ export class OvercookedGridworld {
                             let obj = new_state.get_object(i_pos);
                             // assert(obj.name === 'soup', "Object in pot was not soup")
                             let [soup_type, num_items, cook_time] = obj.state;
-                            if ((num_items < 3) && soup_type === item_type) {
+                            if ((num_items < this.num_items_for_soup) && soup_type === item_type) {
                                 player.remove_object();
                                 obj.state = [soup_type, num_items + 1, 0];
                             }
@@ -405,7 +475,7 @@ export class OvercookedGridworld {
                     if (obj.name === 'soup') {
                         let [soup_type, num_items, cook_time] = obj.state;
                         assert(_.includes(ObjectState.SOUP_TYPES, soup_type));
-                        assert(num_items === 3 &&
+                        assert(num_items === this.num_items_for_soup &&
                                cook_time >= this.COOK_TIME &&
                                cook_time < this.explosion_time);
                         player.remove_object();
@@ -483,7 +553,8 @@ export class OvercookedGridworld {
         }
         let new_pos = Direction.move_in_direction(position, action);
         let new_orientation;
-        if (action === Direction.STAY) {
+
+        if (_.isEqual(Direction.STAY, action)) {
             new_orientation = orientation;
         }
         else {
@@ -578,10 +649,10 @@ export class OvercookedGridworld {
                 if (
                         (this.terrain_mtx[y][x] === 'P') &&
                         (cook_time < this.explosion_time) &&
-                        (num_items === 3)) {
-                    obj.state = [soup_type, num_items, cook_time + 1];
+                        (num_items === this.num_items_for_soup)) {
+                    obj.state = [soup_type, num_items, Math.min(cook_time + 1, this.COOK_TIME)];
                 }
-                if ((obj.state[2] === this.explosion_time) && (num_items === 3)) {
+                if ((obj.state[2] === this.explosion_time) && (num_items === this.num_items_for_soup)) {
                     state.pot_explosion = true
                 }
             }
@@ -613,6 +684,7 @@ export class OvercookedGridworld {
 OvercookedGridworld.COOK_TIME = 5;
 OvercookedGridworld.DELIVERY_REWARD = 20;
 OvercookedGridworld.ORDER_TYPES = ObjectState.SOUP_TYPES + ['any'];
+OvercookedGridworld.num_items_for_soup = 3; 
 
 let str_to_array = (val) => {
     if (Array.isArray(val)) {
