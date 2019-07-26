@@ -2,8 +2,6 @@ import _ from 'lodash';
 import $ from "jquery";
 
 require("overcooked-window.js");
-var trajectoryData = require("../../common_tests/test_traj.json");
-// to get a test that should fail, run with "../../common_tests/failing_traj.json";
 
 let OvercookedMDP = window.Overcooked.OvercookedMDP;
 let OvercookedGame = window.Overcooked.OvercookedGame.OvercookedGame;
@@ -28,7 +26,7 @@ expect.extend({
         let e = JSON.stringify(expected);
         return {
             message: () =>
-                `Received: ${r}\nExpected: ${e}`,
+                `Trajectory State: ${r}\nJS Transition State: ${e}`,
             pass: false
         };
     } else {
@@ -45,9 +43,19 @@ let player_colors = {};
 	player_colors[0] = 'green';
 	player_colors[1] = 'blue';
 
-test('States and rewards are equivalent between python and JS', () => {
+const testTrajectoryFolder = '../common_tests/trajectory_tests/';
+const fs = require('fs');
+let testFiles = []; 
+fs.readdirSync(testTrajectoryFolder).forEach(function(item, index) {
+	// I'm sorry for this, blame the fact that require and all other file system things use different reference points
+	testFiles.push('../' + testTrajectoryFolder + item)
+})
 
-			let game = new OvercookedGame({
+// to get a test that is known to fail, run with "../../common_tests/failing_traj.json";
+
+function trajectoryTest(trajectoryFile) {
+	var trajectoryData = require(trajectoryFile);
+	let game = new OvercookedGame({
 		        start_grid: [
 							    "XXPXX", 
 							    "O  2O", 
@@ -66,6 +74,8 @@ test('States and rewards are equivalent between python and JS', () => {
 
 			let alignedStates = []; 
 			let alignedRewards = [];
+			let alignedStartingStates = []; 
+			let alignedJointActions = [];
 
 			let observations = trajectoryData.ep_observations[0];
 		    let actions = trajectoryData.ep_actions[0];
@@ -83,11 +93,8 @@ test('States and rewards are equivalent between python and JS', () => {
 		                        joint_action: joint_action
 		                    }); 
 		        let next_trajectory_state = dictToState(observations[i+1]);
-		        // console.log("Current state index: " + i )
-		        // console.log("Started from: " + JSON.stringify(current_state));
-		        // console.log("Took action: " + joint_action);
-		        // console.log("Got to state: " + JSON.stringify(next_transitioned_state))
-
+		        alignedStartingStates.push(current_state); 
+		        alignedJointActions.push(joint_action); 
 		        alignedStates.push({'trajectory': next_trajectory_state,  'transitioned': next_transitioned_state}); 
 		        alignedRewards.push({'trajectory': trajectory_reward, 'transitioned': transitioned_reward})
 		        current_state = next_trajectory_state
@@ -97,14 +104,21 @@ test('States and rewards are equivalent between python and JS', () => {
 
 			alignedStates.forEach(function(item, index) {
 				//console.log("Reached state index " + index)
-				expect(item['trajectory']).toEqualState(item['transitioned'])
+				let failMessage = "State failed to match. Started from " + JSON.stringify(alignedStartingStates[index]) + " and took actions " + alignedJointActions[index]; 
+				expect(item['trajectory'], failMessage).toEqualState(item['transitioned'])
 			})
 			alignedRewards.forEach(function(item, index) {
-				expect(item['trajectory']).toBe(item['transitioned'])
+				let failMessage = "Reward failed to match. Started from " + JSON.stringify(alignedStartingStates[index]) + " and took actions " + alignedJointActions[index];
+				expect(item['trajectory'], failMessage).toBe(item['transitioned'])
 			})
-		
-	//}); 	
+}
+testFiles.forEach(function(testFile, index) {
+	console.log("Testing " + testFile)
+	test('States and rewards in ' + testFile + ' should be equivalent between python and JS', () => {
+	trajectoryTest(testFile)	
 });
+
+})
 
 
 

@@ -24,6 +24,7 @@
     "canvas": "^2.5.0",
     "jest": "^23.6.0",
     "jest-canvas-mock": "^2.1.0",
+    "jest-expect-message": "^1.0.2",
     "jquery": "^3.4.1",
     "nodemon": "^1.19.1"
   },
@@ -33,10 +34,13 @@
     ]
   },
   "jest": {
+    "setupTestFrameworkScriptFile": "jest-expect-message",
     "setupFiles": [
       "jest-canvas-mock"
-    ], 
-    "verbose": false, 
-    "modulePaths":  ["<rootDir>"]
+    ],
+    "verbose": false,
+    "modulePaths": [
+      "<rootDir>"
+    ]
   }
 }
