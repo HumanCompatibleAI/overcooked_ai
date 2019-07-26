@@ -163,6 +163,7 @@ class EmbeddedPlanningAgent(Agent):
         # We just care about the first low level action of the first med level action
         first_s_a = ml_s_a_plan[1]
 
+        # TODO: Clean this
         # if self.debug:
         #     print("WHAT'S ON MY MIND:")
         #     self.env.state = start_state
@@ -190,37 +191,37 @@ class GreedyHumanModel(Agent):
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS
     """
 
-    def __init__(self, mlp, boltzmann_rational=False, temp=1):
+    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1):
         self.mlp = mlp
         self.mdp = self.mlp.mdp
+
+        # Bool for perfect rationality vs Boltzmann rationality for high level and low level action selection
+        self.hl_boltzmann_rational = hl_boltzmann_rational # For choices among high level goals of same type
+        self.ll_boltzmann_rational = ll_boltzmann_rational # For choices about low level motion
+
+        # Coefficient for Boltzmann rationality for high level action selection
+        self.hl_temperature = hl_temp
+        self.ll_temperature = ll_temp
+
+        self.reset()
+
+    def reset(self):
         self.prev_state = None
-        self.boltzmann_rational = boltzmann_rational
-        self.temperature = temp # Some measure of rationality
+        self.optimal_action_hist = []
 
     def action(self, state):
-        motion_goals = self.ml_action(state)
+        possible_motion_goals = self.ml_action(state)
 
         # Once we have identified the motion goals for the medium
         # level action we want to perform, select the one with lowest cost
         start_pos_and_or = state.players_pos_and_or[self.agent_index]
 
-        if self.boltzmann_rational:
-            plans = [self.mlp.mp.get_plan(start_pos_and_or, goal) for goal in motion_goals]
-            action_plan = [plan[0] for plan in plans]
-            plan_cost = np.array([plan[2] for plan in plans])
-            softmax_probs = np.exp(plan_cost * self.temperature) / np.sum(np.exp(plan_cost * self.temperature))
-            goal_idx = np.random.choice(len(motion_goals), p=softmax_probs)
-            chosen_action = action_plan[goal_idx][0]
+        chosen_goal, chosen_goal_action = self.choose_motion_goal(start_pos_and_or, possible_motion_goals)
 
-        else:  
-            min_cost = np.Inf
-            best_action = None
-            for goal in motion_goals:
-                action_plan, _, plan_cost = self.mlp.mp.get_plan(start_pos_and_or, goal)
-                if plan_cost < min_cost:
-                    best_action = action_plan[0]
-                    min_cost = plan_cost
-            chosen_action = best_action
+        if not self.ll_boltzmann_rational or chosen_goal[0] == start_pos_and_or[0]:
+            chosen_action = chosen_goal_action
+        else:
+            chosen_action = self.boltzmann_rational_ll_action(start_pos_and_or, chosen_goal)
         
         # HACK: if two agents get stuck, select an action at random that would
         # change the player positions if the other player were not to move
@@ -244,6 +245,55 @@ class GreedyHumanModel(Agent):
         self.prev_state = state
         return chosen_action
 
+    def choose_motion_goal(self, start_pos_and_or, motion_goals):
+        """Returns chosen motion goal (either boltzmann rationally or rationally), and corresponding action"""
+        if self.hl_boltzmann_rational:
+            possible_plans = [self.mlp.mp.get_plan(start_pos_and_or, goal) for goal in motion_goals]
+            plan_costs = [plan[2] for plan in possible_plans]
+            goal_idx = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
+            chosen_goal = motion_goals[goal_idx]
+            chosen_goal_action = possible_plans[goal_idx][0][0]
+        else:
+            chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
+        
+        return chosen_goal, chosen_goal_action
+
+    def get_boltzmann_rational_action_idx(self, costs, temperature):
+        """Chooses index based on softmax probabilities obtained from cost array"""
+        costs = np.array(costs)
+        softmax_probs = np.exp(-costs * temperature) / np.sum(np.exp(-costs * temperature))
+        action_idx = np.random.choice(len(costs), p=softmax_probs)
+        # print(costs, softmax_probs, self.agent_index, action_idx == np.argmin(costs))
+        
+        optimal_action = action_idx == np.argmin(costs)
+        # if not optimal_action:
+        #     print(self.agent_index, "suboptimal", costs)
+        self.optimal_action_hist.append(optimal_action)
+        return action_idx
+
+    def get_lowest_cost_action_and_goal(self, start_pos_and_or, motion_goals):
+        """Returns action and goal that correspond to the cheapest plan among possible motion goals"""
+        min_cost = np.Inf
+        best_action, best_goal = None, None
+        for goal in motion_goals:
+            action_plan, _, plan_cost = self.mlp.mp.get_plan(start_pos_and_or, goal)
+            if plan_cost < min_cost:
+                best_action = action_plan[0]
+                min_cost = plan_cost
+                best_goal = goal
+        return best_goal, best_action
+
+    def boltzmann_rational_ll_action(self, start_pos_and_or, goal):
+        future_costs = []
+        for action in Action.ALL_ACTIONS:
+            pos, orient = start_pos_and_or
+            new_pos_and_or = self.mdp._move_if_direction(pos, orient, action)
+            _, _, plan_cost = self.mlp.mp.get_plan(new_pos_and_or, goal)
+            future_costs.append(plan_cost)
+
+        action_idx = self.get_boltzmann_rational_action_idx(future_costs, self.ll_temperature)
+        return Action.ALL_ACTIONS[action_idx]
+
     def ml_action(self, state):
         """Selects a medium level action for the current state"""
         player = state.players[self.agent_index]
@@ -254,16 +304,16 @@ class GreedyHumanModel(Agent):
         pot_states_dict = self.mlp.mdp.get_pot_states(state)
 
         # TODO: this most likely will fail in some tomato scenarios
-        next_order = state.order_list[0]
+        curr_order = state.curr_order
 
         if not player.has_object():
 
-            if next_order == 'any':
+            if curr_order == 'any':
                 ready_soups = pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
                 cooking_soups = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking']
             else:
-                ready_soups = pot_states_dict[next_order]['ready']
-                cooking_soups = pot_states_dict[next_order]['cooking']
+                ready_soups = pot_states_dict[curr_order]['ready']
+                cooking_soups = pot_states_dict[curr_order]['cooking']
             
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
@@ -272,8 +322,8 @@ class GreedyHumanModel(Agent):
                 motion_goals = am.pickup_dish_actions(state, counter_objects)
             else:
                 next_order = None
-                if len(state.order_list) > 1:
-                    next_order = state.order_list[1]
+                if state.num_orders_remaining > 1:
+                    next_order = state.next_order
                 
                 if next_order == 'onion':
                     motion_goals = am.pickup_onion_actions(state, counter_objects)

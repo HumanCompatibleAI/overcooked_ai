@@ -1008,7 +1008,7 @@ class MediumLevelPlanner(object):
             start_state.order_list = start_state.order_list[:delivery_horizon]
         
         expand_fn = lambda state: self.get_successor_states(state)
-        goal_fn = lambda state: len(state.order_list) == 0
+        goal_fn = lambda state: state.num_orders_remaining == 0
         heuristic_fn = lambda state: h_fn(state)
 
         search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
@@ -1085,7 +1085,7 @@ class MediumLevelPlanner(object):
         agent_idx = 1 - other_agent_idx
 
         expand_fn = lambda state: self.embedded_mdp_succ_fn(state, other_agent)
-        goal_fn = lambda state: state.players[agent_idx].pos_and_or == goal_pos_and_or or len(state.order_list) == 0
+        goal_fn = lambda state: state.players[agent_idx].pos_and_or == goal_pos_and_or or state.num_orders_remaining == 0
         heuristic_fn = lambda state: sum(pos_distance(state.players[agent_idx].position, goal_pos_and_or[0]))
 
         search_problem = SearchTree(state, goal_fn, expand_fn, heuristic_fn)
@@ -1291,7 +1291,7 @@ class HighLevelPlanner(object):
     
     def get_hl_plan(self, start_state, h_fn, debug=False):
         expand_fn = lambda state: self.get_successor_states(state)
-        goal_fn = lambda state: len(state.order_list) == 0
+        goal_fn = lambda state: state.num_orders_remaining == 0
         heuristic_fn = lambda state: h_fn(state)
 
         search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)

@@ -19,6 +19,8 @@ class AgentEvaluator(object):
 
     def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=None, debug=False):
         if mdp_fn_params is None:
+            # TODO: Deal with variable MDP somewhere else? In Env rather than evaluator?
+            # TODO: Have a way to pass in mdp and env too?
             self.variable_mdp = False
             self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)
         else:

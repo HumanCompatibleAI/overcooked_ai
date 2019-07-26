@@ -221,6 +221,18 @@ class OvercookedState(object):
         all_objs_by_type.update(self.player_objects_by_type)
         return all_objs_by_type
 
+    @property
+    def curr_order(self):
+        return "any" if self.order_list is None else self.order_list[0]
+
+    @property
+    def next_order(self):
+        return "any" if self.order_list is None else self.order_list[1]
+
+    @property
+    def num_orders_remaining(self):
+        return np.Inf if self.order_list is None else len(self.order_list)
+
     def has_object(self, pos):
         return pos in self.objects
 
