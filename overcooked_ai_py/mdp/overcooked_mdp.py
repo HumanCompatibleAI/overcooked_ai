@@ -969,7 +969,7 @@ class OvercookedGridworld(object):
         base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
         
-        all_objects = list(overcooked_state.objects.values())
+        all_objects = set(overcooked_state.all_objects_by_type.values())
 
         def make_layer(position, value):
                 layer = np.zeros(self.shape)
@@ -1007,9 +1007,6 @@ class OvercookedGridworld(object):
                 player_orientation_idx = Direction.DIRECTION_TO_INDEX[player.orientation]
                 state_mask_dict["player_{}_loc".format(i)] = make_layer(player.position, 1)
                 state_mask_dict["player_{}_orientation_{}".format(i, player_orientation_idx)] = make_layer(player.position, 1)
-                obj = player.held_object
-                if obj is not None:
-                    all_objects.append(obj)
 
             # OBJECT & STATE LAYERS
             for obj in all_objects:
