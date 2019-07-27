@@ -209,6 +209,14 @@ class GreedyHumanModel(Agent):
         self.prev_state = None
         self.optimal_action_hist = []
 
+    def actions(self, states, agent_indices):
+        actions = []
+        for state, agent_idx in zip(states, agent_indices):
+            self.set_agent_index(agent_idx)
+            self.reset()
+            actions.append(self.action(state))
+        return actions
+
     def action(self, state):
         possible_motion_goals = self.ml_action(state)
 
