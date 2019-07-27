@@ -1,5 +1,6 @@
 import itertools, copy
 import numpy as np
+from functools import reduce
 from collections import defaultdict
 from overcooked_ai_py.utils import pos_distance, load_from_json
 from overcooked_ai_py.data.layouts import read_layout_dict
@@ -220,6 +221,11 @@ class OvercookedState(object):
         all_objs_by_type = self.unowned_objects_by_type.copy()
         all_objs_by_type.update(self.player_objects_by_type)
         return all_objs_by_type
+
+    @property
+    def all_objects_list(self):
+        all_objects_lists = list(self.all_objects_by_type.values()) + [[], []]
+        return reduce(lambda x, y: x + y, all_objects_lists)
 
     @property
     def curr_order(self):
@@ -968,8 +974,8 @@ class OvercookedGridworld(object):
         assert type(debug) is bool
         base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
-        
-        all_objects = set(overcooked_state.all_objects_by_type.values())
+
+        all_objects = overcooked_state.all_objects_list
 
         def make_layer(position, value):
                 layer = np.zeros(self.shape)
