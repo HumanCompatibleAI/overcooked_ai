@@ -17,7 +17,13 @@ class AgentEvaluator(object):
     Class used to get rollouts and evaluate performance of various types of agents.
     """
 
-    def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=None, debug=False):
+    def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): of params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        env_params (dict): of params for creation of an OvercookedEnv
+        mdp_fn_params (dict):  of params to setup random MDP generation
+        force_compute (bool):
+        """
         if mdp_fn_params is None:
             # TODO: Deal with variable MDP somewhere else? In Env rather than evaluator?
             # TODO: Have a way to pass in mdp and env too?
@@ -36,10 +42,9 @@ class AgentEvaluator(object):
     @property
     def mlp(self):
         assert not self.variable_mdp, "Variable mdp is not currently supported for planning"
-        if self._mlp is None:
-            mlp_params = self.mlp_params if self.mlp_params is not None else NO_COUNTERS_PARAMS
+        if self._mlp is None: 
             if self.debug: print("Computing Planner")
-            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, mlp_params, force_compute=self.force_compute)
+            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
         return self._mlp
 
     def evaluate_human_model_pair(self, display=True):
@@ -63,12 +68,9 @@ class AgentEvaluator(object):
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_one_optimal_one_greedy_human(self, h_idx=0, display=True):
-        h, r = GreedyHumanModel, CoupledPlanningAgent
-        if h_idx == 0:
-            a0, a1 = h(self.mlp), r(self.mlp)
-        elif h_idx == 1:
-            a0, a1 = r(self.mlp), h(self.mlp)
-        agent_pair = AgentPair(a0, a1)
+        h = GreedyHumanModel(self.mlp)
+        r = CoupledPlanningAgent(self.mlp)
+        agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_agent_pair(self, agent_pair, num_games=1, display=False):
@@ -76,11 +78,12 @@ class AgentEvaluator(object):
 
     @staticmethod
     def cumulative_rewards_from_trajectory(trajectory):
-        cumulative_rew = 0
-        for trajectory_item in trajectory:
-            r_t = trajectory_item[2]
-            cumulative_rew += r_t
-        return cumulative_rew
+        """
+        # TODO: check this is right
+        Takes in a single trajectory in format [s_t, a_t, r_t, d_t, info_t]
+        and returns cumulative rewards.
+        """
+        return sum([r_t for _, _, r_t, _, _ in trajectory])
 
     @staticmethod
     def check_trajectories(trajectories):
@@ -95,21 +98,20 @@ class AgentEvaluator(object):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
 
-            assert len(states) == len(actions)
+            assert len(states) == len(actions) == len(rewards)
 
             # Checking that actions would give rise to same behaviour in current MDP
             simulation_env = OvercookedEnv(OvercookedGridworld.from_layout_name(**mdp_params), **env_params)
-            for i in range(len(states)):
+            for i in range(len(states) - 1):
                 curr_state = states[i]
                 simulation_env.state = curr_state
 
-                if i + 1 < len(states):
-                    next_state, reward, done, info = simulation_env.step(actions[i])
+                next_state, reward, done, info = simulation_env.step(actions[i])
 
-                    assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
-                        simulation_env.display_states(states[i + 1], next_state)
-                    )
-                    assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
+                assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
+                    simulation_env.display_states(states[i + 1], next_state)
+                )
+                assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
 
 
     ### I/O METHODS ###

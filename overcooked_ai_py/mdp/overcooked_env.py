@@ -10,7 +10,7 @@ DEFAULT_ENV_PARAMS = {
     "horizon": 400
 }
 
-MAX_HORIZON = 10e10
+MAX_HORIZON = 1e10
 
 class OvercookedEnv(object):
     """An environment wrapper for the OvercookedGridworld Markov Decision Process.
@@ -84,7 +84,7 @@ class OvercookedEnv(object):
             ep_length: length of rollout
         """
         assert not self.is_done()
-        next_state, sparse_reward, reward_shaping = self.mdp.get_transition_states_and_probs(self.state, joint_action)
+        next_state, sparse_reward, reward_shaping = self.mdp.get_state_transition(self.state, joint_action)
         self.cumulative_sparse_rewards += sparse_reward
         self.cumulative_shaped_rewards += reward_shaping
         self.state = next_state
@@ -114,14 +114,14 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.t >= self.horizon or self.mdp.is_terminal(self.state)
 
-    def execute_plan(self, start_state, action_plan, display=False):
+    def execute_plan(self, start_state, joint_action_plan, display=False):
         """Executes action_plan (a list of joint actions) from a start 
         state in the mdp and returns the resulting state."""
         self.state = start_state
         done = False
         if display: print("Starting state\n{}".format(self))
-        for a in action_plan:
-            self.step(a)
+        for joint_action in joint_action_plan:
+            self.step(joint_action)
             done = self.is_done()
             if display: print(self)
             if done: break

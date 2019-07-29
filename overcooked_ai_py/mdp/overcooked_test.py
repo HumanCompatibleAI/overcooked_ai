@@ -12,6 +12,7 @@ from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 START_ORDER_LIST = ["any"]
 
 class TestDirection(unittest.TestCase):
+
     def test_direction_number_conversion(self):
         all_directions = Direction.ALL_DIRECTIONS
         all_numbers = []
@@ -30,6 +31,9 @@ class TestDirection(unittest.TestCase):
         self.assertEqual(set(all_numbers), set(range(num_directions)))
 
 class TestGridworld(unittest.TestCase):
+
+    # TODO: write more smaller targeted tests to be loaded from jsons
+
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name(
             "mdp_test",
@@ -122,14 +126,14 @@ class TestGridworld(unittest.TestCase):
             [P((0, 0), s), P((3, 1), s)], {}, order_list=[])
 
         with self.assertRaises(AssertionError):
-            self.base_mdp.get_transition_states_and_probs(bad_state, stay)
+            self.base_mdp.get_state_transition(bad_state, stay)
 
         env = OvercookedEnv(self.base_mdp)
         env.state.order_list = ['onion', 'any']
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
-            pred_state, sparse_reward, dense_reward = self.base_mdp.get_transition_states_and_probs(state, action)
+            pred_state, sparse_reward, dense_reward = self.base_mdp.get_state_transition(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
@@ -139,166 +143,6 @@ class TestGridworld(unittest.TestCase):
             [P((1, 1), n),
              P((3, 1), e)],
             {}, order_list=['onion', 'any']))
-
-        check_transition([w, interact], OvercookedState(
-            [P((1, 1), w),
-             P((3, 1), e, Obj('onion', (3, 1)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([interact, w],OvercookedState(
-            [P((1, 1), w, Obj('onion', (1, 1))),
-             P((2, 1), w, Obj('onion', (2, 1)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([e, n], OvercookedState(
-            [P((1, 1), e, Obj('onion', (1, 1))),
-             P((2, 1), n, Obj('onion', (2, 1)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([stay, interact], OvercookedState(
-            [P((1, 1), e, Obj('onion', (1, 1))),
-             P((2, 1), n)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([e, e], OvercookedState(
-            [P((2, 1), e, Obj('onion', (2, 1))),
-             P((3, 1), e)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([n, interact], OvercookedState(
-            [P((2, 1), n, Obj('onion', (2, 1))),
-             P((3, 1), e, Obj('onion', (3, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([interact, w], OvercookedState(
-            [P((2, 1), n),
-             P((3, 1), w, Obj('onion', (3, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([w, w], OvercookedState(
-            [P((1, 1), w),
-             P((2, 1), w, Obj('onion', (2, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([s, n], OvercookedState(
-            [P((1, 2), s),
-             P((2, 1), n, Obj('onion', (2, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))},
-            order_list=['onion', 'any']))
-
-        check_transition([interact, interact], OvercookedState(
-            [P((1, 2), s, Obj('dish', (1, 2))),
-             P((2, 1), n)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 1))},
-            order_list=['onion', 'any']))
-
-        check_transition([e, s], OvercookedState(
-            [P((1, 2), e, Obj('dish', (1, 2))),
-             P((2, 1), s)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 2))},
-            order_list=['onion', 'any']))
-
-        check_transition([e, interact], OvercookedState(
-            [P((2, 2), e, Obj('dish', (2, 2))),
-             P((2, 1), s)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 3))},
-            order_list=['onion', 'any']))
-
-        check_transition([n, e], OvercookedState(
-            [P((2, 1), n, Obj('dish', (2, 1))),
-             P((3, 1), e)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 4))},
-            order_list=['onion', 'any']))
-
-        check_transition([interact, interact], OvercookedState(
-            [P((2, 1), n, Obj('dish', (2, 1))),
-             P((3, 1), e, Obj('onion', (3, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 5))},
-            order_list=['onion', 'any']))
-        
-        check_transition([stay, stay], OvercookedState(
-            [P((2, 1), n, Obj('dish', (2, 1))),
-             P((3, 1), e, Obj('onion', (3, 1)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 5))},
-            order_list=['onion', 'any']))
-
-        check_transition([interact, interact], OvercookedState(
-            [P((2, 1), n, Obj('soup', (2, 1), ('onion', 3, 5))),
-             P((3, 1), e, Obj('onion', (3, 1)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([e, w], OvercookedState(
-            [P((2, 1), e, Obj('soup', (2, 1), ('onion', 3, 5))),
-             P((3, 1), w, Obj('onion', (3, 1)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([e, s], OvercookedState(
-            [P((3, 1), e, Obj('soup', (3, 1), ('onion', 3, 5))),
-             P((3, 2), s, Obj('onion', (3, 2)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([s, interact], OvercookedState(
-            [P((3, 1), s, Obj('soup', (3, 1), ('onion', 3, 5))),
-             P((3, 2), s, Obj('onion', (3, 2)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([s, w], OvercookedState(
-            [P((3, 2), s, Obj('soup', (3, 2), ('onion', 3, 5))),
-             P((2, 2), w, Obj('onion', (2, 2)))],
-            {}, order_list=['onion', 'any']))
-
-        check_transition([interact, n], OvercookedState(
-            [P((3, 2), s),
-             P((2, 1), n, Obj('onion', (2, 1)))],
-            {}, order_list=['any']), expected_reward=self.base_mdp.delivery_reward)
-
-        check_transition([e, interact], OvercookedState(
-            [P((3, 2), e),
-             P((2, 1), n)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, 
-            order_list=['any']))
-
-        check_transition([interact, s], OvercookedState(
-            [P((3, 2), e, Obj('tomato', (3, 2))),
-             P((2, 2), s)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['any']))
-
-        check_transition([w, w], OvercookedState(
-            [P((2, 2), w, Obj('tomato', (2, 2))),
-             P((1, 2), w)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['any']))
-        
-        check_transition([n, interact], OvercookedState(
-            [P((2, 1), n, Obj('tomato', (2, 1))),
-             P((1, 2), w, Obj('tomato', (1, 2)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['any']))
-        
-        check_transition([interact, interact], OvercookedState(
-            [P((2, 1), n, Obj('tomato', (2, 1))),
-             P((1, 2), w, Obj('tomato', (1, 2)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['any']))
-
-        check_transition([s, interact], OvercookedState(
-            [P((2, 2), s, Obj('tomato', (2, 2))),
-             P((1, 2), w, Obj('tomato', (1, 2)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))},
-            order_list=['any']))
-        
-        check_transition([interact, interact], OvercookedState(
-            [P((2, 2), s),
-             P((1, 2), w, Obj('tomato', (1, 2)))],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 1, 0)),
-             (2, 3): Obj('soup', (2, 3), ('tomato', 1, 0))}, 
-            order_list=['any']))
 
     def test_common_mdp(self):
         trajectories = AgentEvaluator.load_traj_from_json('common_tests/test_traj')
@@ -313,7 +157,8 @@ def random_joint_action():
 
 class TestOvercookedEnvironment(unittest.TestCase):
     
-    # TODO: 
+    # TODO: add asserts to existing tests and create tests for randomization
+
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("simple")
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)

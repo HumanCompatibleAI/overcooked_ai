@@ -1111,7 +1111,7 @@ class MediumLevelPlanner(object):
         else:
             joint_action = (action, other_agent_action)
         if not self.mdp.is_terminal(state):
-            results, _, _ = self.mdp.get_transition_states_and_probs(state, joint_action)
+            results, _, _ = self.mdp.get_state_transition(state, joint_action)
             successor_state = results[0][0] # Env is deterministic
         else:
             print("Tried to find successor of terminal")

@@ -637,10 +637,11 @@ class OvercookedGridworld(object):
         counter_locations = self.get_counter_locations()
         return [pos for pos in counter_locations if not state.has_object(pos)]
 
-    def get_transition_states_and_probs(self, state, joint_action):
+    def get_state_transition(self, state, joint_action):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
+        Assumes all actions are deterministic.
 
         NOTE: Sparse reward is given only when soups are delivered, 
         shaped reward is given only for completion of subgoals 
@@ -928,8 +929,10 @@ class OvercookedGridworld(object):
                     player_object = player.held_object
                     if player_object:
                         grid_string += player_object.name[:1]
+                    elif player.position == state.players[0].position:
+                        grid_string += str(0)
                     else:
-                        grid_string += str(0) if player.position == state.players[0].position else str(1)
+                        grid_string += str(1)
                 else:
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
@@ -1117,10 +1120,9 @@ class OvercookedGridworld(object):
 
                 if direction == player.orientation:
                     # Check if counter we are facing is empty
-                    if feat == 'X' and adj_pos not in overcooked_state.objects.keys():
-                        all_features["p{}_facing_empty_counter".format(i)] = [1]
-                    else:
-                        all_features["p{}_facing_empty_counter".format(i)] = [0]
+                    facing_counter = (feat == 'X' and adj_pos not in overcooked_state.objects.keys())
+                    facing_counter_feature = [1] if facing_counter else [0]
+                    all_features["p{}_facing_empty_counter".format(i)] = facing_counter_feature
 
                 all_features["p{}_wall_{}".format(i, direction)] = [0] if feat == ' ' else [1]
 

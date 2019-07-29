@@ -12,16 +12,13 @@ def load_pickle(filename):
 	    return pickle.load(f)
 
 def load_dict_from_file(filepath):
-    f = open(filepath, 'r')
-    data = f.read()
-    f.close()
-    return eval(data)
+    with open(filepath, 'r') as f:
+        return eval(f.read())
 
 def save_dict_to_file(dic, filename):
     dic = dict(dic)
-    f = open(filename + '.txt','w')
-    f.write(str(dic))
-    f.close()
+    with open(filename + '.txt','w') as f:
+        f.write(str(dic))
 
 def load_dict_from_txt(filename):
     return load_dict_from_file(filename + ".txt")

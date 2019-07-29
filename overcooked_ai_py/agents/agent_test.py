@@ -91,10 +91,10 @@ class TestAgents(unittest.TestCase):
 
 
 class TestAgentEvaluator(unittest.TestCase):
+    # TODO: write tests
     pass
 
 
-# TODO: could reformat all of these tests to use AgentEvaluator
 class TestScenarios(unittest.TestCase):
 
     """
@@ -111,10 +111,6 @@ class TestScenarios(unittest.TestCase):
         print("\n"*5, "\n" , "-"*50)
         trajectory_rr = evaluator.evaluate_optimal_pair(display=DISPLAY)
         time_taken_rr = trajectory_rr["ep_lengths"][0]
-        
-        # evaluator.dump_action_trajectory_as_json(trajectory_hr, "../../overcooked-js/unident_s_2_hr")
-        # evaluator.dump_action_trajectory_as_json(trajectory_rr, "../../overcooked-js/unident_s_2_rr")
-        # print("saved!")
 
         print("H+R time taken: ", time_taken_hr)
         print("R+R time taken: ", time_taken_rr)
@@ -122,7 +118,7 @@ class TestScenarios(unittest.TestCase):
         self.assertGreater(time_taken_hr, time_taken_rr)
 
     def test_scenario_1(self):
-        # ≈ Scenario 1 on the Google Doc
+        # Myopic corridor collision
         #
         # X X X X X O X D X X X X X
         # X   ↓Ho     X           X
@@ -148,8 +144,8 @@ class TestScenarios(unittest.TestCase):
         env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
     def test_scenario_1_s(self):
-        # ≈ Scenario 1 on the Google Doc
-        #
+        # Smaller version of the corridor collisions scenario above
+        # to facilitate DRL training
         scenario_1_mdp = OvercookedGridworld.from_layout_name('scenario1_s', start_order_list=['any'], cook_time=5)
         mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_1_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
         a0 = GreedyHumanModel(mlp)
@@ -175,7 +171,7 @@ class TestScenarios(unittest.TestCase):
         print("R+R time taken: ", time_taken_rr)
 
     def test_scenario_2(self):
-        # Based off of scenario 2 on the Google Doc
+        # Simple asymmetric advantages scenario
         #
         # X X X X X O X X X X
         # S                 O
@@ -204,7 +200,7 @@ class TestScenarios(unittest.TestCase):
         self.compare_times(eva)
 
     def test_scenario_3(self):
-        # Based off of scenario 2 on the Google Doc
+        # Another asymmetric advantage scenario
         #
         # X X X X X O X X X X
         # S           X X P=X
@@ -220,7 +216,8 @@ class TestScenarios(unittest.TestCase):
         # However, H goes to get the onion, and so does R initially, as it
         # assumes H will go and get the dish. Once H has picked up the onion,
         # R realizes that it should go and get the dish itself. This leads to
-        # less time wasted compared to the R-R case
+        # more time wasted compared to the R-R case
+
         mdp_params = {"layout_name": "scenario3", "cook_time": 5}
         mdp = OvercookedGridworld.from_layout_name(**mdp_params)
         start_state = mdp.get_standard_start_state()
@@ -242,11 +239,8 @@ class TestScenarios(unittest.TestCase):
 
         self.compare_times(eva)
 
-        # actions = [traj_item[1] for traj_item in trajectory]
-        # save_as_json("suboptimalities/scenario_3_Opt.json", actions)
-
     def test_scenario_4(self):
-        # Based off of scenario 2 on the Google Doc
+        # Yet another asymmetric advantage scenario
         #
         # X X X X X O X X X X
         # S             X P=X
@@ -293,7 +287,7 @@ class TestScenarios(unittest.TestCase):
         self.compare_times(eva, h_idx=1)
     
     def test_unidentifiable(self):
-        # Human plan unidentifiable
+        # Scenario with unidentifiable human plan (and asymmetric advantages)
         #
         # X O X X X
         # X     ↓RX
@@ -323,7 +317,7 @@ class TestScenarios(unittest.TestCase):
         self.compare_times(eva, h_idx=0)
 
     def test_unidentifiable_s(self):
-        # Human plan unidentifiable, with smaller map
+        # Same as above, but smaller layout to facilitate DRL training
 
         eva = AgentEvaluator({"layout_name": "unident_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
         start_state = eva.env.mdp.get_standard_start_state()

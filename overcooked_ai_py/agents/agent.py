@@ -20,9 +20,85 @@ class Agent(object):
         pass
 
 
+class AgentPair(object):
+    """
+    The AgentPair object is to be used in the context of a OvercookedEnv, in which
+    it can be queried to obtain actions for both the agents.
+    """
+
+    def __init__(self, agent0, agent1=None):
+        """
+        If the pair of agents is in fact a single joint agent, set the agent
+        index (used to order the processed observations) to 0, that is consistent
+        with training.
+
+        Otherwise, set the agent indices in the same order as the agents have been passed in.
+        """
+        self.agents = [agent0]
+
+        if agent1 is None:
+            self.is_joint_agent = True
+            self.joint_agent = agent0
+            self.joint_agent.set_agent_index(0)
+        else:
+            self.agents += [agent1]
+            self.is_joint_agent = False
+            self.a0, self.a1 = agent0, agent1
+            self.a0.set_agent_index(0)
+            self.a1.set_agent_index(1)
+
+            if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
+                print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
+
+    def set_mdp(self, mdp):
+        for a in self.agents:
+            a.set_mdp(mdp)
+
+    def joint_action(self, state):
+        if self.is_joint_agent:
+            return self.joint_agent.action(state)
+        elif self.a0 is self.a1:
+            # When using the same instance of an agent for self-play, 
+            # reset agent index at each turn to prevent overwriting it
+            self.a0.set_agent_index(0)
+            action_0 = self.a0.action(state)
+            self.a1.set_agent_index(1)
+            action_1 = self.a1.action(state)
+            return (action_0, action_1)
+        else:
+            return (self.a0.action(state), self.a1.action(state))
+        
+    def reset(self):
+        for a in self.agents:
+            a.reset()
+
+
+class CoupledPlanningPair(AgentPair):
+    # TODO: Test this class
+    """Pair of identical coupled planning agents. Enables to search for optimal
+    action once rather than repeating computation to find action of second agent"""
+
+    def __init__(self, agent):
+        super().__init__(agent, agent)
+
+    def joint_action(self, state):
+        # Reduce computation by half if both agents are coupled planning agents
+        joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
+        return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
+
+
 class AgentFromPolicy(Agent):
+    """
+    Defines an agent from a `state_policy` and `direct_policy` functions
+    """
     
     def __init__(self, state_policy, direct_policy, stochastic=True, action_probs=False):
+        """
+        state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
+        direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
+        stochastic (Bool): Whether the agent should sample from policy or take argmax
+        action_probs (Bool): Whether agent should return action probabilities or a sampled action
+        """
         self.state_policy = state_policy
         self.direct_policy = direct_policy
         self.history = []
@@ -99,6 +175,11 @@ class FixedPlanAgent(Agent):
 
 
 class CoupledPlanningAgent(Agent):
+    """
+    An agent that uses a joint planner (mlp, a MediumLevelPlanner) to find near-optimal
+    plans. At each timestep the agent re-plans under the assumption that the other agent 
+    is also a CoupledPlanningAgent, and then takes the first action in the plan.
+    """
 
     def __init__(self, mlp, delivery_horizon=2, heuristic=None):
         self.mlp = mlp
@@ -117,15 +198,20 @@ class CoupledPlanningAgent(Agent):
 
 
 class EmbeddedPlanningAgent(Agent):
+    """
+    An agent that uses A* search to find an optimal action based on a model of the other agent,
+    `other_agent`. This class approximates the other agent as being deterministic even though it
+    might be stochastic in order to perform the search.
+    """
 
-    def __init__(self, other_agent, mlp, env, delivery_horizon=2, debug=False):
-        """other_agent_policy returns highest prob action"""
+    def __init__(self, other_agent, mlp, env, delivery_horizon=2, logging_level=0):
+        """mlp is a MediumLevelPlanner"""
         self.other_agent = other_agent
         self.delivery_horizon = delivery_horizon
         self.mlp = mlp
         self.env = env
         self.h_fn = Heuristic(mlp.mp).simple_heuristic
-        self.debug = debug
+        self.logging_level = logging_level
 
     def action(self, state):
         from overcooked_ai_py.planning.search import SearchTree
@@ -151,34 +237,36 @@ class EmbeddedPlanningAgent(Agent):
             idx = np.random.randint(5)
             return Action.ALL_ACTIONS[idx]
 
-        # Check plan
-        actions = [item[0] for item in ml_s_a_plan]
-        actions = actions[1:]
-        tru_actions = ()
-        for a in actions:
-            tru_actions = tru_actions + a
-        assert len(tru_actions) == cost
+        # Check estimated cost of the plan equals 
+        # the sum of the costs of each medium-level action
+        assert sum([len(item[0]) for item in ml_s_a_plan[1:]]) == cost
+        # TODO: check this works
+        # actions = [item[0] for item in ml_s_a_plan]
+        # actions = actions[1:]
+        # tru_actions = ()
+        # for a in actions:
+        #     tru_actions = tru_actions + a
+        # assert len(tru_actions) == cost
 
         # In this case medium level actions are tuples of low level actions
         # We just care about the first low level action of the first med level action
         first_s_a = ml_s_a_plan[1]
 
-        # TODO: Clean this
-        # if self.debug:
-        #     print("WHAT'S ON MY MIND:")
-        #     self.env.state = start_state
-        #     for joint_a in first_s_a[0]:
-        #         print(self.env)
-        #         print(joint_a)
-        #         self.env.step(joint_a)
-        #     print(self.env)
-        #     print("======The End======")
+        # Print what the agent is expecting to happen
+        if self.logging_level >= 2:
+            self.env.state = start_state
+            for joint_a in first_s_a[0]:
+                print(self.env)
+                print(joint_a)
+                self.env.step(joint_a)
+            print(self.env)
+            print("======The End======")
 
         self.env.state = initial_env_state
         self.other_agent.stochastic = initial_other_agent_type
 
         first_joint_action = first_s_a[0][0]
-        if self.debug: 
+        if self.logging_level >= 1: 
             print("expected joint action", first_joint_action)
         action = first_joint_action[self.agent_index]
         return action
@@ -188,7 +276,8 @@ class GreedyHumanModel(Agent):
     Agent that at each step selects a medium level action corresponding
     to the most intuitively high-priority thing to do
     
-    NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS
+    NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example random1.layout,
+    in which an individual agent cannot complete the task on their own.
     """
 
     def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1):
@@ -243,7 +332,7 @@ class GreedyHumanModel(Agent):
 
             unblocking_joint_actions = []
             for j_a in joint_actions:
-                new_state, _, _ = self.mlp.mdp.get_transition_states_and_probs(state, j_a)
+                new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
                 if new_state.player_positions != self.prev_state.player_positions:
                     unblocking_joint_actions.append(j_a)
 
@@ -358,65 +447,14 @@ class GreedyHumanModel(Agent):
             else:
                 raise ValueError()
         
-        motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+        # TODO: verify this works and then clean
+        motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+        # motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+            motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg) for mg in motion_goals]
             assert len(motion_goals) != 0
 
         return motion_goals
 
-
-class AgentPair(object):
-    """
-    The AgentPair object is to be used in the context of a OvercookedEnv, in which
-    it can be queried to obtain actions for both the agents.
-    """
-
-    def __init__(self, *agents):
-        """
-        If the pair of agents is in fact a single joint agent, set the agent
-        index (used to order the processed observations) to 0, that is consistent
-        with training.
-
-        Otherwise, set the agent indices in the same order as the agents have been passed in.
-        """
-        self.agents = agents
-
-        if len(agents) == 1:
-            self.is_joint_agent = True
-            self.joint_agent = agents[0]
-            self.joint_agent.set_agent_index(0)
-        else:
-            self.is_joint_agent = False
-            self.a0, self.a1 = agents
-            self.a0.set_agent_index(0)
-            self.a1.set_agent_index(1)
-
-    def set_mdp(self, mdp):
-        for a in self.agents:
-            a.set_mdp(mdp)
-
-    def joint_action(self, state):
-        if self.is_joint_agent:
-            joint_action = self.joint_agent.action(state)
-            return joint_action
-        elif type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-            # Reduce computation by half if both agents are coupled planning agents
-            joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
-            return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
-        elif self.a0 is self.a1:
-            # When using the same instance of an agent for self-play, 
-            # reset agent index at each turn to prevent overwriting it
-            self.a0.set_agent_index(0)
-            action_0 = self.a0.action(state)
-            self.a1.set_agent_index(1)
-            action_1 = self.a1.action(state)
-            return (action_0, action_1)
-        else:
-            return (self.a0.action(state), self.a1.action(state))
-        
-    def reset(self):
-        for a in self.agents:
-            a.reset()
