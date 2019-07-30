@@ -159,16 +159,9 @@ class OvercookedEnv(object):
         if include_final_state:
             trajectory.append((s_tp1, (None, None), 0, True))
 
-        # Store useful variables before reset
-        t, cumul_sparse_r, cumul_shaped_r = self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
+        return np.array(trajectory), self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
 
-        # Reset environment and agents
-        self.reset()
-        agent_pair.reset()
-        trajectory = np.array(trajectory)
-        return trajectory, t, cumul_sparse_r, cumul_shaped_r
-
-    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, agent_idx=0, reward_shaping=0.0):
+    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, agent_idx=0, reward_shaping=0.0, display_until=np.Inf):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -199,7 +192,7 @@ class OvercookedEnv(object):
         for _ in tqdm.trange(num_games):
             agent_pair.set_mdp(self.mdp)
 
-            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state)
+            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
             obs, actions, rews, dones = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3]
             trajectories["ep_observations"].append(obs)
             trajectories["ep_actions"].append(actions)
@@ -210,6 +203,9 @@ class OvercookedEnv(object):
             trajectories["ep_lengths"].append(time_taken)
             trajectories["mdp_params"].append(self.mdp.mdp_params)
             trajectories["env_params"].append(self.env_params)
+
+            self.reset()
+            agent_pair.reset()
 
         mu, se = mean_and_std_err(trajectories["ep_returns"])
         print("Avg reward {:.2f} (std: {:.2f}, se: {:.2f}) over {} games of avg length {}".format(

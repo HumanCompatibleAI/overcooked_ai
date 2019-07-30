@@ -207,7 +207,7 @@ class Graph(object):
 
         successors = self._get_children(start_index)
 
-        # TODO: Support multiple equally costly paths
+        # NOTE: Currently does not support multiple equally costly paths
         best_index = None
         smallest_dist = np.inf
         for s in successors:

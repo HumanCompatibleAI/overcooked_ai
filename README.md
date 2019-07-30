@@ -58,12 +58,7 @@ In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP
 
 ## Visualization Demo
 To run a simple demo that plays a trajectory demonstrating the
-transitions in the game:
-```
-$ open http://localhost:8123/demo.html; python2.7 -m SimpleHTTPServer 8123
-```
-
-Or if you have npm installed (recommended):
+transitions in the game (requires having npm installed):
 ```
 $ npm run demo
 ```

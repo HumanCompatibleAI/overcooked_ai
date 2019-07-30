@@ -235,8 +235,6 @@ class TestJointMotionPlanner(unittest.TestCase):
         a2_start = a2_goal = ((2, 1), n)
         start = (a1_start, a2_start)
         goal = (a1_goal, a2_goal)
-        # FIXME
-        # self.check_joint_plan(planner, start, goal, times=(6, 1), min_t=1)
         self.check_joint_plan(planner, start, goal, min_t=1)
 
     def simple_mdp_test_final_orientation_optimization(self, planner):
@@ -245,7 +243,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         a2_start = a2_goal = ((3, 2), s)
         start = (a1_start, a2_start)
         goal = (a1_goal, a2_goal)
-        # TODO: Not considering all plans with same cost yet, this won't work
+        # NOTE: Not considering all plans with same cost yet, this won't work
         # check_joint_plan(planner, mdp, start, goal, times=(3, 1))
 
         a1_goal = ((1, 2), s)
@@ -430,6 +428,7 @@ class TestMediumLevelPlanner(unittest.TestCase):
         
 
 class TestHighLevelPlanner(unittest.TestCase):
+    """The HighLevelPlanner class has been mostly discontinued"""
     
     def test_basic_hl_planning(self):
         s = OvercookedState(

@@ -19,14 +19,13 @@ class AgentEvaluator(object):
 
     def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
         """
-        mdp_params (dict): of params for creation of an OvercookedGridworld instance through the `from_layout_name` method
-        env_params (dict): of params for creation of an OvercookedEnv
-        mdp_fn_params (dict):  of params to setup random MDP generation
-        force_compute (bool):
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        env_params (dict): params for creation of an OvercookedEnv
+        mdp_fn_params (dict): params to setup random MDP generation
+        force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
+        mlp_params (dict): params for MediumLevelPlanner
         """
         if mdp_fn_params is None:
-            # TODO: Deal with variable MDP somewhere else? In Env rather than evaluator?
-            # TODO: Have a way to pass in mdp and env too?
             self.variable_mdp = False
             self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)
         else:
@@ -77,23 +76,21 @@ class AgentEvaluator(object):
         return self.env.get_rollouts(agent_pair, num_games, display=display)
 
     @staticmethod
-    def cumulative_rewards_from_trajectory(trajectory):
-        """
-        # TODO: check this is right
-        Takes in a single trajectory in format [s_t, a_t, r_t, d_t, info_t]
-        and returns cumulative rewards.
-        """
-        return sum([r_t for _, _, r_t, _, _ in trajectory])
-
-    @staticmethod
     def check_trajectories(trajectories):
         """
-        Checks consistency of trajectories in standard format with dynamics of mdp.
-        
-        NOTE: does not check dones positions, lengths consistency, order lists reducing if not None
-
-        TODO: Should also check signature!!!
+        Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
         """
+        AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
+        AgentEvaluator._check_trajectories_dynamics(trajectories)
+
+    @staticmethod
+    def _check_standard_traj_keys(traj_keys_set):
+        assert traj_keys_set == set(DEFAULT_TRAJ_KEYS), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
+            [k for k in DEFAULT_TRAJ_KEYS if k not in traj_keys_set], [k for k in traj_keys_set if k not in DEFAULT_TRAJ_KEYS]
+        )
+
+    @staticmethod
+    def _check_trajectories_dynamics(trajectories):
         for idx in range(len(trajectories["ep_observations"])):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
@@ -113,20 +110,17 @@ class AgentEvaluator(object):
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
 
-
     ### I/O METHODS ###
 
-    def save_trajectory(self, trajectory, filename):
-        trajectory_dict_standard_signature = [
-            "ep_actions", "ep_observations", "ep_rewards", "ep_dones", "ep_returns", "ep_lengths"
-        ]
-        assert set(trajectory.keys()) == set(trajectory_dict_standard_signature)
-        self.check_trajectories(trajectory)
+    @staticmethod
+    def save_trajectory(trajectory, filename):
+        AgentEvaluator.check_trajectories(trajectory)
         save_pickle(trajectory, filename)
 
-    def load_trajectory(self, filename):
+    @staticmethod
+    def load_trajectory(filename):
         traj = load_pickle(filename)
-        self.check_trajectories(traj)
+        AgentEvaluator.check_trajectories(traj)
         return traj
 
     @staticmethod

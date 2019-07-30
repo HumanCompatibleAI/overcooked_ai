@@ -74,9 +74,10 @@ class AgentPair(object):
 
 
 class CoupledPlanningPair(AgentPair):
-    # TODO: Test this class
-    """Pair of identical coupled planning agents. Enables to search for optimal
-    action once rather than repeating computation to find action of second agent"""
+    """
+    Pair of identical coupled planning agents. Enables to search for optimal
+    action once rather than repeating computation to find action of second agent
+    """
 
     def __init__(self, agent):
         super().__init__(agent, agent)
@@ -216,11 +217,9 @@ class EmbeddedPlanningAgent(Agent):
     def action(self, state):
         from overcooked_ai_py.planning.search import SearchTree
         start_state = state.deepcopy()
-        start_state.order_list = start_state.order_list[:self.delivery_horizon]
+        order_list = start_state.order_list if start_state.order_list is not None else ["any", "any"]
+        start_state.order_list = order_list[:self.delivery_horizon]
         other_agent_index = 1 - self.agent_index
-
-        initial_other_agent_type = self.other_agent.stochastic
-        self.other_agent.stochastic = False
         initial_env_state = self.env.state
         self.other_agent.env = self.env
 
@@ -240,13 +239,6 @@ class EmbeddedPlanningAgent(Agent):
         # Check estimated cost of the plan equals 
         # the sum of the costs of each medium-level action
         assert sum([len(item[0]) for item in ml_s_a_plan[1:]]) == cost
-        # TODO: check this works
-        # actions = [item[0] for item in ml_s_a_plan]
-        # actions = actions[1:]
-        # tru_actions = ()
-        # for a in actions:
-        #     tru_actions = tru_actions + a
-        # assert len(tru_actions) == cost
 
         # In this case medium level actions are tuples of low level actions
         # We just care about the first low level action of the first med level action
@@ -263,7 +255,6 @@ class EmbeddedPlanningAgent(Agent):
             print("======The End======")
 
         self.env.state = initial_env_state
-        self.other_agent.stochastic = initial_other_agent_type
 
         first_joint_action = first_s_a[0][0]
         if self.logging_level >= 1: 
@@ -360,11 +351,7 @@ class GreedyHumanModel(Agent):
         costs = np.array(costs)
         softmax_probs = np.exp(-costs * temperature) / np.sum(np.exp(-costs * temperature))
         action_idx = np.random.choice(len(costs), p=softmax_probs)
-        # print(costs, softmax_probs, self.agent_index, action_idx == np.argmin(costs))
-        
         optimal_action = action_idx == np.argmin(costs)
-        # if not optimal_action:
-        #     print(self.agent_index, "suboptimal", costs)
         self.optimal_action_hist.append(optimal_action)
         return action_idx
 
@@ -400,7 +387,7 @@ class GreedyHumanModel(Agent):
         counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
         pot_states_dict = self.mlp.mdp.get_pot_states(state)
 
-        # TODO: this most likely will fail in some tomato scenarios
+        # NOTE: this most likely will fail in some tomato scenarios
         curr_order = state.curr_order
 
         if not player.has_object():
@@ -447,9 +434,7 @@ class GreedyHumanModel(Agent):
             else:
                 raise ValueError()
         
-        # TODO: verify this works and then clean
         motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
-        # motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)

@@ -5,8 +5,10 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, RandomAgent
+from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.utils import save_pickle, load_pickle
 
 
 START_ORDER_LIST = ["any"]
@@ -148,12 +150,35 @@ class TestGridworld(unittest.TestCase):
         trajectories = AgentEvaluator.load_traj_from_json('common_tests/test_traj')
         AgentEvaluator.check_trajectories(trajectories)
 
+    # TODO: Add automatic testing of all tests in common_tests/*
+
 
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)
     a_idx0, a_idx1 = np.random.randint(low=0, high=num_actions, size=2)
     return (Action.INDEX_TO_ACTION[a_idx0], Action.INDEX_TO_ACTION[a_idx1])
 
+
+class TestFeaturizations(unittest.TestCase):
+
+    def setUp(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.mlp = MediumLevelPlanner.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
+        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlp), GreedyHumanModel(self.mlp))
+        np.random.seed(0)
+
+    def test_lossless_state_featurization(self):
+        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=10)
+        featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        expected_featurization = load_pickle("data/testing/lossless_state_featurization")
+        self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+
+    def test_state_featurization(self):
+        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=10)
+        featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        expected_featurization = load_pickle("data/testing/state_featurization")
+        self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 class TestOvercookedEnvironment(unittest.TestCase):
     
@@ -182,6 +207,8 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_run_agents(self):
         self.env.run_agents(self.rnd_agent_pair)
+
+        # TODO: test non reset behavior
     
     def test_rollouts(self):
         self.env.get_rollouts(self.rnd_agent_pair, 5)

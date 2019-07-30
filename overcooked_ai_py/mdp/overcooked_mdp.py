@@ -1064,6 +1064,10 @@ class OvercookedGridworld(object):
 
         all_features = {}
 
+        def make_closest_feature(idx, name, locations):
+            "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
+            all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations, mlp)
+
         IDX_TO_OBJ = ["onion", "soup", "dish"]
         OBJ_TO_IDX = { o_name:idx for idx, o_name in enumerate(IDX_TO_OBJ) }
 
@@ -1088,32 +1092,25 @@ class OvercookedGridworld(object):
             if held_obj_name == "onion":
                 all_features["p{}_closest_onion".format(i)] = (0, 0)
             else:
-                onion_locations = self.get_onion_dispenser_locations() + counter_objects["onion"]
-                all_features["p{}_closest_onion".format(i)] = self.get_deltas_to_closest_location(player, onion_locations, mlp)
+                make_closest_feature(i, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
 
-            empty_pot_locations = pot_state["empty"]
-            all_features["p{}_closest_empty_pot".format(i)] = self.get_deltas_to_closest_location(player, empty_pot_locations, mlp)
-            one_onion_pot_locations = pot_state["onion"]["one_onion"]
-            all_features["p{}_closest_one_onion_pot".format(i)] = self.get_deltas_to_closest_location(player, one_onion_pot_locations, mlp)
-            two_onion_pot_locations = pot_state["onion"]["two_onion"]
-            all_features["p{}_closest_two_onion_pot".format(i)] = self.get_deltas_to_closest_location(player, two_onion_pot_locations, mlp)
-            cooking_pot_locations = pot_state["onion"]["cooking"]
-            all_features["p{}_closest_cooking_pot".format(i)] = self.get_deltas_to_closest_location(player, cooking_pot_locations, mlp)
-            ready_pot_locations = pot_state["onion"]["ready"]
-            all_features["p{}_closest_ready_pot".format(i)] = self.get_deltas_to_closest_location(player, ready_pot_locations, mlp)
-            
+            make_closest_feature(i, "empty_pot", pot_state["empty"])
+            make_closest_feature(i, "one_onion_pot", pot_state["onion"]["one_onion"])
+            make_closest_feature(i, "two_onion_pot", pot_state["onion"]["two_onion"])
+            make_closest_feature(i, "cooking_pot", pot_state["onion"]["cooking"])
+            make_closest_feature(i, "ready_pot", pot_state["onion"]["ready"])
+
             if held_obj_name == "dish":
                 all_features["p{}_closest_dish".format(i)] = (0, 0)
             else:
-                dish_locations = self.get_dish_dispenser_locations() + counter_objects["dish"]
-                all_features["p{}_closest_dish".format(i)] = self.get_deltas_to_closest_location(player, dish_locations, mlp)
+                make_closest_feature(i, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
 
             if held_obj_name == "soup":
                 all_features["p{}_closest_soup".format(i)] = (0, 0)
             else:
-                soup_locations = counter_objects["soup"]
-                all_features["p{}_closest_soup".format(i)] = self.get_deltas_to_closest_location(player, soup_locations, mlp)
-            all_features["p{}_closest_serving".format(i)] = self.get_deltas_to_closest_location(player, self.get_serving_locations(), mlp)
+                make_closest_feature(i, "soup", counter_objects["soup"])
+
+            make_closest_feature(i, "serving", self.get_serving_locations())
 
             for direction, pos_and_feat in enumerate(self.get_adjacent_features(player)):
                 adj_pos, feat = pos_and_feat

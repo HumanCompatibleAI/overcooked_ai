@@ -83,7 +83,7 @@ class MotionPlanner(object):
         """Minimum (over possible orientations) number of actions necessary 
         to go from starting position to goal position (not including 
         interaction action)."""
-        # TODO: currently unused, pretty bad code. If used in future, clean up
+        # NOTE: currently unused, pretty bad code. If used in future, clean up
         min_cost = np.Inf
         for d1, d2 in itertools.product(Direction.ALL_DIRECTIONS, repeat=2):
             start = (pos1, d1)
@@ -1059,7 +1059,6 @@ class MediumLevelPlanner(object):
 
         successor_high_level_states = []
         for ml_action in ml_actions:
-            # print("Expanding ", ml_action)
             action_plan, end_state, cost = self.get_embedded_low_level_action_plan(start_state, ml_action, other_agent, other_agent_idx)
             
             if not self.mdp.is_terminal(end_state):
@@ -1070,13 +1069,8 @@ class MediumLevelPlanner(object):
                 cost = cost + 1
 
                 end_state, _ = self.embedded_mdp_step(end_state, Action.INTERACT, other_agent_action, other_agent.agent_index)
-                
-                # other_agent.env.state = end_state
-                # print("Got action plan ", action_plan)
-                # print(other_agent.env)
 
             successor_high_level_states.append((action_plan, end_state, cost))
-
         return successor_high_level_states
 
     def get_embedded_low_level_action_plan(self, state, goal_pos_and_or, other_agent, other_agent_idx):
@@ -1112,7 +1106,7 @@ class MediumLevelPlanner(object):
             joint_action = (action, other_agent_action)
         if not self.mdp.is_terminal(state):
             results, _, _ = self.mdp.get_state_transition(state, joint_action)
-            successor_state = results[0][0] # Env is deterministic
+            successor_state = results
         else:
             print("Tried to find successor of terminal")
             assert False, "state {} \t action {}".format(state, action)
@@ -1429,7 +1423,7 @@ class Heuristic(object):
                 len(soups_in_transit), len(dishes_in_transit), len(onions_in_transit)
             ))
 
-            # TODO: Consider cost of dish delivery too when considering if a
+            # NOTE Possible improvement: consider cost of dish delivery too when considering if a
             # transit soup is better than dispenser equivalent
             print("# better than disp: \t Soups {} \t Dishes {} \t Onions {}".format(
                 num_soups_better_than_pot, num_dishes_better_than_disp, num_onions_better_than_disp
@@ -1500,14 +1494,14 @@ class Heuristic(object):
     
     def simple_heuristic(self, state, time=0, debug=False):
         """Simpler heuristic that tends to run faster than current one"""
+        # NOTE: State should be modified to have an order list w.r.t. which
+        # one can calculate the heuristic
+        assert state.order_list is not None
+        
         objects_dict = state.unowned_objects_by_type
         player_objects = state.player_objects_by_type
         pot_states_dict = self.mdp.get_pot_states(state)
-
-        # num_onion_deliveries_to_go = [item for item in state.order_list if item == 'onion']
-        # num_tomato_deliveries_to_go = [item for item in state.order_list if item == 'tomato']
-        # TODO: change this arbitrary 4?
-        num_deliveries_to_go = 4 if state.order_list is None else len(state.order_list)
+        num_deliveries_to_go = state.num_orders_remaining
         
         full_soups_in_pots = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking'] \
                              + pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
@@ -1541,8 +1535,8 @@ class Heuristic(object):
             tomato_to_pot_costs = self.heuristic_cost_dict['tomato-pot'] * num_tomato_to_pot
             items_to_pot_costs.append(tomato_to_pot_costs)
 
-        # TODO: doesn't take into account that a combination of the two might actually be more advantageous.
-        # Might cause heuristic to be inadmissable in some edge cases
+        # NOTE: doesn't take into account that a combination of the two might actually be more advantageous.
+        # Might cause heuristic to be inadmissable in some edge cases.
         items_to_pot_cost = min(items_to_pot_costs)
 
         heuristic_cost = (pot_to_delivery_costs + dish_to_pot_costs + items_to_pot_cost) / 2
