@@ -8,7 +8,7 @@ from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
-from overcooked_ai_py.utils import save_pickle, load_pickle
+from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_files_in_dir
 
 
 START_ORDER_LIST = ["any"]
@@ -146,12 +146,14 @@ class TestGridworld(unittest.TestCase):
              P((3, 1), e)],
             {}, order_list=['onion', 'any']))
 
-    def test_common_mdp(self):
-        trajectories = AgentEvaluator.load_traj_from_json('common_tests/test_traj')
-        AgentEvaluator.check_trajectories(trajectories)
-
-    # TODO: Add automatic testing of all tests in common_tests/*
-
+    def test_common_mdp_jsons(self):
+        traj_test_json_paths = iterate_over_files_in_dir("../common_tests/trajectory_tests/")
+        for test_json_path in traj_test_json_paths:
+            test_trajectory = AgentEvaluator.load_traj_from_json(test_json_path)
+            try:
+                AgentEvaluator.check_trajectories(test_trajectory)
+            except AssertionError as e:
+                self.fail("File {} failed with error:\n{}".format(test_json_path, e))
 
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)
@@ -191,7 +193,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
         np.random.seed(0)
 
     def test_constructor(self):
-        OvercookedEnv(self.base_mdp, horizon=10)
+        try:
+            OvercookedEnv(self.base_mdp, horizon=10)
+        except Exception as e:
+            self.fail("Failed to instantiate OvercookedEnv:\n{}".format(e))
 
         with self.assertRaises(TypeError):
             OvercookedEnv(self.base_mdp, **{"invalid_env_param": None})
