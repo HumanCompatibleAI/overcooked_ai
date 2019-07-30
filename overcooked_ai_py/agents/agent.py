@@ -438,7 +438,7 @@ class GreedyHumanModel(Agent):
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg) for mg in motion_goals]
+            motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
             assert len(motion_goals) != 0
 
         return motion_goals
