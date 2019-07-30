@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Overcook Demo</title>
+    <script src="./overcooked-window.js"></script>
+</head>
+<body>
+<div id="task"></div>
+
+<script>
+    let OvercookedGame = Overcooked.OvercookedGame.OvercookedGame;
+    let OvercookedMDP = Overcooked.OvercookedMDP;
+    let PlayerState = OvercookedMDP.PlayerState;
+    let ObjectState = OvercookedMDP.ObjectState;
+    let Direction = OvercookedMDP.Direction;
+    let Action = OvercookedMDP.Action;
+    let OvercookedGridworld = OvercookedMDP.OvercookedGridworld;
+    let OvercookedState = OvercookedMDP.OvercookedState;
+
+    let [n, s, e, w] = Direction.CARDINAL;
+    let [stay, interact] = [Direction.STAY, Action.INTERACT];
+    let [P, Obj] = [PlayerState, ObjectState];
+    let delivery_reward = OvercookedGridworld.DELIVERY_REWARD;
+
+    let game = new OvercookedGame({
+        start_grid: [
+            'XXPXX',
+            'O  2O',
+            'T1  T',
+            'XDPSX'
+        ],
+        container: "task"
+    });
+    game.init();
+
+    let atraj = [
+        //make two soups and watch them blow up
+        [n,e], [w, interact], [interact, w], [e, n], [stay, interact], [e, e],
+        [n, interact], [interact, w], [w, w], [s, n], [interact, interact],
+        [e, s], [e, interact], [n, e], [interact, interact], [stay, stay],
+        [interact, interact],
+        [e, w], [e, s], [s, interact], [s, w], [interact, n], [e, interact],
+        [interact, s], [w, w], [n, interact], [interact, interact],
+        [s, interact], [interact, interact], [interact, stay], [e, e],
+        [interact, s], [stay, interact], [w, w], [s, stay], [interact, stay],
+        [n, stay], [s, stay], [stay, n], [stay, s], [n, stay],
+        [s, stay], [n, stay], [s, stay], [n, stay], [s, stay],
+        [stay, stay],
+
+        //pick up things and put them on tables
+        [stay, interact], [stay, n], [stay, interact],
+        [stay, w], [stay, interact], [stay, e], [stay, e],
+        [stay, n], [stay, interact], [stay, interact],
+        [stay, w], [stay, n], [stay, interact],
+        [stay, e], [stay, interact], [stay, w], [stay, n],
+        [stay, interact],
+        [stay, w], [stay, n], [stay, interact], [stay, e],
+        [stay, n], [stay, stay], [stay, interact],
+        [stay, e], [stay, n], [stay, interact],
+        [stay, stay],
+
+        [stay, stay]
+    ];
+
+    let state = game.mdp.get_start_state();
+    state.order_list = ["onion"];
+    let start_i = 0;
+    for (let i = 0; i < atraj.length; i++) {
+        state = state.deepcopy();
+        let joint_action = atraj[i];
+        if (i > start_i) {
+            setTimeout(((state, joint_action) => {
+                return () => {
+                    console.log(state);
+                    console.log(joint_action);
+                    console.log("");
+                    game.drawState(state);
+                }
+            })(state, joint_action), 1000 + 550 * (i - start_i));
+        }
+        [[state, _], _] =
+            game.mdp.get_transition_states_and_probs({state, joint_action});
+    }
+</script>
+</body>
+</html>
