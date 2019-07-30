@@ -171,20 +171,18 @@ class TestFeaturizations(unittest.TestCase):
         np.random.seed(0)
 
     def test_lossless_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=10)
+        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_observations"]]
         expected_featurization = load_pickle("data/testing/lossless_state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=10)
+        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
         featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_observations"]]
         expected_featurization = load_pickle("data/testing/state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 class TestOvercookedEnvironment(unittest.TestCase):
-    
-    # TODO: add asserts to existing tests and create tests for randomization
 
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("simple")
@@ -211,12 +209,15 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.env.execute_plan(self.base_mdp.get_standard_start_state(), action_plan)
 
     def test_run_agents(self):
+        start_state = self.env.state
         self.env.run_agents(self.rnd_agent_pair)
+        self.assertNotEqual(self.env.state, start_state)
 
-        # TODO: test non reset behavior
-    
     def test_rollouts(self):
-        self.env.get_rollouts(self.rnd_agent_pair, 5)
+        try:
+            self.env.get_rollouts(self.rnd_agent_pair, 3)
+        except Exception as e:
+            self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("simple")
@@ -228,18 +229,34 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env.get_rollouts(self.rnd_agent_pair, 5)
 
     def test_starting_position_randomization(self):
-        pass
+        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=True, rnd_obj_prob_thresh=0.0)
+        env = OvercookedEnv(self.base_mdp, start_state_fn)
+        start_state = env.state.players_pos_and_or
+        for _ in range(3):
+            env.reset()
+            print(env)
+            curr_terrain = env.state.players_pos_and_or
+            self.assertFalse(np.array_equal(start_state, curr_terrain))
 
     def test_starting_obj_randomization(self):
-        pass
+        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=False, rnd_obj_prob_thresh=0.8)
+        env = OvercookedEnv(self.base_mdp, start_state_fn)
+        start_state = env.state.all_objects_list
+        for _ in range(3):
+            env.reset()
+            print(env)
+            curr_terrain = env.state.all_objects_list
+            self.assertFalse(np.array_equal(start_state, curr_terrain))
 
-    def test_random_layout(self):
-
+    def test_failing_rnd_layout(self):
         with self.assertRaises(TypeError):
-            mdp_gen_params = {"none": None}
+            mdp_gen_params = {"None": None}
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
             OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
 
+    def test_random_layout(self):
         mdp_gen_params = {"prop_feats": (1, 1)}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
         env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)

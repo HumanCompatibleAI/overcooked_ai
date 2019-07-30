@@ -3,7 +3,7 @@ import time
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, GreedyHumanModel, CoupledPlanningPair, EmbeddedPlanningAgent
+from overcooked_ai_py.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, GreedyHumanModel, CoupledPlanningPair, EmbeddedPlanningAgent, RandomAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -22,6 +22,34 @@ force_compute = True
 DISPLAY = True
 simple_mdp = OvercookedGridworld.from_layout_name('simple', start_order_list=['any'], cook_time=5)
 large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
+
+
+class TestAgentEvaluator(unittest.TestCase):
+
+    def setUp(self):
+        self.agent_eval = AgentEvaluator({"layout_name": "simple"}, {"horizon": 100})
+        
+    def test_human_model_pair(self):
+        trajs = self.agent_eval.evaluate_human_model_pair()
+        try:
+            AgentEvaluator.check_trajectories(trajs)
+        except AssertionError as e:
+            self.fail("Trajectories were not returned in standard format:\n{}".format(e))
+
+    def test_rollouts(self):
+        ap = AgentPair(RandomAgent(), RandomAgent())
+        trajs = self.agent_eval.evaluate_agent_pair(ap, num_games=5)
+        try:
+            AgentEvaluator.check_trajectories(trajs)
+        except AssertionError as e:
+            self.fail("Trajectories were not returned in standard format:\n{}".format(e))
+        
+    def test_mlp_computation(self):
+        try:
+            self.agent_eval.mlp
+        except Exception as e:
+            self.fail("Failed to compute MediumLevelPlanner:\n{}".format(e))
+
 
 class TestAgents(unittest.TestCase):
 
@@ -109,11 +137,6 @@ class TestAgents(unittest.TestCase):
         epa = EmbeddedPlanningAgent(other_agent, agent_evaluator.mlp, agent_evaluator.env, delivery_horizon=1)
         ap = AgentPair(epa, other_agent)
         agent_evaluator.evaluate_agent_pair(ap, num_games=1, display=True)
-
-
-class TestAgentEvaluator(unittest.TestCase):
-    # TODO: write tests
-    pass
 
 
 class TestScenarios(unittest.TestCase):

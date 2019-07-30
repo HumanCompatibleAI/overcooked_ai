@@ -493,9 +493,9 @@ class OvercookedGridworld(object):
 
             start_state = OvercookedState.from_player_positions(start_pos, order_list=self.start_order_list)
 
-            if rnd_obj_prob_thresh != 0:
+            if rnd_obj_prob_thresh == 0:
                 return start_state
-            
+
             # Arbitrary hard-coding for randomization of objects
             # For each pot, add a random amount of onions with prob rnd_obj_prob_thresh
             pots = self.get_pot_states(start_state)["empty"]
