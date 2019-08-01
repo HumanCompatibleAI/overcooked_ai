@@ -34,30 +34,20 @@ class AgentPair(object):
 
         Otherwise, set the agent indices in the same order as the agents have been passed in.
         """
-        self.agents = [agent0]
+        self.agents = [agent0, agent1]
+        self.a0, self.a1 = agent0, agent1
+        self.a0.set_agent_index(0)
+        self.a1.set_agent_index(1)
 
-        if agent1 is None:
-            self.is_joint_agent = True
-            self.joint_agent = agent0
-            self.joint_agent.set_agent_index(0)
-        else:
-            self.agents += [agent1]
-            self.is_joint_agent = False
-            self.a0, self.a1 = agent0, agent1
-            self.a0.set_agent_index(0)
-            self.a1.set_agent_index(1)
-
-            if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-                print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
+        if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
+            print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
 
     def set_mdp(self, mdp):
         for a in self.agents:
             a.set_mdp(mdp)
 
     def joint_action(self, state):
-        if self.is_joint_agent:
-            return self.joint_agent.action(state)
-        elif self.a0 is self.a1:
+        if self.a0 is self.a1:
             # When using the same instance of an agent for self-play, 
             # reset agent index at each turn to prevent overwriting it
             self.a0.set_agent_index(0)
