@@ -53,6 +53,9 @@ class TestAgentEvaluator(unittest.TestCase):
 
 class TestAgents(unittest.TestCase):
 
+    def setUp(self):
+        self.mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
+
     def test_fixed_plan_agents(self):
         a0 = FixedPlanAgent([s, e, n, w])
         a1 = FixedPlanAgent([s, w, n, e])
@@ -64,9 +67,8 @@ class TestAgents(unittest.TestCase):
         self.assertEqual(env.mdp.get_standard_start_state().player_positions, end_state.player_positions)
 
     def test_two_coupled_agents(self):
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
-        a0 = CoupledPlanningAgent(mlp_large)
-        a1 = CoupledPlanningAgent(mlp_large)
+        a0 = CoupledPlanningAgent(self.mlp_large)
+        a1 = CoupledPlanningAgent(self.mlp_large)
         agent_pair = AgentPair(a0, a1)
         start_state = OvercookedState(
             [P((2, 2), n),
@@ -91,8 +93,7 @@ class TestAgents(unittest.TestCase):
         self.assertEqual(end_state.order_list, [])
     
     def test_one_coupled_one_fixed(self):
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
-        a0 = CoupledPlanningAgent(mlp_large)
+        a0 = CoupledPlanningAgent(self.mlp_large)
         a1 = FixedPlanAgent([s, e, n, w])
         agent_pair = AgentPair(a0, a1)
         env = OvercookedEnv(large_mdp)
@@ -103,9 +104,8 @@ class TestAgents(unittest.TestCase):
         # Even though in the first ~10 timesteps it seems like agent 1 is wasting time
         # it turns out that this is actually not suboptimal as the true bottleneck is 
         # going to be agent 0 later on (when it goes to get the 3rd onion)
-        mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
-        a0 = GreedyHumanModel(mlp_large)
-        a1 = CoupledPlanningAgent(mlp_large)
+        a0 = GreedyHumanModel(self.mlp_large)
+        a1 = CoupledPlanningAgent(self.mlp_large)
         agent_pair = AgentPair(a0, a1)
         start_state = OvercookedState(
             [P((2, 1), s),
@@ -279,7 +279,7 @@ class TestScenarios(unittest.TestCase):
         }
 
         env_params = {"start_state_fn": lambda: start_state, "horizon": 1000}
-        eva = AgentEvaluator(mdp_params, env_params, mlp_params=one_counter_params)
+        eva = AgentEvaluator(mdp_params, env_params, mlp_params=one_counter_params, force_compute=force_compute)
 
         self.compare_times(eva)
 

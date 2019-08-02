@@ -362,6 +362,7 @@ class OvercookedGridworld(object):
         self.terrain_mtx = terrain
         self.terrain_pos_dict = self._get_terrain_type_pos_dict()
         self.start_player_positions = start_player_positions
+        self.num_players = len(start_player_positions)
         self.start_order_list = start_order_list
         self.soup_cooking_time = cook_time
         self.num_items_for_soup = num_items_for_soup
@@ -435,19 +436,20 @@ class OvercookedGridworld(object):
         layout_grid = [[c for c in row] for row in layout_grid]
         OvercookedGridworld._assert_valid_grid(layout_grid)
 
-        player_positions = [None, None]
+        player_positions = [None] * 9
         for y, row in enumerate(layout_grid):
             for x, c in enumerate(row):
-                if c in ['1', '2']:
+                if c in [str(x) for x in range(1, 10)]:
                     layout_grid[y][x] = ' '
                     assert player_positions[int(c) - 1] is None, 'Duplicate player in grid'
                     player_positions[int(c) - 1] = (x, y)
 
+        num_players = len([x for x in player_positions if x is not None])
+        player_positions = player_positions[:num_players]
+        assert all(position is not None for position in player_positions), 'Some players were missing'
+
         # After removing player positions from grid we have a terrain mtx
         mdp_config["terrain"] = layout_grid
-
-        assert all(position is not None for position in player_positions), 'A player was missing'
-
         mdp_config["start_player_positions"] = player_positions
 
         for k, v in params_to_overwrite.items():
@@ -530,11 +532,11 @@ class OvercookedGridworld(object):
         return self.terrain_pos_dict[' ']
 
     def get_valid_joint_player_positions(self):
-        """Returns all valid tuples of the form (p0_pos, p1_pos)"""
-        valid_positions = self.get_valid_player_positions()
-        all_joint_positions = itertools.product(valid_positions, valid_positions)
-        valid_joint = [(pos0, pos1) for pos0, pos1 in all_joint_positions if pos0 != pos1]
-        return valid_joint
+        """Returns all valid tuples of the form (p0_pos, p1_pos, p2_pos, ...)"""
+        valid_positions = self.get_valid_player_positions() 
+        all_joint_positions = list(itertools.product(valid_positions, repeat=self.num_players))
+        valid_joint_positions = [j_pos for j_pos in all_joint_positions if not self.is_joint_position_collision(j_pos)]
+        return valid_joint_positions
 
     def get_valid_player_positions_and_orientations(self):
         valid_states = []
@@ -548,10 +550,10 @@ class OvercookedGridworld(object):
         valid_player_states = self.get_valid_player_positions_and_orientations()
 
         valid_joint_player_states = []
-        for pos_and_or_0, pos_and_or_1 in itertools.product(valid_player_states, repeat=2):
-            p0_pos, p1_pos = pos_and_or_0[0], pos_and_or_1[0]
-            if p0_pos != p1_pos:
-                valid_joint_player_states.append((pos_and_or_0, pos_and_or_1))
+        for players_pos_and_orientations in itertools.product(valid_player_states, repeat=self.num_players):
+            joint_position = [plyer_pos_and_or[0] for plyer_pos_and_or in players_pos_and_orientations]
+            if not self.is_joint_position_collision(joint_position):
+                valid_joint_player_states.append(players_pos_and_orientations)
 
         return valid_joint_player_states
 
@@ -790,12 +792,20 @@ class OvercookedGridworld(object):
         new_positions = self._handle_collisions(old_positions, new_positions)
         return new_positions, new_orientations
 
-    def is_collision(self, old_positions, new_positions):
-        p1_old, p2_old = old_positions
-        p1_new, p2_new = new_positions
-        if p1_new == p2_new:
+    def is_transition_collision(self, old_positions, new_positions):
+        # Checking for any players ending in same square
+        if self.is_joint_position_collision(new_positions):
             return True
-        elif p1_new == p2_old and p1_old == p2_new:
+        # Check if any two players crossed paths
+        for idx0, idx1 in itertools.combinations(range(self.num_players), 2):
+            p1_old, p2_old = old_positions[idx0], old_positions[idx1]
+            p1_new, p2_new = new_positions[idx0], new_positions[idx1]
+            if p1_new == p2_old and p1_old == p2_new:
+                return True
+        return False
+
+    def is_joint_position_collision(self, joint_position):
+        if any(pos0 == pos1 for pos0, pos1 in itertools.combinations(joint_position, 2)):
             return True
         return False
 
@@ -814,7 +824,7 @@ class OvercookedGridworld(object):
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""
-        if self.is_collision(old_positions, new_positions):
+        if self.is_transition_collision(old_positions, new_positions):
             return old_positions
         return new_positions
 
@@ -901,7 +911,8 @@ class OvercookedGridworld(object):
             assert is_not_free(grid[-1][x]), 'Bottom border must not be free'
 
         all_elements = [element for row in grid for element in row]
-        assert all(c in 'XOPDST12 ' for c in all_elements), 'Invalid character in grid'
+        all_numbers = "".join([str(x) for x in range(9)])
+        assert all(c in 'XOPDST ' + all_numbers for c in all_elements), 'Invalid character in grid'
         assert all_elements.count('1') == 1, "'1' must be present exactly once"
         assert all_elements.count('2') == 1, "'2' must be present exactly once"
         assert all_elements.count('D') >= 1, "'D' must be present at least once"
@@ -929,10 +940,10 @@ class OvercookedGridworld(object):
                     player_object = player.held_object
                     if player_object:
                         grid_string += player_object.name[:1]
-                    elif player.position == state.players[0].position:
-                        grid_string += str(0)
                     else:
-                        grid_string += str(1)
+                        player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                        assert len(player_idx_lst) == 1
+                        grid_string += str(player_idx_lst[0])
                 else:
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
@@ -1055,12 +1066,15 @@ class OvercookedGridworld(object):
             return np.array(state_mask_stack).astype(int)
 
         # NOTE: Currently not very efficient, a decent amount of computation repeated here
-        final_obs_p0 = process_for_player(0)
-        final_obs_p1 = process_for_player(1)
-        return final_obs_p0, final_obs_p1
+        num_players = len(overcooked_state.players)
+        final_obs_for_players = tuple(process_for_player(i) for i in range(num_players))
+        return final_obs_for_players
 
     def featurize_state(self, overcooked_state, mlp):
-        """Encode state with some manually designed features."""
+        """
+        Encode state with some manually designed features. 
+        NOTE: currently works for just two players.
+        """
 
         all_features = {}
 

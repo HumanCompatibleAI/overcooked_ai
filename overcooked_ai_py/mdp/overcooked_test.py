@@ -5,7 +5,7 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_files_in_dir
@@ -60,13 +60,6 @@ class TestGridworld(unittest.TestCase):
                                                  'O  2XX',
                                                  'X1 3 X',
                                                  'XDXSXX'])
-
-        with self.assertRaises(AssertionError):
-            # There can't be more than two agents
-            mdp = OvercookedGridworld.from_grid(['XXPXX',
-                                                 'O  2O',
-                                                 'X1 3X',
-                                                 'XDXSX'])
 
         with self.assertRaises(AssertionError):
             # There can't be fewer than two agents.
@@ -155,6 +148,12 @@ class TestGridworld(unittest.TestCase):
             except AssertionError as e:
                 self.fail("File {} failed with error:\n{}".format(test_json_path, e))
 
+    def test_four_player_mdp(self):
+        try:
+            OvercookedGridworld.from_layout_name("multiplayer_schelling")
+        except AssertionError as e:
+            print("Loading > 2 player map failed with error:", e)
+
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)
     a_idx0, a_idx1 = np.random.randint(low=0, high=num_actions, size=2)
@@ -181,6 +180,7 @@ class TestFeaturizations(unittest.TestCase):
         featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_observations"]]
         expected_featurization = load_pickle("data/testing/state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+
 
 class TestOvercookedEnvironment(unittest.TestCase):
 
@@ -218,6 +218,17 @@ class TestOvercookedEnvironment(unittest.TestCase):
             self.env.get_rollouts(self.rnd_agent_pair, 3)
         except Exception as e:
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
+
+    def test_4_player_env(self):
+        mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
+        assert mdp.num_players == 4
+        env = OvercookedEnv(mdp, horizon=100)
+        ag = AgentGroup(*[RandomAgent() for _ in range(4)])
+        env.run_agents(ag, display=True)
+        self.assertEqual(
+            env.state.players_pos_and_or,
+            (((1, 5), (-1, 0)), ((3, 5), (1, 0)), ((4, 1), (1, 0)), ((4, 3), (0, 1)))
+        )
 
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("simple")

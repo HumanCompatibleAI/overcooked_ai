@@ -458,7 +458,7 @@ class JointMotionPlanner(object):
         for t in range(min_length):
             curr_pos_or0, curr_pos_or1 = pos_and_or_paths[0][t], pos_and_or_paths[1][t]
             curr_positions = (curr_pos_or0[0], curr_pos_or1[0])
-            if self.mdp.is_collision(prev_positions, curr_positions):
+            if self.mdp.is_transition_collision(prev_positions, curr_positions):
                 return True
             prev_positions = curr_positions
         return False
@@ -511,7 +511,7 @@ class JointMotionPlanner(object):
 
             # If agents collide, let the waiting agent wait and the non-waiting
             # agent take a step
-            if self.mdp.is_collision(prev_positions, next_positions):
+            if self.mdp.is_transition_collision(prev_positions, next_positions):
                 if wait_agent_idx == 0:
                     curr_pos_or0 = curr_pos_or0 # Agent 0 will wait, stays the same
                     curr_pos_or1 = next_pos_or1

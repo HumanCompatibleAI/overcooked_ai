@@ -20,47 +20,59 @@ class Agent(object):
         pass
 
 
-class AgentPair(object):
+class AgentGroup(object):
     """
-    The AgentPair object is to be used in the context of a OvercookedEnv, in which
-    it can be queried to obtain actions for both the agents.
+    AgentGroup is a group of N agents used to sample 
+    joint actions in the context of an OvercookedEnv instance.
     """
 
-    def __init__(self, agent0, agent1=None):
-        """
-        If the pair of agents is in fact a single joint agent, set the agent
-        index (used to order the processed observations) to 0, that is consistent
-        with training.
+    def __init__(self, *agents):
+        self.agents = agents
+        self.n = len(self.agents)
+        for i, agent in enumerate(self.agents):
+            agent.set_agent_index(i)
 
-        Otherwise, set the agent indices in the same order as the agents have been passed in.
-        """
-        self.agents = [agent0, agent1]
-        self.a0, self.a1 = agent0, agent1
-        self.a0.set_agent_index(0)
-        self.a1.set_agent_index(1)
+        if self.n != 2:
+            assert all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)), "All agents should be separate instances"
 
-        if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-            print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
+    def joint_action(self, state):
+        return tuple(a.action(state) for a in self.agents)
 
     def set_mdp(self, mdp):
         for a in self.agents:
             a.set_mdp(mdp)
 
+    def reset(self):
+        for a in self.agents:
+            a.reset()
+
+
+class AgentPair(AgentGroup):
+    """
+    AgentPair is the N=2 case of AgentGroup. Unlike AgentGroup,
+    it supports having both agents being the same instance of Agent.
+    """
+
+    def __init__(self, *agents): 
+        super().__init__(*agents)
+        assert self.n == 2
+        self.a0, self.a1 = self.agents
+        if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
+            print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
+
     def joint_action(self, state):
         if self.a0 is self.a1:
             # When using the same instance of an agent for self-play, 
             # reset agent index at each turn to prevent overwriting it
+            # NOTE: This will cause unexpected behaviour if the agent 
+            # is not state-less (has history).
             self.a0.set_agent_index(0)
             action_0 = self.a0.action(state)
             self.a1.set_agent_index(1)
             action_1 = self.a1.action(state)
             return (action_0, action_1)
         else:
-            return (self.a0.action(state), self.a1.action(state))
-        
-    def reset(self):
-        for a in self.agents:
-            a.reset()
+            return super().joint_action(state)
 
 
 class CoupledPlanningPair(AgentPair):
@@ -119,6 +131,7 @@ class AgentFromPolicy(Agent):
 
     def reset(self):
         self.history = []
+
 
 class RandomAgent(Agent):
     """
@@ -251,6 +264,7 @@ class EmbeddedPlanningAgent(Agent):
             print("expected joint action", first_joint_action)
         action = first_joint_action[self.agent_index]
         return action
+
 
 class GreedyHumanModel(Agent):
     """
