@@ -72,8 +72,8 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
         return self.evaluate_agent_pair(agent_pair, display=display)
 
-    def evaluate_agent_pair(self, agent_pair, num_games=1, display=False):
-        return self.env.get_rollouts(agent_pair, num_games, display=display)
+    def evaluate_agent_pair(self, agent_pair, num_games=1, display=False, info=True):
+        return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
     @staticmethod
     def check_trajectories(trajectories):
@@ -81,6 +81,7 @@ class AgentEvaluator(object):
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
         """
         AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
+        AgentEvaluator._check_right_types(trajectories)
         AgentEvaluator._check_trajectories_dynamics(trajectories)
 
     @staticmethod
@@ -88,6 +89,16 @@ class AgentEvaluator(object):
         assert traj_keys_set == set(DEFAULT_TRAJ_KEYS), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
             [k for k in DEFAULT_TRAJ_KEYS if k not in traj_keys_set], [k for k in traj_keys_set if k not in DEFAULT_TRAJ_KEYS]
         )
+    
+    @staticmethod
+    def _check_right_types(trajectories):
+        for idx in range(len(trajectories["ep_observations"])):
+            states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+            mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
+            assert all(type(a) is tuple for a in actions)
+            assert all(type(s) is OvercookedState for s in states)
+            assert type(mdp_params) is dict
+            assert type(env_params) is dict
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):
@@ -95,7 +106,9 @@ class AgentEvaluator(object):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
 
-            assert len(states) == len(actions) == len(rewards)
+            assert len(states) == len(actions) == len(rewards), "# states {}\t# actions {}\t# rewards {}".format(
+                len(states), len(actions), len(rewards)
+            )
 
             # Checking that actions would give rise to same behaviour in current MDP
             simulation_env = OvercookedEnv(OvercookedGridworld.from_layout_name(**mdp_params), **env_params)
