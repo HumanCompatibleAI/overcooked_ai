@@ -943,7 +943,12 @@ class MediumLevelPlanner(object):
         Returns:
             full_joint_action_plan (list): joint actions to reach goal
         """
+        start_state = start_state.deepcopy()
         ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
+
+        if start_state.order_list is None:
+            start_state.order_list = ['any'] * delivery_horizon
+            
         full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
             start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
         )
@@ -1047,7 +1052,10 @@ class MediumLevelPlanner(object):
             successor_states.append((goal_jm_state, end_state, min(plan_costs)))
         return successor_states
 
-    def get_successor_states_fixed_other(self, start_state, other_agent, other_agent_idx=1):
+    def get_successor_states_fixed_other(self, start_state, other_agent, other_agent_idx):
+        """
+        Get the successor states of a given start state, assuming that the other agent is fixed and will act according to the passed in model
+        """
         if self.mdp.is_terminal(start_state):
             return []
 

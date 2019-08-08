@@ -11,8 +11,10 @@ setup(name='overcooked_ai',
       install_requires=[
         'numpy',
         'tqdm',
-        'ipython',
-        'ipywidgets',
+        'ipykernel==5.1.0',
+        'ipython==7.4.0',
+        'ipython-genutils==0.2.0',
+        'ipywidgets==7.4.2',
         'jupyter',
         'gym'
       ]

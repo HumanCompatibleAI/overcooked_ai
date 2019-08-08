@@ -25,6 +25,8 @@ class AgentEvaluator(object):
         force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
         mlp_params (dict): params for MediumLevelPlanner
         """
+        assert type(mdp_params) is dict, "mdp_params must be a dictionary"
+
         if mdp_fn_params is None:
             self.variable_mdp = False
             self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)

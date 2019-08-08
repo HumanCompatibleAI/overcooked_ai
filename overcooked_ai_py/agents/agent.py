@@ -3,6 +3,7 @@ import numpy as np
 
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.planning.planners import Heuristic
+from overcooked_ai_py.planning.search import SearchTree
 
 
 class Agent(object):
@@ -218,7 +219,6 @@ class EmbeddedPlanningAgent(Agent):
         self.logging_level = logging_level
 
     def action(self, state):
-        from overcooked_ai_py.planning.search import SearchTree
         start_state = state.deepcopy()
         order_list = start_state.order_list if start_state.order_list is not None else ["any", "any"]
         start_state.order_list = order_list[:self.delivery_horizon]
