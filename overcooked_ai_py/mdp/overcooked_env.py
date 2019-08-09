@@ -27,8 +27,10 @@ class OvercookedEnv(object):
         """
         if isinstance(mdp, OvercookedGridworld):
             self.mdp_generator_fn = lambda: mdp
+            self.variable_mdp = True
         elif callable(mdp) and isinstance(mdp(), OvercookedGridworld):
             self.mdp_generator_fn = mdp
+            self.variable_mdp = False
         else:
             raise ValueError("Mdp should be either OvercookedGridworld instance or a generating function")
         
@@ -248,16 +250,16 @@ class Overcooked(gym.Env):
             # is controlled by the actual run seeds
             np.random.seed(0)
         self.base_env = base_env
-        self.mdp = base_env.mdp
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
         self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.reset()
 
     def _setup_observation_space(self):
-        dummy_state = self.mdp.get_standard_start_state()
-        obs_shape = self.featurize_fn(dummy_state)[0].shape
-        high = np.ones(obs_shape) * max(self.mdp.soup_cooking_time, self.mdp.num_items_for_soup, 5)
+        dummy_mdp = self.base_env.mdp
+        dummy_state = dummy_mdp.get_standard_start_state()
+        obs_shape = self.featurize_fn(dummy_mdp, dummy_state)[0].shape
+        high = np.ones(obs_shape) * max(dummy_mdp.soup_cooking_time, dummy_mdp.num_items_for_soup, 5)
         return gym.spaces.Box(high * 0, high, dtype=np.float32)
 
     def step(self, action):
@@ -278,7 +280,7 @@ class Overcooked(gym.Env):
             joint_action = (other_agent_action, agent_action)
 
         next_state, reward, done, info = self.base_env.step(joint_action)
-        ob_p0, ob_p1 = self.featurize_fn(next_state)
+        ob_p0, ob_p1 = self.featurize_fn(self.mdp, next_state)
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
         else:
@@ -299,8 +301,10 @@ class Overcooked(gym.Env):
         have to deal with randomizing indices.
         """
         self.base_env.reset()
+        print(self.base_env)
+        self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
-        ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
+        ob_p0, ob_p1 = self.featurize_fn(self.mdp, self.base_env.state)
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
         else:
