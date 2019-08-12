@@ -913,13 +913,12 @@ class OvercookedGridworld(object):
         digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
         layout_digits = [e for e in all_elements if e in digits]
         num_players = len(layout_digits)
-        assert num_players > 1, "Zero or one players (digits) in grid. One-player Overcooked is not currently supported"
+        assert num_players > 0, "No players (digits) in grid"
         layout_digits = list(sorted(map(int, layout_digits)))
         assert layout_digits == list(range(1, num_players + 1)), "Some players were missing"
 
         assert all(c in 'XOPDST123456789 ' for c in all_elements), 'Invalid character in grid'
         assert all_elements.count('1') == 1, "'1' must be present exactly once"
-        assert all_elements.count('2') == 1, "'2' must be present exactly once"
         assert all_elements.count('D') >= 1, "'D' must be present at least once"
         assert all_elements.count('S') >= 1, "'S' must be present at least once"
         assert all_elements.count('P') >= 1, "'P' must be present at least once"

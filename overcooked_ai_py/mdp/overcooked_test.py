@@ -219,6 +219,17 @@ class TestOvercookedEnvironment(unittest.TestCase):
         except Exception as e:
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
+    def test_one_player_env(self):
+        mdp = OvercookedGridworld.from_layout_name("simple_single")
+        env = OvercookedEnv(mdp, horizon=12)
+        a0 = FixedPlanAgent([stay, w, w, e, e, n, e, interact, w, n, interact])
+        ag = AgentGroup(a0)
+        env.run_agents(ag, display=False)
+        self.assertEqual(
+            env.state.players_pos_and_or,
+            (((2, 1), (0, -1)),)
+        )
+
     def test_four_player_env_fixed(self):
         mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
         assert mdp.num_players == 4
