@@ -5,13 +5,18 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, RandomAgent, GreedyHumanModel, FixedPlanAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_files_in_dir
 
 
 START_ORDER_LIST = ["any"]
+n, s = Direction.NORTH, Direction.SOUTH
+e, w = Direction.EAST, Direction.WEST
+stay, interact = Action.STAY, Action.INTERACT
+P, Obj = PlayerState, ObjectState
+
 
 class TestDirection(unittest.TestCase):
 
@@ -112,11 +117,6 @@ class TestGridworld(unittest.TestCase):
                          [Action.ALL_ACTIONS, Action.ALL_ACTIONS])
 
     def test_transitions_and_environment(self):
-        n, s = Direction.NORTH, Direction.SOUTH
-        e, w = Direction.EAST, Direction.WEST
-        stay, interact = Action.STAY, Action.INTERACT
-        P, Obj = PlayerState, ObjectState
-
         bad_state = OvercookedState(
             [P((0, 0), s), P((3, 1), s)], {}, order_list=[])
 
@@ -219,12 +219,27 @@ class TestOvercookedEnvironment(unittest.TestCase):
         except Exception as e:
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
-    def test_4_player_env(self):
+    def test_four_player_env_fixed(self):
+        mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
+        assert mdp.num_players == 4
+        env = OvercookedEnv(mdp, horizon=16)
+        a0 = FixedPlanAgent([stay, w, w])
+        a1 = FixedPlanAgent([stay, stay, e, e, n, n, n, e, interact, n, n, w, w, w, n, interact, e])
+        a2 = FixedPlanAgent([stay, w, interact, n, n, e, e, e, n, e, n, interact, w])
+        a3 = FixedPlanAgent([e, interact, n, n, w, w, w, n, interact, e, s])
+        ag = AgentGroup(a0, a1, a2, a3)
+        env.run_agents(ag, display=False)
+        self.assertEqual(
+            env.state.players_pos_and_or,
+            (((1, 1), (-1, 0)), ((3, 1), (0, -1)), ((2, 1), (-1, 0)), ((4, 2), (0, 1)))
+        )
+
+    def test_four_player_env_random(self):
         mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
         assert mdp.num_players == 4
         env = OvercookedEnv(mdp, horizon=100)
         ag = AgentGroup(*[RandomAgent() for _ in range(4)])
-        env.run_agents(ag, display=True)
+        env.run_agents(ag, display=False)
         self.assertEqual(
             env.state.players_pos_and_or,
             (((1, 5), (-1, 0)), ((3, 5), (1, 0)), ((4, 1), (1, 0)), ((4, 3), (0, 1)))

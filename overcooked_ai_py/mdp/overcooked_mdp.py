@@ -439,14 +439,15 @@ class OvercookedGridworld(object):
         player_positions = [None] * 9
         for y, row in enumerate(layout_grid):
             for x, c in enumerate(row):
-                if c in [str(x) for x in range(1, 10)]:
+                if c in ['1', '2', '3', '4', '5', '6', '7', '8', '9']:
                     layout_grid[y][x] = ' '
+
+                    # -1 is to account for fact that player indexing starts from 1 rather than 0
                     assert player_positions[int(c) - 1] is None, 'Duplicate player in grid'
                     player_positions[int(c) - 1] = (x, y)
 
         num_players = len([x for x in player_positions if x is not None])
         player_positions = player_positions[:num_players]
-        assert all(position is not None for position in player_positions), 'Some players were missing'
 
         # After removing player positions from grid we have a terrain mtx
         mdp_config["terrain"] = layout_grid
@@ -805,10 +806,8 @@ class OvercookedGridworld(object):
         return False
 
     def is_joint_position_collision(self, joint_position):
-        if any(pos0 == pos1 for pos0, pos1 in itertools.combinations(joint_position, 2)):
-            return True
-        return False
-
+        return any(pos0 == pos1 for pos0, pos1 in itertools.combinations(joint_position, 2))
+            
     def step_environment_effects(self, state):
         reward = 0
         for obj in state.objects.values():
@@ -911,8 +910,14 @@ class OvercookedGridworld(object):
             assert is_not_free(grid[-1][x]), 'Bottom border must not be free'
 
         all_elements = [element for row in grid for element in row]
-        all_numbers = "".join([str(x) for x in range(9)])
-        assert all(c in 'XOPDST ' + all_numbers for c in all_elements), 'Invalid character in grid'
+        digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+        layout_digits = [e for e in all_elements if e in digits]
+        num_players = len(layout_digits)
+        assert num_players > 1, "Zero or one players (digits) in grid. One-player Overcooked is not currently supported"
+        layout_digits = list(sorted(map(int, layout_digits)))
+        assert layout_digits == list(range(1, num_players + 1)), "Some players were missing"
+
+        assert all(c in 'XOPDST123456789 ' for c in all_elements), 'Invalid character in grid'
         assert all_elements.count('1') == 1, "'1' must be present exactly once"
         assert all_elements.count('2') == 1, "'2' must be present exactly once"
         assert all_elements.count('D') >= 1, "'D' must be present at least once"

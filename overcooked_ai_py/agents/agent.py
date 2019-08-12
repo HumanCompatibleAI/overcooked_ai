@@ -33,9 +33,6 @@ class AgentGroup(object):
         for i, agent in enumerate(self.agents):
             agent.set_agent_index(i)
 
-        if self.n != 2:
-            assert all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)), "All agents should be separate instances"
-
     def joint_action(self, state):
         return tuple(a.action(state) for a in self.agents)
 
@@ -52,12 +49,19 @@ class AgentPair(AgentGroup):
     """
     AgentPair is the N=2 case of AgentGroup. Unlike AgentGroup,
     it supports having both agents being the same instance of Agent.
+    
+    NOTE: Allowing duplicate agents (using the same instance of an agent
+    for both fields can lead to problems if the agents have state / history)
     """
 
-    def __init__(self, *agents): 
+    def __init__(self, *agents, allow_duplicate_agents=False): 
         super().__init__(*agents)
         assert self.n == 2
         self.a0, self.a1 = self.agents
+
+        if self.a0 is self.a1:
+            assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
+
         if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
             print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
 
@@ -65,8 +69,6 @@ class AgentPair(AgentGroup):
         if self.a0 is self.a1:
             # When using the same instance of an agent for self-play, 
             # reset agent index at each turn to prevent overwriting it
-            # NOTE: This will cause unexpected behaviour if the agent 
-            # is not state-less (has history).
             self.a0.set_agent_index(0)
             action_0 = self.a0.action(state)
             self.a1.set_agent_index(1)
@@ -164,19 +166,24 @@ class StayAgent(Agent):
 
 
 class FixedPlanAgent(Agent):
-    
+    """
+    An Agent with a fixed plan. Returns Stay actions once pre-defined plan has terminated.
+    # NOTE: Assumes that calls to action are sequential (agent has history)
+    """
+
     def __init__(self, plan):
         self.plan = plan
         self.i = 0
     
     def action(self, state):
         if self.i >= len(self.plan):
-            return None
+            return Action.STAY
         curr_action = self.plan[self.i]
-
-        # NOTE: Assumes that calls to action are sequential
         self.i += 1
         return curr_action
+    
+    def reset(self):
+        self.i = 0
 
 
 class CoupledPlanningAgent(Agent):
