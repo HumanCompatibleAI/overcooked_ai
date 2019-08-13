@@ -26,7 +26,6 @@ class LayoutGenerator(object):
         """
         self.outer_shape = np.array(outer_shape)
         self.mdp_params = mdp_params
-        print("OK", self.mdp_params)
 
     @staticmethod
     def mdp_gen_fn_from_dict(
