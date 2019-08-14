@@ -72,10 +72,13 @@ def rnd_int_uniform(low, high):
 
 def mean_and_std_err(lst):
     "Mean and standard error"
-    mu, sd = np.mean(lst), np.std(lst)
+    mu = np.mean(lst)
+    return mu, std_err(lst)
+
+def std_err(lst):
+    sd = np.std(lst)
     n = len(lst)
-    se = sd / np.sqrt(n)
-    return mu, se
+    return sd / np.sqrt(n)
 
 # Utils
 

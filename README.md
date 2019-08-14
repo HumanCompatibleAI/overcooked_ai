@@ -23,23 +23,41 @@ To complete the installation, run the following commands:
 ```
 cd overcooked_ai
 pip setup.py develop
-pip install -r requirements.txt
 ```
 
-## Verify Installation
+In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
 
-To verify your installation, you can try running the following command from the inner `overcooked_ai_py` folder (with flag `-f` for a quick run, and without for a more comprehensive suite that will take approximately 5/10 minutes to run):
+To install it, cd into `overcooked_ai_js` and set up the package with `npm install`.
+
+To get nodemon installed and usable as a bash command, you'll need to run `npm install -g nodemon` to globally install, and then make sure whatever path it displays as the install path is part of your $PATH. 
+
+## Verifying Installation
+
+### Python code
+
+To verify your python installation, you can try running the following command from the inner `overcooked_ai_py` folder:
 
 ```
-python run_tests.py -f
+python run_tests_fast.py
 ```
+
+or (this can take 5-10 mins):
+```
+python run_tests_full.py
+```
+
+### Javascript code
+
+Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
+`npm run build-window` should be run before running modified tests.
+
+`overcooked-window.js` is used for the demo and testing.
 
 ## `overcooked_ai_py` Structure Overview
 
 `mdp/`:
 - `overcooked_mdp.py`: main Overcooked game logic
 - `overcooked_env.py`: environment classes built on top of the Overcooked mdp
-- `overcooked_interactive.py`: script to play Overcooked in terminal against trained agents
 - `layout_generator.py`: functions to generate random layouts programmatically
 
 `agents/`:
@@ -54,22 +72,10 @@ python run_tests.py -f
 
 # Javascript Visualizations
 
-In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
-
-## Visualization Demo
 To run a simple demo that plays a trajectory demonstrating the
 transitions in the game (requires having npm installed):
+
 ```
 $ npm run demo
 ```
 
-## Development
-Set up the package with `npm install`.
-
-To get nodemon installed and usable as a bash command, you'll need to run `npm install -g nodemon` to globally install, and then make sure whatever 
-path it displays as the install path is part of your $PATH. 
-
-Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
-`npm run build-window` should be run before running modified tests.
-
-`overcooked-window.js` is used for the demo and testing.
