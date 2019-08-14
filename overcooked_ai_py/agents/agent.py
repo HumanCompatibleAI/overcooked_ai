@@ -27,11 +27,14 @@ class AgentGroup(object):
     joint actions in the context of an OvercookedEnv instance.
     """
 
-    def __init__(self, *agents):
+    def __init__(self, *agents, allow_duplicate_agents=False):
         self.agents = agents
         self.n = len(self.agents)
         for i, agent in enumerate(self.agents):
             agent.set_agent_index(i)
+
+        if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
+            assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
 
     def joint_action(self, state):
         return tuple(a.action(state) for a in self.agents)
@@ -55,12 +58,9 @@ class AgentPair(AgentGroup):
     """
 
     def __init__(self, *agents, allow_duplicate_agents=False): 
-        super().__init__(*agents)
+        super().__init__(*agents, allow_duplicate_agents=allow_duplicate_agents)
         assert self.n == 2
         self.a0, self.a1 = self.agents
-
-        if self.a0 is self.a1:
-            assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
 
         if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
             print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
