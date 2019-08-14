@@ -22,7 +22,7 @@ To complete the installation, run the following commands:
 
 ```
 cd overcooked_ai
-pip setup.py develop
+python setup.py develop
 ```
 
 In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
