@@ -68,7 +68,7 @@ class LayoutGenerator(object):
 
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
-        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
+        return OvercookedGridworld.from_grid(mdp_grid, base_layout_params=self.mdp_params)
 
     def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True):        
         grid = Grid(inner_shape)
@@ -78,7 +78,7 @@ class LayoutGenerator(object):
         padded_grid = self.embed_grid(grid)
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
-        return OvercookedGridworld.from_grid(mdp_grid, **self.mdp_params)
+        return OvercookedGridworld.from_grid(mdp_grid, base_layout_params=self.mdp_params)
 
     def padded_grid_to_layout_grid(self, padded_grid, start_positions, display=False):
         if display:

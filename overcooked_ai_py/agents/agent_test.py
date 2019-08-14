@@ -60,10 +60,10 @@ class TestAgents(unittest.TestCase):
         a0 = FixedPlanAgent([s, e, n, w])
         a1 = FixedPlanAgent([s, w, n, e])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp)
+        env = OvercookedEnv(large_mdp, horizon=10)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
-        self.assertEqual(time_taken, 4)
+        self.assertEqual(time_taken, 10)
         self.assertEqual(env.mdp.get_standard_start_state().player_positions, end_state.player_positions)
 
     def test_two_coupled_agents(self):
@@ -96,9 +96,9 @@ class TestAgents(unittest.TestCase):
         a0 = CoupledPlanningAgent(self.mlp_large)
         a1 = FixedPlanAgent([s, e, n, w])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp)
+        env = OvercookedEnv(large_mdp, horizon=10)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
-        self.assertEqual(time_taken, 4)
+        self.assertEqual(time_taken, 10)
 
     def test_one_coupled_one_greedy_human(self):
         # Even though in the first ~10 timesteps it seems like agent 1 is wasting time
@@ -213,6 +213,7 @@ class TestScenarios(unittest.TestCase):
 
         print("H+R time taken: ", time_taken_hr)
         print("R+R time taken: ", time_taken_rr)
+        self.assertGreater(time_taken_hr, time_taken_rr)
 
     def test_scenario_2(self):
         # Simple asymmetric advantages scenario

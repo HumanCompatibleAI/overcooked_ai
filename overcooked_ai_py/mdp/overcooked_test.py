@@ -5,7 +5,7 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, RandomAgent, GreedyHumanModel, FixedPlanAgent
+from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_files_in_dir
@@ -65,13 +65,6 @@ class TestGridworld(unittest.TestCase):
                                                  'O  2XX',
                                                  'X1 3 X',
                                                  'XDXSXX'])
-
-        with self.assertRaises(AssertionError):
-            # There can't be fewer than two agents.
-            mdp = OvercookedGridworld.from_grid(['XXPXX',
-                                                 'O   O',
-                                                 'X1  X',
-                                                 'XDXSX'])
 
         with self.assertRaises(AssertionError):
             # The agents must be numbered 1 and 2.
@@ -187,7 +180,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("simple")
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
-        self.rnd_agent_pair = AgentPair(RandomAgent(), RandomAgent())
+        self.rnd_agent_pair = AgentPair(FixedPlanAgent([stay, w, w]), FixedPlanAgent([stay, e, e]))
         np.random.seed(0)
 
     def test_constructor(self):
@@ -243,17 +236,6 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.assertEqual(
             env.state.players_pos_and_or,
             (((1, 1), (-1, 0)), ((3, 1), (0, -1)), ((2, 1), (-1, 0)), ((4, 2), (0, 1)))
-        )
-
-    def test_four_player_env_random(self):
-        mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
-        assert mdp.num_players == 4
-        env = OvercookedEnv(mdp, horizon=100)
-        ag = AgentGroup(*[RandomAgent() for _ in range(4)])
-        env.run_agents(ag, display=False)
-        self.assertEqual(
-            env.state.players_pos_and_or,
-            (((1, 5), (-1, 0)), ((3, 5), (1, 0)), ((4, 1), (1, 0)), ((4, 3), (0, 1)))
         )
 
     def test_multiple_mdp_env(self):
@@ -322,7 +304,7 @@ class TestGymEnvironment(unittest.TestCase):
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("simple")
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
-        self.rnd_agent_pair = AgentPair(RandomAgent(), RandomAgent())
+        self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)
 
     # TODO: write more tests here

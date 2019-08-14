@@ -85,7 +85,7 @@ class CoupledPlanningPair(AgentPair):
     """
 
     def __init__(self, agent):
-        super().__init__(agent, agent)
+        super().__init__(agent, agent, allow_duplicate_agents=True)
 
     def joint_action(self, state):
         # Reduce computation by half if both agents are coupled planning agents
