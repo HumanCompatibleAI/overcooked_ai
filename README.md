@@ -29,7 +29,11 @@ In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP
 
 To install it, cd into `overcooked_ai_js` and set up the package with `npm install`.
 
-To get nodemon installed and usable as a bash command, you'll need to run `npm install -g nodemon` to globally install, and then make sure whatever path it displays as the install path is part of your $PATH. 
+For development, you will also need to install browserify:
+
+```
+npm install -g browserify
+```
 
 ## Verifying Installation
 
