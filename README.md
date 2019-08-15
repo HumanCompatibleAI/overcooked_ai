@@ -44,9 +44,9 @@ For development, you will also need to install browserify:
 npm install -g browserify
 ```
 
-## Verifying Installation
+### Verifying Installation
 
-### Python code
+#### Python code
 
 To verify your python installation, you can try running the following command from the inner `overcooked_ai_py` folder:
 
@@ -59,7 +59,7 @@ or (this can take 5-10 mins):
 python run_tests_full.py
 ```
 
-### Javascript code
+#### Javascript code
 
 Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
 `npm run build-window` should be run before running modified tests.
@@ -83,7 +83,11 @@ Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `wind
 
 `run_tests.py`: script to run all tests
 
-# Javascript Visualizations
+## Python Visualizations
+
+One can adapt a version of [this file](https://github.com/HumanCompatibleAI/human_aware_rl/blob/master/human_aware_rl/overcooked_interactive.py) in order to be able to play games in terminal graphics with custom-defined agents.
+
+## Javascript Visualizations
 
 To run a simple demo that plays a trajectory demonstrating the
 transitions in the game (requires having npm installed):
@@ -91,4 +95,3 @@ transitions in the game (requires having npm installed):
 ```
 $ npm run demo
 ```
-
