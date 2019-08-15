@@ -2,6 +2,15 @@
 <p align="center">
 <img src="overcooked_ai_js/images/screenshot.png" width="350">
 </p>
+<br>
+
+## Introduction
+
+Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance.
+
+The goal of the game is to deliver soups as fast as possible. Each soup requires taking 3 items and placing them in a pot, waiting for the soup to cook, and then having an agent pick up the soup and delivering it. The agents should split up tasks on the fly and coordinate effectively in order to achieve high reward.
+
+To play the game with some previously trained DRL agents, use [Overcooked-Demo](https://github.com/HumanCompatibleAI/overcooked-demo).
 
 ## Installation
 
