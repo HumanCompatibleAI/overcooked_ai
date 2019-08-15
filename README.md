@@ -46,7 +46,7 @@ npm install -g browserify
 
 ### Verifying Installation
 
-#### Python code
+#### Python Code
 
 To verify your python installation, you can try running the following command from the inner `overcooked_ai_py` folder:
 
@@ -59,14 +59,16 @@ or (this can take 5-10 mins):
 python run_tests_full.py
 ```
 
-#### Javascript code
+#### Javascript Code
 
 Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
 `npm run build-window` should be run before running modified tests.
 
 `overcooked-window.js` is used for the demo and testing.
 
-## `overcooked_ai_py` Structure Overview
+## Python Code Structure Overview
+
+`overcooked_ai_py` contains:
 
 `mdp/`:
 - `overcooked_mdp.py`: main Overcooked game logic
@@ -74,7 +76,7 @@ Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `wind
 - `layout_generator.py`: functions to generate random layouts programmatically
 
 `agents/`:
-- `agent.py`: where agent types are defined
+- `agent.py`: location of agent classes
 - `benchmarking.py`: sample trajectories of agents (both trained and planners) and load various models
 
 `planning`:
