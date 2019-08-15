@@ -48,7 +48,14 @@ class LayoutGenerator(object):
         prop_feats: (min, max) proportion of counters with features on them
         """
 
-        if mdp_choices is not None:
+        print("MDP PARAMS", mdp_params)
+        print("MDP PARAMS", mdp_params["layout_name"])
+
+        if "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None:
+            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+            mdp_generator_fn = lambda: mdp
+        
+        elif mdp_choices is not None:
             assert type(mdp_choices) is list
             
             # If list of MDPs, randomly choose one at each reset
