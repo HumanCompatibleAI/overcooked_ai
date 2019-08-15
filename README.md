@@ -2,6 +2,17 @@
 <p align="center">
 <img src="overcooked_ai_js/images/screenshot.png" width="350">
 </p>
+<br>
+
+## Introduction
+
+Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance, based on the widly popular video game [Overcooked](http://www.ghosttowngames.com/overcooked/).
+
+The goal of the game is to deliver soups as fast as possible. Each soup requires taking 3 items and placing them in a pot, waiting for the soup to cook, and then having an agent pick up the soup and delivering it. The agents should split up tasks on the fly and coordinate effectively in order to achieve high reward.
+
+To play the game with some previously trained DRL agents, use [Overcooked-Demo](https://github.com/HumanCompatibleAI/overcooked-demo).
+
+For DRL implementations compatible with the environment and reproducibile results to [our paper](https://bit.ly/2XoYHAm), check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl).
 
 ## Installation
 
@@ -22,18 +33,22 @@ To complete the installation, run the following commands:
 
 ```
 cd overcooked_ai
-pip setup.py develop
+python setup.py develop
 ```
 
 In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
 
 To install it, cd into `overcooked_ai_js` and set up the package with `npm install`.
 
-To get nodemon installed and usable as a bash command, you'll need to run `npm install -g nodemon` to globally install, and then make sure whatever path it displays as the install path is part of your $PATH. 
+For development, you will also need to install browserify:
 
-## Verifying Installation
+```
+npm install -g browserify
+```
 
-### Python code
+### Verifying Installation
+
+#### Python Code
 
 To verify your python installation, you can try running the following command from the inner `overcooked_ai_py` folder:
 
@@ -46,14 +61,16 @@ or (this can take 5-10 mins):
 python run_tests_full.py
 ```
 
-### Javascript code
+#### Javascript Code
 
 Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `window` object, and so
 `npm run build-window` should be run before running modified tests.
 
 `overcooked-window.js` is used for the demo and testing.
 
-## `overcooked_ai_py` Structure Overview
+## Python Code Structure Overview
+
+`overcooked_ai_py` contains:
 
 `mdp/`:
 - `overcooked_mdp.py`: main Overcooked game logic
@@ -61,7 +78,7 @@ Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `wind
 - `layout_generator.py`: functions to generate random layouts programmatically
 
 `agents/`:
-- `agent.py`: where agent types are defined
+- `agent.py`: location of agent classes
 - `benchmarking.py`: sample trajectories of agents (both trained and planners) and load various models
 
 `planning`:
@@ -70,7 +87,11 @@ Run tests with `npm run test`. Testing scripts use `jest`, which exposes a `wind
 
 `run_tests.py`: script to run all tests
 
-# Javascript Visualizations
+## Python Visualizations
+
+One can adapt a version of [this file](https://github.com/HumanCompatibleAI/human_aware_rl/blob/master/human_aware_rl/overcooked_interactive.py) in order to be able to play games in terminal graphics with custom-defined agents.
+
+## Javascript Visualizations
 
 To run a simple demo that plays a trajectory demonstrating the
 transitions in the game (requires having npm installed):
@@ -78,4 +99,3 @@ transitions in the game (requires having npm installed):
 ```
 $ npm run demo
 ```
-
