@@ -1,7 +1,7 @@
 import json, copy
 import numpy as np
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
@@ -87,6 +87,10 @@ class AgentEvaluator(object):
 
     def evaluate_agent_pair(self, agent_pair, num_games=1, display=False, info=True):
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
+
+    @staticmethod
+    def trajectory_mean_and_se_rewards(trajectories):
+        return mean_and_std_err(trajectories["ep_returns"])
 
     @staticmethod
     def trajectory_entropy(trajectories):
