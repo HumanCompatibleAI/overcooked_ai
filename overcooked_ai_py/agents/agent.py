@@ -9,7 +9,13 @@ from overcooked_ai_py.planning.search import SearchTree
 class Agent(object):
 
     def action(self, state):
+        """Returns action and action probabilities"""
         return NotImplementedError()
+
+    @staticmethod
+    def a_probs_from_action(action):
+        action_idx = Action.ACTION_TO_INDEX[action]
+        return np.eye(Action.NUM_ACTIONS)[action_idx]
 
     def set_agent_index(self, agent_index):
         self.agent_index = agent_index
@@ -146,8 +152,10 @@ class RandomAgent(Agent):
         self.sim_threads = sim_threads
     
     def action(self, state):
+        # 1/5 prob for first 5 actions, and 0 for interact
+        action_probs = [1/5] * 5 + [0.0]
         idx = np.random.randint(4)
-        return Action.ALL_ACTIONS[idx]
+        return Action.ALL_ACTIONS[idx], action_probs
 
     def direct_action(self, obs):
         return [np.random.randint(4) for _ in range(self.sim_threads)]
@@ -159,7 +167,8 @@ class StayAgent(Agent):
         self.sim_threads = sim_threads
     
     def action(self, state):
-        return Action.STAY
+        a = Action.STAY
+        return a, self.a_probs_from_action(a)
 
     def direct_action(self, obs):
         return [Action.ACTION_TO_INDEX[Action.STAY]] * self.sim_threads

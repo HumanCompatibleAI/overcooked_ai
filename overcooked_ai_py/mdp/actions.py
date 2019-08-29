@@ -1,4 +1,5 @@
 import itertools
+import numpy as np
 
 
 class Direction(object):
@@ -49,6 +50,7 @@ class Action(object):
         STAY: "stay",
         INTERACT: "interact"
     }
+    NUM_ACTIONS = len(ALL_ACTIONS)
 
     @staticmethod
     def move_in_direction(point, direction):
@@ -73,6 +75,15 @@ class Action(object):
         direction = (new_x - old_x, new_y - old_y)
         assert direction in Direction.ALL_DIRECTIONS
         return direction
+
+    @staticmethod
+    def sample(action_probs):
+        return np.random.choice(Action.ALL_ACTIONS, p=action_probs)
+    
+    @staticmethod
+    def argmax(action_probs):
+        action_idx = np.argmax(action_probs)
+        return Action.INDEX_TO_ACTION[action_idx]
 
     @staticmethod
     def to_char(action):

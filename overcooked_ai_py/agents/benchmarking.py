@@ -9,7 +9,18 @@ from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, Ove
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 
-DEFAULT_TRAJ_KEYS = ["ep_observations", "ep_actions", "ep_rewards", "ep_dones", "ep_returns", "ep_returns_sparse", "ep_lengths", "mdp_params", "env_params"]
+DEFAULT_TRAJ_KEYS = [
+    "ep_observations", 
+    "ep_actions",
+    "ep_actions_probs",
+    "ep_rewards",
+    "ep_dones", 
+    "ep_returns", 
+    "ep_returns_sparse", 
+    "ep_lengths", 
+    "mdp_params", 
+    "env_params"
+]
 
 
 class AgentEvaluator(object):
@@ -78,6 +89,31 @@ class AgentEvaluator(object):
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
     @staticmethod
+    def trajectory_entropy(trajectories):
+        """
+        Calculates the on-policy empirical entropy of the agents' policies for each trajectory
+        """
+        avg_agents_entropy = np.zeros(2)
+        num_trajs = len(trajectories["ep_lengths"])
+        for traj_idx in range(num_trajs):
+            episode_action_probs = trajectories["ep_actions_probs"][traj_idx]
+            for agent_idx, agent_action_probs in enumerate(zip(*episode_action_probs)):
+                avg_agents_entropy[agent_idx] += AgentEvaluator.avg_action_entropy(agent_action_probs)
+        return avg_agents_entropy / num_trajs
+
+    @staticmethod
+    def avg_action_entropy(action_probs_n):
+        """
+        Given a list of action probabilities of an agent, compute the average entropy
+        """
+        return np.mean([AgentEvaluator.entropy(action_probs) for action_probs in action_probs_n])
+
+    @staticmethod
+    def entropy(action_probs, eps=1e-14):
+        action_probs = [p if p != 0 else eps for p in action_probs]
+        return -sum([p * np.log(p) for p in action_probs])
+
+    @staticmethod
     def check_trajectories(trajectories):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
@@ -85,6 +121,7 @@ class AgentEvaluator(object):
         AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
         AgentEvaluator._check_trajectories_dynamics(trajectories)
+        # TODO: Check shapes?
 
     @staticmethod
     def _check_standard_traj_keys(traj_keys_set):

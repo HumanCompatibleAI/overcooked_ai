@@ -143,14 +143,16 @@ class OvercookedEnv(object):
         if display: print(self)
         while not done:
             s_t = self.state
-            a_t = agent_pair.joint_action(s_t)
+
+            # Getting actions and action probs for both agents
+            a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
 
             # Break if either agent is out of actions
             if any([a is None for a in a_t]):
                 break
 
             s_tp1, r_t, done, info = self.step(a_t)
-            trajectory.append((s_t, a_t, r_t, done))
+            trajectory.append((s_t, a_t, a_probs_t, r_t, done))
 
             if display and self.t < display_until:
                 self.print_state_transition(a_t, r_t, info)
@@ -180,6 +182,7 @@ class OvercookedEnv(object):
             # With shape (n_timesteps, game_len), where game_len might vary across games:
             "ep_observations": [],
             "ep_actions": [],
+            "ep_actions_probs": [],
             "ep_rewards": [], # Individual dense (= sparse + shaped * rew_shaping) reward values
             "ep_dones": [], # Individual done values
 
@@ -195,9 +198,10 @@ class OvercookedEnv(object):
             agent_pair.set_mdp(self.mdp)
 
             trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
-            obs, actions, rews, dones = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3]
+            obs, actions, action_probs, rews, dones = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
             trajectories["ep_observations"].append(obs)
             trajectories["ep_actions"].append(actions)
+            trajectories["ep_actions_probs"].append(action_probs)
             trajectories["ep_rewards"].append(rews)
             trajectories["ep_dones"].append(dones)
             trajectories["ep_returns"].append(tot_rews_sparse + tot_rews_shaped * reward_shaping)
@@ -216,6 +220,10 @@ class OvercookedEnv(object):
 
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
+
+        # HACK: should probably transfer checks over to Env class
+        from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+        AgentEvaluator.check_trajectories(trajectories)
         return trajectories
 
 
