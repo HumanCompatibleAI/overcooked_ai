@@ -148,13 +148,21 @@ class RandomAgent(Agent):
     NOTE: Does not perform interact actions
     """
 
-    def __init__(self, sim_threads=None):
+    def __init__(self, sim_threads=None, interact=False):
         self.sim_threads = sim_threads
+        self.interact = interact
     
     def action(self, state):
-        # 1/5 prob for first 5 actions, and 0 for interact
-        action_probs = [1/5] * 5 + [0.0]
-        idx = np.random.randint(4)
+        if self.interact:
+            # 1/6 prob for first 6 actions, and 0 for rest (potentially bad action)
+            action_probs = np.ones(Action.NUM_ACTIONS) / 6
+            action_probs[6:] = np.zeros(len(action_probs[6:]))
+            idx = np.random.randint(6)
+        else:
+            # 1/5 prob for first 5 actions, and 0 for interact
+            action_probs = np.ones(Action.NUM_ACTIONS) / 5
+            action_probs[5:] = np.zeros(len(action_probs[5:]))
+            idx = np.random.randint(5)
         return Action.ALL_ACTIONS[idx], action_probs
 
     def direct_action(self, obs):
@@ -351,7 +359,7 @@ class GreedyHumanModel(Agent):
 
         # NOTE: Assumes that calls to action are sequential
         self.prev_state = state
-        return chosen_action
+        return chosen_action, self.a_probs_from_action(chosen_action)
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
         """Returns chosen motion goal (either boltzmann rationally or rationally), and corresponding action"""

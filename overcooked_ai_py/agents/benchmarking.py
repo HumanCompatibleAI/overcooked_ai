@@ -59,11 +59,15 @@ class AgentEvaluator(object):
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
         return self._mlp
 
-    def evaluate_human_model_pair(self, display=True):
+    def evaluate_random_pair(self, interact=True, display=False):
+        agent_pair = AgentPair(RandomAgent(interact=interact), RandomAgent(interact=interact))
+        return self.evaluate_agent_pair(agent_pair, display=display)
+
+    def evaluate_human_model_pair(self, display=True, num_games=1):
         a0 = GreedyHumanModel(self.mlp)
         a1 = GreedyHumanModel(self.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, display=display, num_games=num_games)
 
     def evaluate_optimal_pair(self, display=True, delivery_horizon=2):
         a0 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)

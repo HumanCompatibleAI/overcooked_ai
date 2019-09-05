@@ -912,12 +912,13 @@ class MediumLevelPlanner(object):
         
         try:
             mlp = MediumLevelPlanner.from_action_manager_file(filename)
-        except (FileNotFoundError, ModuleNotFoundError, EOFError) as e:
-            print("Recomputing planner due to:", e)
-            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
-        if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
-            print("Mlp with different params or mdp found, computing from scratch")
+            if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
+                print("Mlp with different params or mdp found, computing from scratch")
+                return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+            print("Recomputing planner due to:", e)
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
         print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
