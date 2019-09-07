@@ -4,7 +4,7 @@ import numpy as np
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import Agent, AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
@@ -109,6 +109,56 @@ class AgentEvaluator(object):
                 avg_agents_entropy[agent_idx] += AgentEvaluator.avg_action_entropy(agent_action_probs)
         return avg_agents_entropy / num_trajs
 
+    # @staticmethod
+    # def flatten_redundant_actions(trajectories):
+    #     """
+    #     'Flattens' redundant actions – by turning 'a' → 'stay' in all 
+    #     cases in which the effect of 'a' is indistinguishable from 'stay'
+    #     and fixing the respective action probs.
+
+    #     Useful for more indicative measurements of entropy.
+    #     """
+    #     trajectories = copy.deepcopy(trajectories)
+    #     _, envs = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
+
+    #     ep_actions, ep_actions_probs = [], []
+    #     num_trajs = len(trajectories["ep_lengths"])
+    #     for idx in range(num_trajs):
+    #         episode_states = trajectories["ep_observations"][idx]
+    #         episode_actions = trajectories["ep_actions"][idx]
+    #         episode_action_probs = trajectories["ep_actions_probs"][idx]
+    #         # episode_length = trajectories["ep_lengths"][idx]
+    #         simulation_env = envs[idx]
+
+    #         actions, action_probs = [], []
+    #         for i, (s_t, j_a, j_a_p) in enumerate(zip(episode_states, episode_actions, ep_actions_probs)):
+    #             simulation_env.state = s_t
+    #             actual_s_tp1, _, _, _ = simulation_env.step(j_a)
+
+    #             # TODO: Sum probabilities of all actions that would lead to same state!!
+    #             # stay, stay
+    #             stay_j_a = (Action.STAY, Action.STAY)
+    #             simulation_env.state = s_t
+    #             double_stay_s_tp1, _, _, _ = simulation_env.step(stay_j_a)
+    #             if double_stay_s_tp1 == actual_s_tp1:
+    #                 actions.append(stay_j_a)
+    #                 action_probs.append([Agent.a_probs_from_action(Action.STAY) for _ in range(2)])
+    #                 continue
+
+    #             # stay, a
+    #             for a_idx in range(2):
+    #                 other_j_a = (Action.STAY, j_a[1]) if a_idx == 1 else (j_a[0], Action.STAY)
+    #                 simulation_env.state = s_t
+    #                 double_stay_s_tp1, _, _, _ = simulation_env.step(other_j_a)
+    #                 if double_stay_s_tp1 == actual_s_tp1:
+    #                     actions.append(other_j_a)
+    #                     action_probs.append((Agent.a_probs_from_action(Action.STAY), j_a_p[a_idx]))
+
+
+    #     trajectories["ep_actions"] = ep_actions
+    #     trajectories["ep_actions_probs"] = ep_actions_probs
+    #     return trajectories
+
     @staticmethod
     def avg_action_entropy(action_probs_n):
         """
@@ -149,16 +199,17 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):
+        _, envs = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
+
         for idx in range(len(trajectories["ep_observations"])):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
-            mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
+            simulation_env = envs[idx]
 
             assert len(states) == len(actions) == len(rewards), "# states {}\t# actions {}\t# rewards {}".format(
                 len(states), len(actions), len(rewards)
             )
 
             # Checking that actions would give rise to same behaviour in current MDP
-            simulation_env = OvercookedEnv(OvercookedGridworld.from_layout_name(**mdp_params), **env_params)
             for i in range(len(states) - 1):
                 curr_state = states[i]
                 simulation_env.state = curr_state
@@ -169,6 +220,18 @@ class AgentEvaluator(object):
                     simulation_env.display_states(states[i + 1], next_state)
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
+
+    @staticmethod
+    def mdps_and_envs_from_trajectories(trajectories):
+        mdps, envs = [], []
+        for idx in range(len(trajectories["ep_lengths"])):
+            mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
+            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+            env = OvercookedEnv(mdp, **env_params)
+            mdps.append(mdp)
+            envs.append(env)
+        return mdps, envs
+
 
     ### I/O METHODS ###
 
