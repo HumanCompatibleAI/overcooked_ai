@@ -1,5 +1,6 @@
 import io, json, pickle, pstats, cProfile
 import numpy as np
+from numpy import nan
 from pathlib import Path
 
 # I/O
