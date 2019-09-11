@@ -1160,175 +1160,10 @@ class OvercookedGridworld(object):
         final_obs_p1 = process_for_player(1)
 
         # Check that the func to turn the obs back into a state is working:
-        self.check_state_to_obs_to_state(final_obs_p0, player_observing=0, state=overcooked_state)
-        self.check_state_to_obs_to_state(final_obs_p1, player_observing=1, state=overcooked_state)
+        # self.check_state_to_obs_to_state(final_obs_p0, player_observing=0, state=overcooked_state)
+        # self.check_state_to_obs_to_state(final_obs_p1, player_observing=1, state=overcooked_state)
 
         return final_obs_p0, final_obs_p1
-
-    """---Added by pk:"""
-    def check_state_to_obs_to_state(self, observation, player_observing, state):
-
-        state_from_obs_from_state = self.state_from_observation(observation, player_observing)
-        # print(state_from_obs_from_state)
-        if state.players != state_from_obs_from_state.players or state.objects != state_from_obs_from_state.objects:
-            # It's fine if they're not equal due to the info lost about the number of onions in cooked soup:
-            # This could be a held cooked-soup:
-            for i in range(2):
-                if state_from_obs_from_state.players[i].has_object() and \
-                        state_from_obs_from_state.players[i].held_object.name == 'soup':
-                    # Take the 'cooking time' value from the actual state... then the states should be the same
-                    state_from_obs_from_state.players[i].held_object.state = (
-                        state_from_obs_from_state.players[i].held_object.state[0],
-                        state_from_obs_from_state.players[i].held_object.state[1],
-                        state.players[i].held_object.state[2])
-            # Or a cooked-soup on the counter:
-            for loc in state_from_obs_from_state.objects:
-                if state_from_obs_from_state.objects[loc].name == 'soup' and loc not in self.get_pot_locations():
-                    # Take the 'cooking time' value from the actual state... then the states should be the same
-                    state_from_obs_from_state.objects[loc].state = (state_from_obs_from_state.objects[loc].state[0],
-                                                                    state_from_obs_from_state.objects[loc].state[1],
-                                                                    state.objects[loc].state[2])
-
-        # if state.players != state_from_obs_from_state.players:
-        #     print('Not equal!!')
-        #     print('...')
-        assert state.players == state_from_obs_from_state.players
-        assert state.objects == state_from_obs_from_state.objects
-
-    def state_from_observation(self, observation, player_observing):
-        """
-        We want to reverse the function lossless_state_encoding, which takes a state and produces an
-        observation (the observation is what is fed into the NN model for DRL agents).
-        :player_observing: the index of the player observing"""
-
-        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
-
-        # Ensure that primary_agent_idx layers are ordered before other_agent_idx layers
-        primary_agent_idx = player_observing
-        other_agent_idx = 1 - primary_agent_idx
-
-        ordered_player_features = ["player_{}_loc".format(primary_agent_idx), "player_{}_loc".format(other_agent_idx)] \
-                                  + ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
-                                   for i, d in itertools.product([primary_agent_idx, other_agent_idx],
-                                                                 Direction.ALL_DIRECTIONS)]
-        variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc",
-                                 "dishes", "onions"]
-        LAYERS = ordered_player_features + base_map_features + variable_map_features
-        state_mask_dict = {k: observation[:,:,j] for j, k in enumerate(LAYERS)}
-
-
-        # Order list: Just set to any/onions all the way down?
-        order_list = ["any"] * 10
-
-        # Extract positions and values from a layer:
-        def extract_pos_value(layer):
-            #TODO: Must be more efficient way of doing this (e.g. use np.nonzero? I tried this but it's hard to get the
-            # data types right, and the indices are the wrong way round!)
-            positions = []
-            values = []
-            for i in range(layer.shape[0]):
-                for j in range(layer.shape[1]):
-                    if layer[(i, j)] != 0:
-                        positions.append((i, j))
-                        values.append(layer[(i, j)])
-            return positions, values
-
-        # players: List of PlayerStates
-        # A player state is defined by 'position', 'orientation' and 'held_object'. So for each player we just need to
-        # supply these, then do player = PlayerState(position, orientation, held_object) to make the player state
-
-        players = []
-        for i in range(2):  # Assuming 2 players
-            # Player position:
-            layer_player_pos = state_mask_dict["player_{}_loc".format(i)]
-            player_pos, _ = extract_pos_value(layer_player_pos)
-            player_pos = player_pos[0]
-
-            # Player orientation:
-            for j in range(Direction.ALL_DIRECTIONS.__len__()):
-                player_orientation_idx = j
-                layer_temp = state_mask_dict["player_{}_orientation_{}".format(i, player_orientation_idx)]
-                if not np.array_equal(layer_temp, np.zeros(self.shape)):
-                    # If this orientation layer isn't all zeros:
-                    player_or = Direction.INDEX_TO_DIRECTION[player_orientation_idx]
-
-            # Player objects held:
-            layers_to_search_for_held_objects = ["onion_soup_loc", "dishes", "onions"]
-            possible_held_objects = ["soup", "dish", "onion"]
-            number_held_objects = 0
-            held_object_state = None
-            for j, object in enumerate(layers_to_search_for_held_objects):
-                layer_temp = state_mask_dict[object]
-                if layer_temp[player_pos] == 1:
-                    # If this layer has a 1 where the player is then the player is holding the object
-                    held_object_name = possible_held_objects[j]
-                    number_held_objects += 1
-                    if held_object_name == 'soup':
-                        # Assuming onion:
-                        soup_type = 'onion'
-                        num_onions = 3  # This info isn't in the observation -- presumably it's 3!
-                        cook_time = 99  # This info isn't in the observation
-                        soup_state = (soup_type, num_onions, cook_time)
-                        held_object_state = ObjectState(held_object_name, player_pos, soup_state)
-                    else:
-                        held_object_state = ObjectState(held_object_name, player_pos)
-            assert number_held_objects <= 1
-
-            # Now create the player state:
-            players.append(PlayerState(player_pos, player_or, held_object_state))
-
-
-        # Objects: Dictionary mapping positions (x, y) to ObjectStates (not inc objects held by players)
-
-        objects_dict = {}
-
-        # Consider each layer separately:
-
-        # Onion:
-        positions, _ = extract_pos_value(state_mask_dict['onions'])
-        for i in range(positions.__len__()):  # For each position containing an onion
-            if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
-                # then it's part of the player's state
-                object_name = 'onion'
-                object_position = positions[i]
-                objects_dict[object_position] = ObjectState(object_name, object_position)
-
-        # Dish:
-        positions, _ = extract_pos_value(state_mask_dict['dishes'])
-        for i in range(positions.__len__()):  # For each position containing an onion
-            if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
-                # then it's part of the player's state
-                object_name = 'dish'
-                object_position = positions[i]
-                objects_dict[object_position] = ObjectState(object_name, object_position)
-
-        # Soup outside pot:
-        positions, _ = extract_pos_value(state_mask_dict['onion_soup_loc'])
-        for i in range(positions.__len__()):  # For each position containing an onion
-            if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
-                # then it's part of the player's state
-                object_name = 'soup'
-                object_position = positions[i]
-                soup_type = 'onion'
-                num_onions = 3  # This info isn't in the observation -- presumably it's 3!
-                cook_time = 99  # This info isn't in the observation
-                soup_state = (soup_type, num_onions, cook_time)
-                objects_dict[object_position] = ObjectState(object_name, object_position, soup_state)
-
-        # Soup inside pot:
-        onions_in_pot_pos, onions_in_pot_value = extract_pos_value(state_mask_dict['onions_in_pot'])
-        # onions_cook_time_pos, onions_cook_time_value = extract_pos_value(state_mask_dict['onions_cook_time'])
-        for i in range(onions_in_pot_pos.__len__()):
-            object_name = 'soup'
-            object_position = onions_in_pot_pos[i]
-            soup_type = 'onion'
-            num_onions = onions_in_pot_value[i]
-            cook_time = state_mask_dict['onions_cook_time'][object_position]
-            soup_state = (soup_type, num_onions, cook_time)
-            objects_dict[object_position] = ObjectState(object_name, object_position, soup_state)
-
-        return OvercookedState(players, objects_dict, order_list)
-    """---end of added by pk"""
 
     def get_deltas_to_closest_location(self, player, locations, mlp):
         _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
@@ -1343,6 +1178,172 @@ class OvercookedGridworld(object):
     ##############
     # DEPRECATED #
     ##############
+
+    """---Added by pk: But these aren't needed AND seem to use an old version of the state encoding, 
+    because sometimes state.objects == state_from_obs_from_state.objects...???"""
+    # def check_state_to_obs_to_state(self, observation, player_observing, state):
+    #
+    #     state_from_obs_from_state = self.state_from_observation(observation, player_observing)
+    #     # print(state_from_obs_from_state)
+    #     if state.players != state_from_obs_from_state.players or state.objects != state_from_obs_from_state.objects:
+    #         # It's fine if they're not equal due to the info lost about the number of onions in cooked soup:
+    #         # This could be a held cooked-soup:
+    #         for i in range(2):
+    #             if state_from_obs_from_state.players[i].has_object() and \
+    #                     state_from_obs_from_state.players[i].held_object.name == 'soup':
+    #                 # Take the 'cooking time' value from the actual state... then the states should be the same
+    #                 state_from_obs_from_state.players[i].held_object.state = (
+    #                     state_from_obs_from_state.players[i].held_object.state[0],
+    #                     state_from_obs_from_state.players[i].held_object.state[1],
+    #                     state.players[i].held_object.state[2])
+    #         # Or a cooked-soup on the counter:
+    #         for loc in state_from_obs_from_state.objects:
+    #             if state_from_obs_from_state.objects[loc].name == 'soup' and loc not in self.get_pot_locations():
+    #                 # Take the 'cooking time' value from the actual state... then the states should be the same
+    #                 state_from_obs_from_state.objects[loc].state = (state_from_obs_from_state.objects[loc].state[0],
+    #                                                                 state_from_obs_from_state.objects[loc].state[1],
+    #                                                                 state.objects[loc].state[2])
+    #
+    #     # if state.players != state_from_obs_from_state.players:
+    #     #     print('Not equal!!')
+    #     #     print('...')
+    #     assert state.players == state_from_obs_from_state.players
+    #     assert state.objects == state_from_obs_from_state.objects
+    #
+    # def state_from_observation(self, observation, player_observing):
+    #     """
+    #     We want to reverse the function lossless_state_encoding, which takes a state and produces an
+    #     observation (the observation is what is fed into the NN model for DRL agents).
+    #     :player_observing: the index of the player observing"""
+    #
+    #     base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
+    #
+    #     # Ensure that primary_agent_idx layers are ordered before other_agent_idx layers
+    #     primary_agent_idx = player_observing
+    #     other_agent_idx = 1 - primary_agent_idx
+    #
+    #     ordered_player_features = ["player_{}_loc".format(primary_agent_idx), "player_{}_loc".format(other_agent_idx)] \
+    #                               + ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
+    #                                for i, d in itertools.product([primary_agent_idx, other_agent_idx],
+    #                                                              Direction.ALL_DIRECTIONS)]
+    #     variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc",
+    #                              "dishes", "onions"]
+    #     LAYERS = ordered_player_features + base_map_features + variable_map_features
+    #     state_mask_dict = {k: observation[:,:,j] for j, k in enumerate(LAYERS)}
+    #
+    #
+    #     # Order list: Just set to any/onions all the way down?
+    #     order_list = ["any"] * 10
+    #
+    #     # Extract positions and values from a layer:
+    #     def extract_pos_value(layer):
+    #         #TODO: Must be more efficient way of doing this (e.g. use np.nonzero? I tried this but it's hard to get the
+    #         # data types right, and the indices are the wrong way round!)
+    #         positions = []
+    #         values = []
+    #         for i in range(layer.shape[0]):
+    #             for j in range(layer.shape[1]):
+    #                 if layer[(i, j)] != 0:
+    #                     positions.append((i, j))
+    #                     values.append(layer[(i, j)])
+    #         return positions, values
+    #
+    #     # players: List of PlayerStates
+    #     # A player state is defined by 'position', 'orientation' and 'held_object'. So for each player we just need to
+    #     # supply these, then do player = PlayerState(position, orientation, held_object) to make the player state
+    #
+    #     players = []
+    #     for i in range(2):  # Assuming 2 players
+    #         # Player position:
+    #         layer_player_pos = state_mask_dict["player_{}_loc".format(i)]
+    #         player_pos, _ = extract_pos_value(layer_player_pos)
+    #         player_pos = player_pos[0]
+    #
+    #         # Player orientation:
+    #         for j in range(Direction.ALL_DIRECTIONS.__len__()):
+    #             player_orientation_idx = j
+    #             layer_temp = state_mask_dict["player_{}_orientation_{}".format(i, player_orientation_idx)]
+    #             if not np.array_equal(layer_temp, np.zeros(self.shape)):
+    #                 # If this orientation layer isn't all zeros:
+    #                 player_or = Direction.INDEX_TO_DIRECTION[player_orientation_idx]
+    #
+    #         # Player objects held:
+    #         layers_to_search_for_held_objects = ["onion_soup_loc", "dishes", "onions"]
+    #         possible_held_objects = ["soup", "dish", "onion"]
+    #         number_held_objects = 0
+    #         held_object_state = None
+    #         for j, object in enumerate(layers_to_search_for_held_objects):
+    #             layer_temp = state_mask_dict[object]
+    #             if layer_temp[player_pos] == 1:
+    #                 # If this layer has a 1 where the player is then the player is holding the object
+    #                 held_object_name = possible_held_objects[j]
+    #                 number_held_objects += 1
+    #                 if held_object_name == 'soup':
+    #                     # Assuming onion:
+    #                     soup_type = 'onion'
+    #                     num_onions = 3  # This info isn't in the observation -- presumably it's 3!
+    #                     cook_time = 99  # This info isn't in the observation
+    #                     soup_state = (soup_type, num_onions, cook_time)
+    #                     held_object_state = ObjectState(held_object_name, player_pos, soup_state)
+    #                 else:
+    #                     held_object_state = ObjectState(held_object_name, player_pos)
+    #         assert number_held_objects <= 1
+    #
+    #         # Now create the player state:
+    #         players.append(PlayerState(player_pos, player_or, held_object_state))
+    #
+    #
+    #     # Objects: Dictionary mapping positions (x, y) to ObjectStates (not inc objects held by players)
+    #
+    #     objects_dict = {}
+    #
+    #     # Consider each layer separately:
+    #
+    #     # Onion:
+    #     positions, _ = extract_pos_value(state_mask_dict['onions'])
+    #     for i in range(positions.__len__()):  # For each position containing an onion
+    #         if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
+    #             # then it's part of the player's state
+    #             object_name = 'onion'
+    #             object_position = positions[i]
+    #             objects_dict[object_position] = ObjectState(object_name, object_position)
+    #
+    #     # Dish:
+    #     positions, _ = extract_pos_value(state_mask_dict['dishes'])
+    #     for i in range(positions.__len__()):  # For each position containing an onion
+    #         if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
+    #             # then it's part of the player's state
+    #             object_name = 'dish'
+    #             object_position = positions[i]
+    #             objects_dict[object_position] = ObjectState(object_name, object_position)
+    #
+    #     # Soup outside pot:
+    #     positions, _ = extract_pos_value(state_mask_dict['onion_soup_loc'])
+    #     for i in range(positions.__len__()):  # For each position containing an onion
+    #         if positions[i] != players[0].position and positions[i] != players[1].position:  # If it's held by a player
+    #             # then it's part of the player's state
+    #             object_name = 'soup'
+    #             object_position = positions[i]
+    #             soup_type = 'onion'
+    #             num_onions = 3  # This info isn't in the observation -- presumably it's 3!
+    #             cook_time = 99  # This info isn't in the observation
+    #             soup_state = (soup_type, num_onions, cook_time)
+    #             objects_dict[object_position] = ObjectState(object_name, object_position, soup_state)
+    #
+    #     # Soup inside pot:
+    #     onions_in_pot_pos, onions_in_pot_value = extract_pos_value(state_mask_dict['onions_in_pot'])
+    #     # onions_cook_time_pos, onions_cook_time_value = extract_pos_value(state_mask_dict['onions_cook_time'])
+    #     for i in range(onions_in_pot_pos.__len__()):
+    #         object_name = 'soup'
+    #         object_position = onions_in_pot_pos[i]
+    #         soup_type = 'onion'
+    #         num_onions = onions_in_pot_value[i]
+    #         cook_time = state_mask_dict['onions_cook_time'][object_position]
+    #         soup_state = (soup_type, num_onions, cook_time)
+    #         objects_dict[object_position] = ObjectState(object_name, object_position, soup_state)
+    #
+    #     return OvercookedState(players, objects_dict, order_list)
+    # """---end of added by pk"""
 
     def calculate_distance_based_shaped_reward(self, state, new_state):
         """
