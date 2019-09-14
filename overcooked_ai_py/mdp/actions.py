@@ -88,6 +88,20 @@ class Action(object):
         return Action.INDEX_TO_ACTION[action_idx]
 
     @staticmethod
+    def remove_indices_and_renormalize(probs, indices):
+        if len(np.array(probs).shape) > 1:
+            probs = np.array(probs)
+            for row_idx, row in enumerate(indices):
+                for idx in indices:
+                    probs[row_idx][idx] = 0
+            norm_probs =  probs.T / np.sum(probs, axis=1)
+            return norm_probs.T
+        else:
+            for idx in indices:
+                probs[idx] = 0
+            return probs / sum(probs)
+
+    @staticmethod
     def to_char(action):
         assert action in Action.ALL_ACTIONS
         return Action.ACTION_TO_CHAR[action]

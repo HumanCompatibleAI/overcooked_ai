@@ -90,7 +90,18 @@ class AgentEvaluator(object):
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_agent_pair(self, agent_pair, num_games=1, display=False, info=True):
+        self.env.reset()
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
+
+    def subset_trajs(trajectories):
+        pass
+
+    @staticmethod
+    def merge_trajs(args):
+        superset_traj = {}
+        for k in DEFAULT_TRAJ_KEYS:
+            superset_traj[k] = np.concatenate([traj[k] for traj in args])
+        return superset_traj
 
     @staticmethod
     def trajectory_mean_and_se_rewards(trajectories):
