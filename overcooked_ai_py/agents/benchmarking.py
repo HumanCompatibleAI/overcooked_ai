@@ -93,8 +93,30 @@ class AgentEvaluator(object):
         self.env.reset()
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
-    def subset_trajs(trajectories):
-        pass
+    @staticmethod
+    def subset_trajs(trajectories, indices):
+        new_traj = {}
+        for k, v in trajectories.items():
+            new_traj[k] = np.take(copy.deepcopy(v), indices, axis=0)
+        return new_traj
+
+    @staticmethod
+    def featurize_traj_states(trajectories):
+        featurized_states = []
+        # HACK
+        mdp_params = trajectories["mdp_params"][0]
+        env_params = trajectories["env_params"][0]
+        ave = AgentEvaluator(mdp_params, env_params)
+
+        mdps, _ = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
+        for i in range(len(trajectories["ep_lengths"])):
+            mdp = mdps[i]
+            mlp = ave.mlp
+            assert mlp.mdp == mdp
+            ep_states = trajectories["ep_observations"][i]
+            featurized_states.append([mdp.featurize_state(s, mlp) for s in ep_states])
+
+        return featurized_states
 
     @staticmethod
     def merge_trajs(args):

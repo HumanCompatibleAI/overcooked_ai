@@ -1,4 +1,4 @@
-import itertools
+import itertools, copy
 import numpy as np
 
 
@@ -88,17 +88,18 @@ class Action(object):
         return Action.INDEX_TO_ACTION[action_idx]
 
     @staticmethod
-    def remove_indices_and_renormalize(probs, indices):
+    def remove_indices_and_renormalize(probs, indices, eps=0.0):
+        probs = copy.deepcopy(probs)
         if len(np.array(probs).shape) > 1:
             probs = np.array(probs)
             for row_idx, row in enumerate(indices):
                 for idx in indices:
-                    probs[row_idx][idx] = 0
+                    probs[row_idx][idx] = eps
             norm_probs =  probs.T / np.sum(probs, axis=1)
             return norm_probs.T
         else:
             for idx in indices:
-                probs[idx] = 0
+                probs[idx] = eps
             return probs / sum(probs)
 
     @staticmethod
