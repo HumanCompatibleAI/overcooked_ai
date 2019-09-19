@@ -256,7 +256,8 @@ class Overcooked(gym.Env):
             # seeding does not) reach, we set the same seed internally to all
             # environments. The effect is negligible, as all other randomness
             # is controlled by the actual run seeds
-            np.random.seed(0)
+            # np.random.seed(0)
+            pass
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
@@ -294,8 +295,8 @@ class Overcooked(gym.Env):
         else:
             both_agents_ob = (ob_p1, ob_p0)
         
-        obs = {"both_agent_obs": both_agents_ob, 
-                "overcooked_state": next_state, 
+        obs = {"both_agent_obs": both_agents_ob,
+                "overcooked_state": next_state,
                 "other_agent_env_idx": 1 - self.agent_idx}
         return obs, reward, done, info
 
