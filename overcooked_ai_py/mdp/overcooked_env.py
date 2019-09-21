@@ -245,7 +245,7 @@ class Overcooked(gym.Env):
     what agent index it has in the environment (as encodings will be index dependent).
     """
 
-    def custom_init(self, base_env, featurize_fn, baselines=False, bit_penalty=True):
+    def custom_init(self, base_env, featurize_fn, baselines=False, bit_penalty=False):
         """
         base_env: OvercookedEnv
         featurize_fn: what function is used to featurize states returned in the 'both_agent_obs' field
