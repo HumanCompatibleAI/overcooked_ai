@@ -16,12 +16,6 @@ For DRL implementations compatible with the environment and reproducibile result
 
 ## Installation
 
-When cloning the repo, make sure you also clone the submodules.
-
-```
-git clone --recurse-submodules -j8 git@github.com:HumanCompatibleAI/overcooked_ai.git
-```
-
 It is useful to setup a conda environment with Python 3.7:
 
 ```
@@ -29,7 +23,7 @@ conda create -n overcooked_ai python=3.7
 conda activate overcooked_ai
 ```
 
-To complete the installation, run the following commands:
+To complete the installation after cloning the repo, run the following commands:
 
 ```
 cd overcooked_ai
@@ -99,3 +93,7 @@ transitions in the game (requires having npm installed):
 ```
 $ npm run demo
 ```
+
+## Further Issues and questions
+
+If you have issues or questions, don't hesitate to contact me at mdc@berkeley.edu.
