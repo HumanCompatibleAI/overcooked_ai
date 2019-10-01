@@ -96,4 +96,4 @@ $ npm run demo
 
 ## Further Issues and questions
 
-If you have issues or questions, don't hesitate to contact me at mdc@berkeley.edu.
+If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
