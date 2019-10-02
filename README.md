@@ -4,17 +4,16 @@
   <img src="overcooked_ai_js/images/layouts.gif" width="100%"> 
   <i>5 of the available layouts. New layouts are easy to hardcode or generate programmatically.</i>
 </p>
-<br>
 
 ## Introduction
 
-Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance, based on the widly popular video game [Overcooked](http://www.ghosttowngames.com/overcooked/).
+Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance, based on the widly popular video game [Overcooked](http://www.ghosttowngames.com/overcooked/). 
 
 The goal of the game is to deliver soups as fast as possible. Each soup requires taking 3 items and placing them in a pot, waiting for the soup to cook, and then having an agent pick up the soup and delivering it. The agents should split up tasks on the fly and coordinate effectively in order to achieve high reward.
 
-To play the game with some previously trained DRL agents, use [Overcooked-Demo](https://github.com/HumanCompatibleAI/overcooked-demo).
+You can **try out the game [here](https://humancompatibleai.github.io/overcooked-demo/)** (playing with some previously trained DRL agents). To play with your own trained agents using this interface, you can use [this repo](https://github.com/HumanCompatibleAI/overcooked-demo)).
 
-For DRL implementations compatible with the environment and reproducibile results to [our paper](https://bit.ly/2XoYHAm), check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl).
+For DRL implementations compatible with the environment and reproducibile results to [our paper](https://bit.ly/2XoYHAm) (*On the Utility of Learning about Humans for Human-AI Coordination*), check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl).
 
 ## Installation
 
