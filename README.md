@@ -34,12 +34,8 @@ python setup.py develop
 In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
 
 To install it, cd into `overcooked_ai_js` and set up the package with `npm install`.
+For development, you will also need to install browserify: `npm install -g browserify`
 
-For development, you will also need to install browserify:
-
-```
-npm install -g browserify
-```
 
 ### Verifying Installation
 
@@ -51,10 +47,7 @@ To verify your python installation, you can try running the following command fr
 python run_tests_fast.py
 ```
 
-or (this can take 5-10 mins):
-```
-python run_tests_full.py
-```
+or alternatively (this can take 5-10 mins): `python run_tests_full.py`
 
 #### Javascript Code
 
