@@ -1,8 +1,10 @@
 # Overcooked-AI
 <p align="center">
-<img src="overcooked_ai_js/images/screenshot.png" width="350">
+<!-- <img src="overcooked_ai_js/images/screenshot.png" width="350"> -->
+<img src="overcooked_ai_js/images/layouts.gif" width="100%"> 
 </p>
 <br>
+
 
 ## Introduction
 
@@ -97,3 +99,4 @@ $ npm run demo
 ## Further Issues and questions
 
 If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
+
