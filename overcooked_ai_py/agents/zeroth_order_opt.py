@@ -1,5 +1,5 @@
 from human_aware_rl.human.process_dataframes import get_trajs_from_data
-from human_aware_rl.pbt.pbt_hms_v2 import HMAgent
+from human_aware_rl.pbt.pbt_hms import HMAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.agents.agent import GreedyHumanModelv2
