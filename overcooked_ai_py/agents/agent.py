@@ -1249,7 +1249,7 @@ class AdvancedComplementaryModel(Agent):
 
     def __init__(self, mlp, player_index,
                  perseverance=0.5, teamwork=0.8, retain_goals=0.8, wrong_decisions=0.02, thinking_prob=0.8,
-                 path_teamwork=0.8, rationality_coefficient=3):
+                 path_teamwork=0.8, rationality_coefficient=3, prob_pausing=0.5):
         self.mlp = mlp
         self.agent_index = player_index
         self.mdp = self.mlp.mdp
@@ -1262,7 +1262,7 @@ class AdvancedComplementaryModel(Agent):
 
         self.human_model = True
 
-        # "Personality" parameters (within 0 to 1)
+        # "Personality" parameters (within 0 to 1, except rationality_coefficient)
         self.perseverance = perseverance  # perseverance = 1 means the agent always tries to go where it want to do, even when it's stuck
         self.teamwork = teamwork  # teamwork = 0 should make this agent v similar to GreedyHuman
         self.retain_goals = retain_goals  # Prob of keeping the previous goal each timestep (rather than re-calculating)
@@ -1274,6 +1274,7 @@ class AdvancedComplementaryModel(Agent):
         self.path_teamwork = path_teamwork  # Prob of considering the other agent's location in the path choice
         self.rationality_coefficient = rationality_coefficient  # Setting to 0 means random actions; inf means always takes
         # lowest cost path. In practice inf ~ 100
+        self.prob_pausing = prob_pausing # Probability of pausing on a given timestep, instead of acting
 
     # def direct_action(self, observation):
     #     """Required for running with pbt. Each observation is a 25 (?) layered "mask" that is sent to the CNN for the ppo
@@ -1328,171 +1329,192 @@ class AdvancedComplementaryModel(Agent):
         # self.stamp = round(np.random.rand()*10**4)
         # print('Next stamp....: {}'.format(self.stamp))
 
-        logging.info('Player: {}'.format(self.agent_index))
-        logging.info('Other GHM: {}'.format(self.GHM.agent_index))
-        # Get motion_goals if i) self.prev_motion_goal == None; ii) with prob = 1 - self.retain_goals;
-        # iii) if stuck for 2 steps (??); iv) if reached goal
-        # TODO: modify the getting stuck condition, e.g. include the goal to move out the way as a (different type of)
-        #  goal to be saved (see notes)
-        rand = random.random()
-        logging.info('Prev ac plan: {}'.format(self.prev_best_action))
-        if self.prev_best_action == None or rand > self.retain_goals or \
-                self.prev_best_action == 'interact' or self.prev_best_action == (0,0):
 
-            if (self.prev_best_action == 'interact' or self.prev_best_action == (0,0)) and (random.random() > self.thinking_prob):
+        # The agent sometimes just pauses instead of acting:
+        if random.random() > self.prob_pausing:
+            logging.info('Agent not pausing')
 
-                logging.info('Thinking time...')
-                # # Keep self.prev_action_plan == ['interact'], so that the agent also rethinks the next action
-                # action_plan = self.prev_action_plan
-                best_action = (0, 0)
+            logging.info('Player: {}'.format(self.agent_index))
+            logging.info('Other GHM: {}'.format(self.GHM.agent_index))
+            # Get motion_goals if i) self.prev_motion_goal == None; ii) with prob = 1 - self.retain_goals;
+            # iii) if stuck for 2 steps (??); iv) if reached goal
+            # TODO: modify the getting stuck condition, e.g. include the goal to move out the way as a (different type of)
+            #  goal to be saved (see notes)
+            rand = random.random()
+            logging.info('Prev ac plan: {}'.format(self.prev_best_action))
+            if self.prev_best_action == None or rand > self.retain_goals or \
+                    self.prev_best_action == 'interact' or self.prev_best_action == (0,0):
+
+                if (self.prev_best_action == 'interact' or self.prev_best_action == (0,0)) \
+                        and (random.random() > self.thinking_prob):
+
+                    logging.info('Thinking time...')
+                    # # Keep self.prev_action_plan == ['interact'], so that the agent also rethinks the next action
+                    # action_plan = self.prev_action_plan
+                    best_action = (0,0)
+
+                else:
+
+                    logging.info('Getting new goal')
+                    # logging.info('rand: {}, retain_goals: {}, stuck: {}, current goal: {}, current pos or: {}'
+                    #       .format(rand, self.retain_goals, self.timesteps_stuck,
+                    #               self.prev_motion_goal, state.players_pos_and_or[self.agent_index]))
+
+                    motion_goals = self.ml_action(state)
+
+                    # Find plan; with Prob = self.path_teamwork factor in the other player
+                    if random.random() < self.path_teamwork:
+                        best_action, best_goal = self.find_plan_boltz_rat_inc_other(state, motion_goals)
+                        logging.info('Choosing path inc other player. Best act: {}, goal: {}'.format(best_action, best_goal))
+
+                        # If the plan that included the other player has infinite cost, then ignore them or do a random action
+                        if best_action == None:
+                            # Get temp action and goal by ignoring the other player:
+                            best_action, best_goal = self.find_plan_boltz_rational(state, motion_goals)
+                            # if random.random() < self.perseverance:
+                            # Ignore the other player:
+                            # best_action = best_action_temp
+                            # best_goal = best_goal_temp
+                            logging.info('No path with finite cost... ignoring other player now. Best act: {}, goal: {}'.format(best_action, best_goal))
+
+                            # Removed this because Boltz rationality will take random actions
+                            # else:
+                            #     # Move in random direction, but keep goal as the best goal if ignoring the other agent
+                            #     all_actions = Action.ALL_ACTIONS
+                            #     best_action = all_actions[np.random.choice(len(all_actions))]
+                            #     best_goal = best_goal_temp
+                            #     logging.info('No path with finite cost... Random action. Best act: {}, goal: {}'.format(best_action, best_goal))
+
+                    else:
+                        best_action, best_goal = self.find_plan_boltz_rational(state, motion_goals)
+                        logging.info('Choosing path ignoring other player. Best act: {}, goal: {}'.format(best_action, best_goal))
+
+                    # Save motion goal:
+                    self.prev_motion_goal = [best_goal]
 
             else:
 
-                logging.info('Getting new goal')
-                # logging.info('rand: {}, retain_goals: {}, stuck: {}, current goal: {}, current pos or: {}'
-                #       .format(rand, self.retain_goals, self.timesteps_stuck,
-                #               self.prev_motion_goal, state.players_pos_and_or[self.agent_index]))
-
-                motion_goals = self.ml_action(state)
-
+                logging.info('Keeping old goal:')
+                # Use previous goal:
+                motion_goals = self.prev_motion_goal
+                # Find action for this goal:
                 # Find plan; with Prob = self.path_teamwork factor in the other player
                 if random.random() < self.path_teamwork:
-                    best_action, best_goal = self.find_plan_boltz_rat_inc_other(state, motion_goals)
-                    logging.info('Choosing path inc other player. Best act: {}, goal: {}'.format(best_action, best_goal))
+                    best_action, _ = self.find_plan_boltz_rat_inc_other(state, motion_goals)
 
-                    # If the plan that included the other player has infinite cost, then ignore them or do a random action
+                    # If the plan that included the other player has infinite cost, then ignore them or do random action
                     if best_action == None:
                         # Get temp action and goal by ignoring the other player:
-                        best_action, best_goal = self.find_plan_boltz_rational(state, motion_goals)
+                        best_action, _ = self.find_plan_boltz_rational(state, motion_goals)
                         # if random.random() < self.perseverance:
                         # Ignore the other player:
                         # best_action = best_action_temp
-                        # best_goal = best_goal_temp
-                        logging.info('No path with finite cost... ignoring other player now. Best act: {}, goal: {}'.format(best_action, best_goal))
 
                         # Removed this because Boltz rationality will take random actions
                         # else:
-                        #     # Move in random direction, but keep goal as the best goal if ignoring the other agent
+                        #     # Move in random direction
                         #     all_actions = Action.ALL_ACTIONS
                         #     best_action = all_actions[np.random.choice(len(all_actions))]
-                        #     best_goal = best_goal_temp
-                        #     logging.info('No path with finite cost... Random action. Best act: {}, goal: {}'.format(best_action, best_goal))
 
                 else:
-                    best_action, best_goal = self.find_plan_boltz_rational(state, motion_goals)
-                    logging.info('Choosing path ignoring other player. Best act: {}, goal: {}'.format(best_action, best_goal))
-
-                # Save motion goal:
-                self.prev_motion_goal = [best_goal]
-
-        else:
-
-            logging.info('Keeping old goal:')
-            # Use previous goal:
-            motion_goals = self.prev_motion_goal
-            # Find action for this goal:
-            # Find plan; with Prob = self.path_teamwork factor in the other player
-            if random.random() < self.path_teamwork:
-                best_action, _ = self.find_plan_boltz_rat_inc_other(state, motion_goals)
-
-                # If the plan that included the other player has infinite cost, then ignore them or do random action
-                if best_action == None:
-                    # Get temp action and goal by ignoring the other player:
                     best_action, _ = self.find_plan_boltz_rational(state, motion_goals)
-                    # if random.random() < self.perseverance:
-                    # Ignore the other player:
-                    # best_action = best_action_temp
 
-                    # Removed this because Boltz rationality will take random actions
-                    # else:
-                    #     # Move in random direction
-                    #     all_actions = Action.ALL_ACTIONS
-                    #     best_action = all_actions[np.random.choice(len(all_actions))]
-
+            # Before setting self.prev_best_action = best_action, we need to determine if the prev_best_action was (0,0),
+            # in which case the agent isn't stuck:
+            if self.prev_best_action == (0,0):
+                agent_chose_stationary = True
             else:
-                best_action, _ = self.find_plan_boltz_rational(state, motion_goals)
+                agent_chose_stationary = False
 
-        self.prev_best_action = best_action
+            self.prev_best_action = best_action
 
-        """If the agent is stuck, then take an alternative action with a probability based on the time stuck and the
-        agent's "perseverance". Note: We consider an agent stuck if their whole state is unchanged (but this misses the
-        case when they try to move and do change direction but can't move <-- here the state changes & they're stuck).
-        Also, there exist cases when the state doesn't change but they're not stuck, they just can't complete their action
-        (e.g. on unident they could try to use an onion but the other player has already filled the pot)"""
-        #TODO: Removed self.prev_best_action != 'interact'. In that case the agent might have paused to think rather than
-        # being stuck. But even when it's paused, then it could still take random actions?!
-        if self.prev_state is not None and state.players[self.agent_index] == self.prev_state.players[self.agent_index]:
+            """If the agent is stuck, then take an alternative action with a probability based on the time stuck and the
+            agent's "perseverance". Note: We consider an agent stuck if their whole state is unchanged (but this misses the
+            case when they try to move and do change direction but can't move <-- here the state changes & they're stuck).
+            Also, there exist cases when the state doesn't change but they're not stuck, they just can't complete their action
+            (e.g. on unident they could try to use an onion but the other player has already filled the pot)"""
+            #Todo: Check this more thoroughly: Later change to ensure previous action != (0, 0), because in this
+            # cause the agent isn't stuck
+            if self.prev_state is not None \
+                    and state.players[self.agent_index] == self.prev_state.players[self.agent_index] \
+                    and not agent_chose_stationary:
 
-            self.timesteps_stuck += 1
-            take_alternative = self.take_alternative_action()
-            # logging.info('Player {} timesteps stuck: {}'.format(self.agent_index, self.timesteps_stuck))
-            if take_alternative:
+                self.timesteps_stuck += 1
+                take_alternative = self.take_alternative_action()
+                # logging.info('Player {} timesteps stuck: {}'.format(self.agent_index, self.timesteps_stuck))
+                if take_alternative:
+                     logging.info('Stuck, and taking alternative action')
+                     # If the agent is stuck, set self.prev_action_plan = None, then they always re-think their goal
+                     # TODO: This is the place to put a more thorough avoiding action, e.g. 2 steps rather than 1?
+                     # self.prev_action_plan = ['interact']  # Trialling this, because it means the agent sometimes pauses after
+                     # taking an avoiding action, which measn 2 agents won't get stuck so much
+                     self.prev_best_action = None
 
-                 # If the agent is stuck, set self.prev_action_plan = None, then they always re-think their goal
-                 # TODO: This is the place to put a more thorough avoiding action, e.g. 2 steps rather than 1?
-                 # self.prev_action_plan = ['interact']  # Trialling this, because it means the agent sometimes pauses after
-                 # taking an avoiding action, which measn 2 agents won't get stuck so much
-                 self.prev_best_action = None
-
-                 # logging.info('Taking alternative action!')
-                 # Select an action at random that would change the player positions if the other player were not to move
-                 if self.agent_index == 0:
-                     joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
-                 elif self.agent_index == 1:
-                     joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
-                 else:
-                     raise ValueError("Player index not recognized")
-
-                 unblocking_joint_actions = []
-                 for j_a in joint_actions:
-                     new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
-                     if new_state.player_positions != self.prev_state.player_positions:
-                         unblocking_joint_actions.append(j_a)
-
-                 """Prefer adjacent actions if available:"""
-                 # Adjacent actions only exist if best_action is N, S, E, W
-                 if best_action in Direction.ALL_DIRECTIONS:
-
-                     # Find the adjacent actions:
+                     # logging.info('Taking alternative action!')
+                     # Select an action at random that would change the player positions if the other player were not to move
                      if self.agent_index == 0:
-                         joint_adjacent_actions = list(itertools.product(Direction.get_adjacent_directions(best_action),
-                                                                         [Action.STAY]))
+                         joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
                      elif self.agent_index == 1:
-                         joint_adjacent_actions = list(itertools.product([Action.STAY],
-                                                                         Direction.get_adjacent_directions(best_action)))
+                         joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
                      else:
                          raise ValueError("Player index not recognized")
 
-                     # If at least one of the adjacent actions is in the set of unblocking_joint_actions, then select these:
-                     if (joint_adjacent_actions[0] in unblocking_joint_actions
-                             or joint_adjacent_actions[1] in unblocking_joint_actions):
-                         preferred_unblocking_joint_actions = []
-                         # There are only ever two adjacent actions:
-                         if joint_adjacent_actions[0] in unblocking_joint_actions:
-                             preferred_unblocking_joint_actions.append(joint_adjacent_actions[0])
-                         if joint_adjacent_actions[1] in unblocking_joint_actions:
-                             preferred_unblocking_joint_actions.append(joint_adjacent_actions[1])
-                     elif (joint_adjacent_actions[0] not in unblocking_joint_actions
-                           and joint_adjacent_actions[1] not in unblocking_joint_actions):
-                         # No adjacent actions in the set of unblocking_joint_actions, so keep these actions
-                         preferred_unblocking_joint_actions = unblocking_joint_actions
+                     unblocking_joint_actions = []
+                     for j_a in joint_actions:
+                         new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                         if new_state.player_positions != self.prev_state.player_positions:
+                             unblocking_joint_actions.append(j_a)
+
+                     """Prefer adjacent actions if available:"""
+                     # Adjacent actions only exist if best_action is N, S, E, W
+                     if best_action in Direction.ALL_DIRECTIONS:
+
+                         # Find the adjacent actions:
+                         if self.agent_index == 0:
+                             joint_adjacent_actions = list(itertools.product(Direction.get_adjacent_directions(best_action),
+                                                                             [Action.STAY]))
+                         elif self.agent_index == 1:
+                             joint_adjacent_actions = list(itertools.product([Action.STAY],
+                                                                             Direction.get_adjacent_directions(best_action)))
+                         else:
+                             raise ValueError("Player index not recognized")
+
+                         # If at least one of the adjacent actions is in the set of unblocking_joint_actions, then select these:
+                         if (joint_adjacent_actions[0] in unblocking_joint_actions
+                                 or joint_adjacent_actions[1] in unblocking_joint_actions):
+                             preferred_unblocking_joint_actions = []
+                             # There are only ever two adjacent actions:
+                             if joint_adjacent_actions[0] in unblocking_joint_actions:
+                                 preferred_unblocking_joint_actions.append(joint_adjacent_actions[0])
+                             if joint_adjacent_actions[1] in unblocking_joint_actions:
+                                 preferred_unblocking_joint_actions.append(joint_adjacent_actions[1])
+                         elif (joint_adjacent_actions[0] not in unblocking_joint_actions
+                               and joint_adjacent_actions[1] not in unblocking_joint_actions):
+                             # No adjacent actions in the set of unblocking_joint_actions, so keep these actions
+                             preferred_unblocking_joint_actions = unblocking_joint_actions
+                         else:
+                             raise ValueError("Binary truth value is neither true nor false")
+
+                     # If adjacent actions don't exist then keep unblocking_joint_actions as it is
                      else:
-                         raise ValueError("Binary truth value is neither true nor false")
+                         preferred_unblocking_joint_actions = unblocking_joint_actions
 
-                 # If adjacent actions don't exist then keep unblocking_joint_actions as it is
-                 else:
-                     preferred_unblocking_joint_actions = unblocking_joint_actions
-
-                 best_action = preferred_unblocking_joint_actions[
-                     np.random.choice(len(preferred_unblocking_joint_actions))][self.agent_index]
-                 # Note: np.random isn't actually random!
+                     best_action = preferred_unblocking_joint_actions[
+                         np.random.choice(len(preferred_unblocking_joint_actions))][self.agent_index]
+                     # Note: np.random isn't actually random!
 
 
+            else:
+                self.timesteps_stuck = 0  # Reset to zero if prev & current player states aren't the same (they're not stuck)
+
+            # NOTE: Assumes that calls to action are sequential
+            self.prev_state = state
+
+        # The agent sometimes just pauses instead of acting:
         else:
-            self.timesteps_stuck = 0  # Reset to zero if prev & current player states aren't the same (they're not stuck)
+            logging.info('Agent pausing')
+            best_action = (0,0)
 
-        # NOTE: Assumes that calls to action are sequential
-        self.prev_state = state
         return best_action
 
 
@@ -2218,6 +2240,10 @@ class AdvancedComplementaryModel(Agent):
         temperature = self.rationality_coefficient
         exponent = [-y*temperature for y in x]
         #TODO: We take -ve exponents because we want to prioritise the smallest costs. Is taking -ve a good way to do it??
+
+        # if np.isnan(np.sum(np.exp(exponent), axis=0)) or np.sum(np.exp(exponent), axis=0) == 0:
+            # print('Dividing by zero or NaN in function boltz_rationality')
+
         return np.exp(exponent) / np.sum(np.exp(exponent), axis=0)
 
     def find_plan_boltz_rational(self, state, motion_goals):
@@ -2287,6 +2313,7 @@ class AdvancedComplementaryModel(Agent):
         # Now find their own best goal, assuming the other agent is Greedy:
         min_cost = np.Inf
         # best_action = None
+
         for goal in motion_goals:
 
             if self.agent_index == 0:
