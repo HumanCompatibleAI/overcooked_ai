@@ -283,6 +283,24 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr
     # Choose random epsilon (eps) from normal dist, sd=epsilon_sd
     epsilon = np.random.normal(scale=epsilon_sd, size=params['PERSON_PARAMS_HM'].__len__())
 
+    # Turn into random unit vector:
+    if params["ensure_random_direction"]:
+        print('NOTE: This only works for sd=0.01 and 8 pparams. AND I did this bit quickly so should be checked!')
+        #TODO: There might be an issue that we have 8 pparams but only 6 are usually allowed to vary... this is like
+        # taking a random direction then projecting onto the 6-dim subspace, which should be fine (??)
+
+        print('ep initial length = {}'.format(np.sqrt(sum(epsilon**2))))
+
+        # Make random vector from Gaussian sd=1
+        random_gauss_vect = np.random.normal(scale=1, size=8)
+        length = np.sqrt(sum(random_gauss_vect**2))
+        unit_vect = random_gauss_vect / length
+        # print('Unit length = {}'.format(np.sqrt(sum(unit_vect**2))))
+
+        # Now scale by 0.023, which is the average length of an 8-dim vector from Gaussians with sd=0.01
+        epsilon = 0.027*unit_vect
+        print('ep final length = {}'.format(np.sqrt(sum(epsilon**2))))
+
     # Make PERSON_PARAMS_HM + epsilon. For rationality_coefficient, do eps*10 for now. shift_by_epsilon also ensures all
     # params are between 0 and 1:
     shift_by_epsilon(params, epsilon)
@@ -330,6 +348,10 @@ if __name__ == "__main__":
                         required=False, default=3, type=int)
     parser.add_argument("-ns", "--num_grad_steps",  help="Number of gradient decent steps", required=False,
                         default=1e4, type=int)
+    # This gives problems with the BOOL for some reason:
+    # parser.add_argument("-r", "--ensure_random_direction",
+    #                     help="Should make extra sure that the random search direction is not biased towards corners "
+    #                          "of the hypercube.", required=False, default=False, type=bool)
 
     args = parser.parse_args()
     layout = args.layout
@@ -341,6 +363,7 @@ if __name__ == "__main__":
     base_learning_rate = args.base_lr  # Quick test suggests loss for a single episode can be up to around 10. So if
     # base learning rate is 1/5, we shift by roughly epsilon. NEED TO TUNE THIS!
     epsilon_sd = args.epsilon_sd  # standard deviation of the dist to pick epsilon from
+    ensure_random_direction = False
     number_hms = args.num_hms
     total_number_steps = args.num_grad_steps  # Number of steps to do in gradient decent
     # -----------------------------#
@@ -426,7 +449,8 @@ if __name__ == "__main__":
         "START_ORIENTATIONS": START_ORIENTATIONS,
         "WAIT_ALLOWED": WAIT_ALLOWED,
         "COUNTER_PICKUP": COUNTER_PICKUP,
-        "SAME_MOTION_GOALS": SAME_MOTION_GOALS
+        "SAME_MOTION_GOALS": SAME_MOTION_GOALS,
+        "ensure_random_direction": ensure_random_direction
     }  # Using same format as pbt_hms_v2
 
     mdp = OvercookedGridworld.from_layout_name(**params["MDP_PARAMS"])
