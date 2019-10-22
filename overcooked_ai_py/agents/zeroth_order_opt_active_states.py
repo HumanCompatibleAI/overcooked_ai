@@ -5,6 +5,7 @@ from human_aware_rl.pbt.pbt_hms import HMAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.agents.agent import GreedyHumanModelv2
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
 import logging, pickle
 import numpy as np
 # np.seterr(divide='ignore', invalid='ignore')  # Suppress error about diving by zero
@@ -264,7 +265,7 @@ def shift_by_gradient(params, epsilon, delta_loss, lr):
         # print('param shifted final: {}'.format(PERSON_PARAMS_HM[pparam]))
     # return PERSON_PARAMS_HM
 
-def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
+def find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
                                     start_time, step_number, total_number_steps):
     """
     Same as find_gradient_and_step_single_hm except here we have multiple hms taking multiple actions, so we find
@@ -276,7 +277,7 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr
 
     hm_number = ''
     # Make multiple hm agents:
-    multi_hm_agent = HMAgent(params, mdp, hm_number).get_multi_agent()
+    multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
 
     loss = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use)
 
@@ -307,7 +308,7 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr
 
     # Find loss for new params
     hm_number = 'eps'
-    multi_hm_agent_eps = HMAgent(params, mdp, hm_number).get_multi_agent()
+    multi_hm_agent_eps = HMAgent(params, hm_number).get_multi_agent(mlp)
     loss_eps = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent_eps, num_ep_to_use)
     delta_loss = loss - loss_eps
 
@@ -316,7 +317,7 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr
 
     # What's the loss after this grad step:
     # hm_number = ''
-    # multi_hm_agent = HMAgent(params, mdp, hm_number).get_multi_agent()
+    # multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
     # loss_final = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use)
     # return loss_final
 
@@ -334,16 +335,18 @@ if __name__ == "__main__":
     """
     parser = ArgumentParser()
     parser.add_argument("-l", "--layout",
-                        help="Layout, (Choose from: sim, sc1, sch, uni, ran)", required=False, default="simple")
-    parser.add_argument("-p", "--params", help="Starting params (all params get this value)", required=False,
+                        help="Layout, (Choose from: simple, scenario1_s, schelling_s, unident_s, random1)",
+                        required=True)
+    parser.add_argument("-p", "--params", help="Starting params (all params get this value). OR set to 9 to get "
+                                               "random values for the starting params", required=False,
                         default=None, type=float)
-    parser.add_argument("-ne", "--num_ep",
-                        help="Number of episodes to use when training (up to 16?)", required=False, default=16,
-                        type=int)
+    parser.add_argument("-ne", "--num_ep", help="Number of episodes to use when training (up to 16?)",
+                        required=False, default=16, type=int)
     parser.add_argument("-lr", "--base_lr", help="Base learning rate. E.g. 0.1", required=False, default=0.1,
                         type=float)
     parser.add_argument("-sd", "--epsilon_sd", type=float,
-                        help="Standard deviation of dist picking epison from. E.g. 0.01", required=False, default=0.01)
+                        help="Standard deviation of dist picking epison from. Initial runs suggest sd=0.02 is good",
+                        required=False, default=0.02)
     parser.add_argument("-nh", "--num_hms", help="Number of human models to use for approximating P(action|state)",
                         required=False, default=3, type=int)
     parser.add_argument("-ns", "--num_grad_steps",  help="Number of gradient decent steps", required=False,
@@ -376,11 +379,10 @@ if __name__ == "__main__":
     train_mdps = [layout]
     ordered_trajs = True
     human_ai_trajs = False
-    # data_path = "human_aware_rl/data/human/anonymized/clean_{}_trials.pkl".format('train')
-    # expert_trajs = get_trajs_from_data(data_path, train_mdps, ordered_trajs, human_ai_trajs)
-    # Load (file I saved using pickle) instead:
-    pickle_in = open('expert_trajs.pkl','rb')
-    expert_trajs = pickle.load(pickle_in)
+    data_path = "human_aware_rl/data/human/anonymized/clean_{}_trials.pkl".format('train')
+    expert_trajs = get_trajs_from_data(data_path, train_mdps, ordered_trajs, human_ai_trajs)
+    # Load (file I saved using pickle) instead FOR SIMPLE ONLY???: pickle_in = open('expert_trajs.pkl',
+    # 'rb'); expert_trajs = pickle.load(pickle_in)
 
     # Starting personality params
     if starting_params == None:
@@ -392,7 +394,19 @@ if __name__ == "__main__":
             "THINKING_PROB_HM": 1,  # NOTE: This is the probability of moving on, not of waiting to think!
             "PATH_TEAMWORK_HM": 0.5,
             "RATIONALITY_COEFF_HM": 2,
-            "PROB_PAUSING_HM": 99  # This should be modified within the code. If not setting to 99 gives an error
+            "PROB_PAUSING_HM": 99  # This will be modified within the code. If not setting to 99 gives an error
+        }
+    elif starting_params == 9:
+        # Random initialisation:
+        PERSON_PARAMS_HM = {
+            "PERSEVERANCE_HM": np.random.rand(),
+            "TEAMWORK_HM": np.random.rand(),
+            "RETAIN_GOALS_HM": np.random.rand(),
+            "WRONG_DECISIONS_HM": np.random.rand(),
+            "THINKING_PROB_HM": 1,  # NOTE: This is the probability of moving on, not of waiting to think!
+            "PATH_TEAMWORK_HM": np.random.rand(),
+            "RATIONALITY_COEFF_HM": np.random.randint(0, 20),
+            "PROB_PAUSING_HM": 99  # This will be modified within the code. If not setting to 99 gives an error
         }
     else:
         PERSON_PARAMS_HM = {
@@ -403,7 +417,7 @@ if __name__ == "__main__":
             "THINKING_PROB_HM": 1,  # NOTE: This is the probability of moving on, not of waiting to think!
             "PATH_TEAMWORK_HM": starting_params,
             "RATIONALITY_COEFF_HM": 20*starting_params,
-            "PROB_PAUSING_HM": 99  # This should be modified within the code. If not setting to 99 gives an error
+            "PROB_PAUSING_HM": 99  # This will be modified within the code. If not setting to 99 gives an error
         }
 
     # Irrelevant what values these start as:
@@ -419,7 +433,7 @@ if __name__ == "__main__":
     }
 
     # Keep some of the person params fixed. E.g. put {"PROB_PAUSING_HM"}
-    PERSON_PARAMS_FIXED = {"THINKING_PROB_HM","PROB_PAUSING_HM"}
+    PERSON_PARAMS_FIXED = {"PROB_PAUSING_HM"}
 
     # Need some params to create HM agent:
     LAYOUT_NAME = train_mdps[0]
@@ -455,6 +469,17 @@ if __name__ == "__main__":
 
     mdp = OvercookedGridworld.from_layout_name(**params["MDP_PARAMS"])
 
+    # Make the mlp:
+    NO_COUNTERS_PARAMS = {
+        'start_orientations': START_ORIENTATIONS,
+        'wait_allowed': WAIT_ALLOWED,
+        'counter_goals': mdp.get_counter_locations(),
+        'counter_drop': mdp.get_counter_locations(),
+        'counter_pickup': COUNTER_PICKUP,
+        'same_motion_goals': params["SAME_MOTION_GOALS"]
+    }  # This means that all counter locations are allowed to have objects dropped on them AND be "goals" (I think!)
+    mlp = MediumLevelPlanner.from_pickle_or_compute(mdp, NO_COUNTERS_PARAMS, force_compute=False)
+
     #-----------------------------#
     lr = base_learning_rate / num_ep_to_use  # learning rate: the more episodes we use the more the loss will be,
     # so we need to scale it down by num_ep_to_use
@@ -468,7 +493,7 @@ if __name__ == "__main__":
     # For each gradient decent step, find the gradient and step:
     start_time = time.time()
     for step_number in range(np.int(total_number_steps)):
-        find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
+        find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
                                         start_time, step_number, total_number_steps)
 
     print('end')
