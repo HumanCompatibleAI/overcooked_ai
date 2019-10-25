@@ -1335,6 +1335,16 @@ class AdvancedComplementaryModel(Agent):
         if random.random() > self.prob_pausing:
             logging.info('Agent not pausing')
 
+            # Check motion goal is valid; if not, set to None AND set best action to None:
+            if self.prev_motion_goal is not None and not self.mlp.mp.is_valid_motion_start_goal_pair \
+                        (state.players_pos_and_or[self.agent_index], self.prev_motion_goal[0]):
+                self.prev_motion_goal = None
+                self.prev_best_action = None
+            # TODO: We only need this very hacky 'check motion goals' cos the HM agent isn't reset at the end of an
+            #  episode, so in unident it's possible that the agent has changed sides, so that the prev motion goal
+            #  is no longer valid. A better solution is to reset the HM after each episode. (But I'm not sure how?
+            #  Perhaps on line 386 of ppo2.py??)
+
             logging.info('Player: {}'.format(self.agent_index))
             logging.info('Other GHM: {}'.format(self.GHM.agent_index))
             # Get motion_goals if i) self.prev_motion_goal == None; ii) with prob = 1 - self.retain_goals;
@@ -1396,18 +1406,6 @@ class AdvancedComplementaryModel(Agent):
             else:
 
                 logging.info('Keeping old goal:')
-
-                # Check motion goal is valid; if not, set to be the closest feature (a valid goal must face a feature):
-                if self.prev_motion_goal is not None and not self.mlp.mp.is_valid_motion_start_goal_pair \
-                            (state.players_pos_and_or[self.agent_index], self.prev_motion_goal[0]):
-                    self.prev_motion_goal = self.mlp.ml_action_manager.go_to_closest_feature_actions(
-                        state.players[self.agent_index])
-                    # Sometimes there can be more than one goal from this method. Take the first:
-                    self.prev_motion_goal = [self.prev_motion_goal[0]]
-                # TODO: We only need this very hacky 'check motion goals' cos the HM agent isn't reset at the end of an
-                #  episode, so in unident it's possible that the agent has changed sides, so that the prev motion goal
-                #  is no longer valid. A better solution is to reset the HM after each episode. (But I'm not sure how?
-                #  Perhaps on line 386 of ppo2.py??)
 
                 # Use previous goal:
                 motion_goals = self.prev_motion_goal
