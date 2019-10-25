@@ -1396,6 +1396,16 @@ class AdvancedComplementaryModel(Agent):
             else:
 
                 logging.info('Keeping old goal:')
+
+                # Check motion goal is valid; if not, set to be the same as the current position:
+                if self.prev_motion_goal is not None and not self.mlp.mp.is_valid_motion_start_goal_pair \
+                            (state.players_pos_and_or[self.agent_index], self.prev_motion_goal[0]):
+                    self.prev_motion_goal = [state.players_pos_and_or[self.agent_index]]
+                # TODO: We only need the previous 'check motion goals' because the HM agent isn't reset at the end of an
+                #  episode, so in unident it's possible that the agent has changed sides, so that the prev motion goal
+                #  is no longer valid. A better solution is to reset the HM after each episode. (But I'm not sure how?
+                #  Perhaps on line 386 of ppo2.py??)
+
                 # Use previous goal:
                 motion_goals = self.prev_motion_goal
                 # Find action for this goal:
