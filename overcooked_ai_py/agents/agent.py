@@ -1249,7 +1249,7 @@ class AdvancedComplementaryModel(Agent):
 
     def __init__(self, mlp, player_index,
                  perseverance=0.5, teamwork=0.8, retain_goals=0.8, wrong_decisions=0.02, thinking_prob=0.8,
-                 path_teamwork=0.8, rationality_coefficient=3, prob_pausing=0.7):
+                 path_teamwork=0.8, rationality_coefficient=3, prob_pausing=0.5):
         self.mlp = mlp
         self.agent_index = player_index
         self.mdp = self.mlp.mdp
@@ -1275,7 +1275,7 @@ class AdvancedComplementaryModel(Agent):
         self.rationality_coefficient = rationality_coefficient  # Setting to 0 means random actions; inf means always takes
         # lowest cost path. In practice inf ~ 100
         self.prob_pausing = prob_pausing # Probability of pausing on a given timestep, instead of acting. From a
-        # quick initial look at the human data, the humans pause approx 70% of the time
+        # quick initial look at the human data, the humans pause very approx 50% of the time
 
     # def direct_action(self, observation):
     #     """Required for running with pbt. Each observation is a 25 (?) layered "mask" that is sent to the CNN for the ppo

@@ -8,6 +8,7 @@ from overcooked_ai_py.agents.agent import GreedyHumanModelv2
 from overcooked_ai_py.planning.planners import MediumLevelPlanner
 import logging, pickle
 import numpy as np
+from collections import Counter
 # np.seterr(divide='ignore', invalid='ignore')  # Suppress error about diving by zero
 
 """
@@ -193,6 +194,61 @@ def find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent, num
 
     return loss
 
+def two_most_frequent(List):
+    occurence_count = Counter(List)
+    second_action = None
+    if len(occurence_count) > 1:
+        second_action = occurence_count.most_common(2)[1][0]
+    return occurence_count.most_common(1)[0][0], second_action
+
+def find_top_12_accuracy(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use, number_states_with_acting):
+    """
+    Find top-1 (top-2) accuracy, which is the proportion of states in which the HM's most likely (2nd most likely)
+    action equals the action from the data
+    """
+
+    multi_hm_actions = []
+    # For each agent
+    for hm_agent in multi_hm_agent:
+        # Find all actions by this agent:
+        hm_actions = choose_hm_actions(expert_trajs, hm_agent, num_ep_to_use)
+        multi_hm_actions.append(hm_actions)
+    # Now have all actions for all agents
+
+    count_top_1 = 0
+    count_top_2 = 0
+
+    # For each state:
+    for i in range(num_ep_to_use):
+        for j in range(actions_from_data[i].__len__()):
+
+            # Only consider states where the data takes an action:
+            if actions_from_data[i][j] != (0, 0):
+
+                # Change format of multi_hm_actions:
+                list_actions = []
+                for k in range(len(multi_hm_actions)):
+                    list_actions.append(multi_hm_actions[k][i][j])
+
+                #TODO: Here we're ignoring draws between two actions:
+                top_action, second_action = two_most_frequent(list_actions)
+
+                assert top_action != second_action
+
+                # If the top/2nd action is the same as the data, count it:
+                if top_action == actions_from_data[i][j]:
+                    count_top_1 += 1
+                    count_top_2 += 1
+                elif second_action == actions_from_data[i][j]:
+                    count_top_2 += 1
+
+    top_1_acc = count_top_1 / number_states_with_acting
+    top_2_acc = count_top_2 / number_states_with_acting
+
+    assert top_2_acc >= top_1_acc
+
+    return top_1_acc, top_2_acc
+
 def shift_by_epsilon(params, epsilon):
     """
     Shift the PERSON_PARAMS_HM by epsilon, except RATIONALITY_COEFF, which isn't between 0 and 1 so is shifted further
@@ -351,6 +407,9 @@ if __name__ == "__main__":
                         required=False, default=3, type=int)
     parser.add_argument("-ns", "--num_grad_steps",  help="Number of gradient decent steps", required=False,
                         default=1e4, type=int)
+    parser.add_argument("-acc", "--check_accuracy_only",
+                        help="Set to true to just check the top-1 and top-2 accuracy (instead of optimising params)",
+                        required=False, default=False, type=bool)
     # This gives problems with the BOOL for some reason:
     # parser.add_argument("-r", "--ensure_random_direction",
     #                     help="Should make extra sure that the random search direction is not biased towards corners "
@@ -369,6 +428,7 @@ if __name__ == "__main__":
     ensure_random_direction = False
     number_hms = args.num_hms
     total_number_steps = args.num_grad_steps  # Number of steps to do in gradient decent
+    check_accuracy_only = args.check_accuracy_only
     # -----------------------------#
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.ERROR)
@@ -464,7 +524,8 @@ if __name__ == "__main__":
         "WAIT_ALLOWED": WAIT_ALLOWED,
         "COUNTER_PICKUP": COUNTER_PICKUP,
         "SAME_MOTION_GOALS": SAME_MOTION_GOALS,
-        "ensure_random_direction": ensure_random_direction
+        "ensure_random_direction": ensure_random_direction,
+        "PERSON_PARAMS_HMcheck": None
     }  # Using same format as pbt_hms_v2
 
     mdp = OvercookedGridworld.from_layout_name(**params["MDP_PARAMS"])
@@ -487,14 +548,32 @@ if __name__ == "__main__":
     actions_from_data = expert_trajs['ep_actions']
     # First find the probability of the data not acting:
     prob_data_doesnt_act, number_states_with_acting = find_prob_not_acting(actions_from_data, num_ep_to_use)
-    print('Prob of data-agent taking action (0,0): {}; Number states when data-agent acts: {}'.format(
+    print('Prob of data-agent taking ZERO action, (0,0): {}; Number states when data-agent acts: {}'.format(
         prob_data_doesnt_act, number_states_with_acting))
 
-    # For each gradient decent step, find the gradient and step:
-    start_time = time.time()
-    for step_number in range(np.int(total_number_steps)):
-        find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
-                                        start_time, step_number, total_number_steps)
+    if not check_accuracy_only:
+        # Optimise the params to fit the data:
+        start_time = time.time()
+        # For each gradient decent step, find the gradient and step:
+        for step_number in range(np.int(total_number_steps)):
+            find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr, epsilon_sd,
+                                            start_time, step_number, total_number_steps)
 
-    print('end')
+    elif check_accuracy_only:
+        # Just find the top-1 and top-2 accuracy:
+
+        PERSON_PARAMS_HMcheck = {"PERSEVERANCE_HMcheck": 0, "TEAMWORK_HMcheck": 0,
+            "RETAIN_GOALS_HMcheck": 0, "WRONG_DECISIONS_HMcheck": 0, "THINKING_PROB_HMcheck": 0,
+            "PATH_TEAMWORK_HMcheck": 0, "RATIONALITY_COEFF_HMcheck": 0, "PROB_PAUSING_HMcheck": 0}
+        params["PERSON_PARAMS_HMcheck"] = PERSON_PARAMS_HMcheck
+        hm_number = 'check'
+        multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
+        start_time = time.time()
+        top_1_acc, top_2_acc = find_top_12_accuracy(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use,
+                                                    number_states_with_acting)
+
+        print('\nTop-1 accuracy: {}; Top-2 accuracy: {}; Finished acc calc in time {} secs'.format(
+                                                                top_1_acc, top_2_acc, round(time.time() - start_time)))
+
+    print('\nend')
 
