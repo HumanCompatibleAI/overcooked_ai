@@ -94,117 +94,6 @@ class AgentEvaluator(object):
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
     @staticmethod
-    def subset_trajs(trajectories, indices):
-        new_traj = {}
-        for k, v in trajectories.items():
-            new_traj[k] = np.take(copy.deepcopy(v), indices, axis=0)
-        return new_traj
-
-    @staticmethod
-    def featurize_traj_states(trajectories):
-        featurized_states = []
-        # HACK
-        mdp_params = trajectories["mdp_params"][0]
-        env_params = trajectories["env_params"][0]
-        ave = AgentEvaluator(mdp_params, env_params)
-
-        mdps, _ = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
-        for i in range(len(trajectories["ep_lengths"])):
-            mdp = mdps[i]
-            mlp = ave.mlp
-            assert mlp.mdp == mdp
-            ep_states = trajectories["ep_observations"][i]
-            featurized_states.append([mdp.featurize_state(s, mlp) for s in ep_states])
-
-        return featurized_states
-
-    @staticmethod
-    def merge_trajs(args):
-        superset_traj = {}
-        for k in DEFAULT_TRAJ_KEYS:
-            superset_traj[k] = np.concatenate([traj[k] for traj in args])
-        return superset_traj
-
-    @staticmethod
-    def trajectory_mean_and_se_rewards(trajectories):
-        return mean_and_std_err(trajectories["ep_returns"])
-
-    @staticmethod
-    def trajectory_entropy(trajectories):
-        """
-        Calculates the on-policy empirical entropy of the agents' policies for each trajectory
-        """
-        avg_agents_entropy = np.zeros(2)
-        num_trajs = len(trajectories["ep_lengths"])
-        for traj_idx in range(num_trajs):
-            episode_action_probs = trajectories["ep_actions_probs"][traj_idx]
-            for agent_idx, agent_action_probs in enumerate(zip(*episode_action_probs)):
-                avg_agents_entropy[agent_idx] += AgentEvaluator.avg_action_entropy(agent_action_probs)
-        return avg_agents_entropy / num_trajs
-
-    # @staticmethod
-    # def flatten_redundant_actions(trajectories):
-    #     """
-    #     'Flattens' redundant actions – by turning 'a' → 'stay' in all 
-    #     cases in which the effect of 'a' is indistinguishable from 'stay'
-    #     and fixing the respective action probs.
-
-    #     Useful for more indicative measurements of entropy.
-    #     """
-    #     trajectories = copy.deepcopy(trajectories)
-    #     _, envs = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
-
-    #     ep_actions, ep_actions_probs = [], []
-    #     num_trajs = len(trajectories["ep_lengths"])
-    #     for idx in range(num_trajs):
-    #         episode_states = trajectories["ep_observations"][idx]
-    #         episode_actions = trajectories["ep_actions"][idx]
-    #         episode_action_probs = trajectories["ep_actions_probs"][idx]
-    #         # episode_length = trajectories["ep_lengths"][idx]
-    #         simulation_env = envs[idx]
-
-    #         actions, action_probs = [], []
-    #         for i, (s_t, j_a, j_a_p) in enumerate(zip(episode_states, episode_actions, ep_actions_probs)):
-    #             simulation_env.state = s_t
-    #             actual_s_tp1, _, _, _ = simulation_env.step(j_a)
-
-    #             # TODO: Sum probabilities of all actions that would lead to same state!!
-    #             # stay, stay
-    #             stay_j_a = (Action.STAY, Action.STAY)
-    #             simulation_env.state = s_t
-    #             double_stay_s_tp1, _, _, _ = simulation_env.step(stay_j_a)
-    #             if double_stay_s_tp1 == actual_s_tp1:
-    #                 actions.append(stay_j_a)
-    #                 action_probs.append([Agent.a_probs_from_action(Action.STAY) for _ in range(2)])
-    #                 continue
-
-    #             # stay, a
-    #             for a_idx in range(2):
-    #                 other_j_a = (Action.STAY, j_a[1]) if a_idx == 1 else (j_a[0], Action.STAY)
-    #                 simulation_env.state = s_t
-    #                 double_stay_s_tp1, _, _, _ = simulation_env.step(other_j_a)
-    #                 if double_stay_s_tp1 == actual_s_tp1:
-    #                     actions.append(other_j_a)
-    #                     action_probs.append((Agent.a_probs_from_action(Action.STAY), j_a_p[a_idx]))
-
-
-    #     trajectories["ep_actions"] = ep_actions
-    #     trajectories["ep_actions_probs"] = ep_actions_probs
-    #     return trajectories
-
-    @staticmethod
-    def avg_action_entropy(action_probs_n):
-        """
-        Given a list of action probabilities of an agent, compute the average entropy
-        """
-        return np.mean([AgentEvaluator.entropy(action_probs) for action_probs in action_probs_n])
-
-    @staticmethod
-    def entropy(action_probs, eps=1e-14):
-        action_probs = [p if p != 0 else eps for p in action_probs]
-        return -sum([p * np.log(p) for p in action_probs])
-
-    @staticmethod
     def check_trajectories(trajectories):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
@@ -229,6 +118,7 @@ class AgentEvaluator(object):
             assert all(type(s) is OvercookedState for s in states)
             assert type(mdp_params) is dict
             assert type(env_params) is dict
+            # TODO: check that are all lists
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):

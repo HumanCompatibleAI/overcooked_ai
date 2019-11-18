@@ -347,7 +347,7 @@ class OvercookedGridworld(object):
     """An MDP grid world based off of the Overcooked game."""
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
 
-    def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):#, bad_penalty=0):
+    def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -370,7 +370,6 @@ class OvercookedGridworld(object):
         self.delivery_reward = delivery_reward
         self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
-        #self.bad_penalty = bad_penalty
 
     def __eq__(self, other):
         return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
@@ -380,8 +379,7 @@ class OvercookedGridworld(object):
                 self.num_items_for_soup == other.num_items_for_soup and \
                 self.delivery_reward == other.delivery_reward and \
                 self.reward_shaping_params == other.reward_shaping_params and \
-                self.layout_name == other.layout_name# and \
-                #self.bad_penalty == other.bad_penalty
+                self.layout_name == other.layout_name
     
     def copy(self):
         return OvercookedGridworld(
@@ -392,8 +390,7 @@ class OvercookedGridworld(object):
             num_items_for_soup=self.num_items_for_soup,
             delivery_reward=self.delivery_reward,
             rew_shaping_params=copy.deepcopy(self.reward_shaping_params),
-            layout_name=self.layout_name,
-            #bad_penalty=bad_penalty
+            layout_name=self.layout_name
         )
 
     @property
@@ -406,8 +403,7 @@ class OvercookedGridworld(object):
             "cook_time": self.soup_cooking_time,
             "num_items_for_soup": self.num_items_for_soup,
             "delivery_reward": self.delivery_reward,
-            "rew_shaping_params": copy.deepcopy(self.reward_shaping_params),
-            #"bad_penalty": self.bad_penalty
+            "rew_shaping_params": copy.deepcopy(self.reward_shaping_params)
         }
 
     @staticmethod
@@ -419,7 +415,6 @@ class OvercookedGridworld(object):
         """
         params_to_overwrite = params_to_overwrite.copy()
         base_layout_params = read_layout_dict(layout_name)
-        # base_layout_params['bad_penalty'] = 5
 
         grid = base_layout_params['grid']
         del base_layout_params['grid']
@@ -694,8 +689,6 @@ class OvercookedGridworld(object):
 
         sparse_reward, shaped_reward = 0, 0
         for player, action in zip(new_state.players, joint_action):
-            # if action == Action.BAD:
-            #     sparse_reward -= self.bad_penalty
 
             if action != Action.INTERACT:
                 continue

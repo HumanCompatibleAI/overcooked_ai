@@ -38,8 +38,7 @@ class Action(object):
 
     STAY = (0, 0)
     INTERACT = 'interact'
-    # BAD = 'bad'
-    ALL_ACTIONS = INDEX_TO_ACTION = Direction.INDEX_TO_DIRECTION + [STAY, INTERACT]#, BAD]
+    ALL_ACTIONS = INDEX_TO_ACTION = Direction.INDEX_TO_DIRECTION + [STAY, INTERACT]
     INDEX_TO_ACTION_INDEX_PAIRS = [v for v in itertools.product(range(len(INDEX_TO_ACTION)), repeat=2)]
     ACTION_TO_INDEX = { a:i for i, a in enumerate(INDEX_TO_ACTION) }
     MOTION_ACTIONS = Direction.ALL_DIRECTIONS + [STAY]

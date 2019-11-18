@@ -146,6 +146,7 @@ class OvercookedEnv(object):
 
             # Getting actions and action probs for both agents
             a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
+            assert sum(a_probs_t) == 1, "Action probabilities should sum up to 1"
 
             # Break if either agent is out of actions
             if any([a is None for a in a_t]):
@@ -221,7 +222,7 @@ class OvercookedEnv(object):
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
 
-        # HACK: should probably transfer checks over to Env class
+        # TODO: should probably transfer check methods over to Env class
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
         AgentEvaluator.check_trajectories(trajectories)
         return trajectories
@@ -245,10 +246,10 @@ class Overcooked(gym.Env):
     what agent index it has in the environment (as encodings will be index dependent).
     """
 
-    def custom_init(self, base_env, featurize_fn, baselines=False, bit_penalty=False):
+    def custom_init(self, base_env, featurize_fn, baselines=False):
         """
         base_env: OvercookedEnv
-        featurize_fn: what function is used to featurize states returned in the 'both_agent_obs' field
+        featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
         """
         if baselines:
             # NOTE: To prevent the randomness of choosing agent indexes
@@ -257,13 +258,10 @@ class Overcooked(gym.Env):
             # environments. The effect is negligible, as all other randomness
             # is controlled by the actual run seeds
             # np.random.seed(0)
-            pass
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
         self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
-        self.bit_penalty = bit_penalty
-        self.penalty_start = 0
         self.reset()
 
     def _setup_observation_space(self):
@@ -299,8 +297,7 @@ class Overcooked(gym.Env):
         
         obs = {"both_agent_obs": both_agents_ob,
                 "overcooked_state": next_state,
-                "other_agent_env_idx": 1 - self.agent_idx,
-                "penalty_start": (self.penalty_start, self.base_env.t)}
+                "other_agent_env_idx": 1 - self.agent_idx}
         return obs, reward, done, info
 
     def reset(self):
@@ -317,17 +314,13 @@ class Overcooked(gym.Env):
         self.agent_idx = np.random.choice([0, 1])
         ob_p0, ob_p1 = self.featurize_fn(self.mdp, self.base_env.state)
 
-        if self.bit_penalty:
-            self.penalty_start = np.random.randint(0, 300)
-
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
         else:
             both_agents_ob = (ob_p1, ob_p0)
         return {"both_agent_obs": both_agents_ob, 
                 "overcooked_state": self.base_env.state, 
-                "other_agent_env_idx": 1 - self.agent_idx,
-                "penalty_start": (self.penalty_start, self.base_env.t)}
+                "other_agent_env_idx": 1 - self.agent_idx}
 
     def render(self, mode='human', close=False):
         pass

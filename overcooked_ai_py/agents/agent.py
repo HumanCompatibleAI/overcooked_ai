@@ -144,8 +144,8 @@ class AgentFromPolicy(Agent):
 
 class RandomAgent(Agent):
     """
-    An agent that randomly picks actions.
-    NOTE: Does not perform interact actions
+    An agent that randomly picks motion actions.
+    NOTE: Does not perform interact actions, unless specified
     """
 
     def __init__(self, sim_threads=None, interact=False):
@@ -153,17 +153,13 @@ class RandomAgent(Agent):
         self.interact = interact
     
     def action(self, state):
+        action_probs = np.zeros(Action.NUM_ACTIONS)
+        legal_actions = Action.MOTION_ACTIONS
         if self.interact:
-            # 1/6 prob for first 6 actions, and 0 for rest (potentially bad action)
-            action_probs = np.ones(Action.NUM_ACTIONS) / 6
-            action_probs[6:] = np.zeros(len(action_probs[6:]))
-            idx = np.random.randint(6)
-        else:
-            # 1/5 prob for first 5 actions, and 0 for interact
-            action_probs = np.ones(Action.NUM_ACTIONS) / 5
-            action_probs[5:] = np.zeros(len(action_probs[5:]))
-            idx = np.random.randint(5)
-        return Action.ALL_ACTIONS[idx], action_probs
+            legal_actions.append(Action.INTERACT)
+        legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
+        action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
+        return Action.sample(action_probs), action_probs
 
     def direct_action(self, obs):
         return [np.random.randint(4) for _ in range(self.sim_threads)]
