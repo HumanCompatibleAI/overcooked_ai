@@ -296,8 +296,9 @@ class OvercookedState(object):
             order_list_equal
 
     def __hash__(self):
+        order_list_hash = tuple(self.order_list) if self.order_list is not None else None
         return hash(
-            (self.players, tuple(self.objects.values()), tuple(self.order_list))
+            (self.players, tuple(self.objects.values()), order_list_hash)
         )
 
     def __str__(self):
