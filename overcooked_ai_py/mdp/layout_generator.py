@@ -47,10 +47,7 @@ class LayoutGenerator(object):
         prop_empty: (min, max) proportion of empty space in generated layout
         prop_feats: (min, max) proportion of counters with features on them
         """
-
-        print("MDP PARAMS", mdp_params)
-        print("MDP PARAMS", mdp_params["layout_name"])
-
+        
         if "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
             mdp_generator_fn = lambda: mdp

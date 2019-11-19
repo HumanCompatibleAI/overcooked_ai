@@ -146,7 +146,7 @@ class OvercookedEnv(object):
 
             # Getting actions and action probs for both agents
             a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
-            assert sum(a_probs_t) == 1, "Action probabilities should sum up to 1"
+            assert all([sum(agent_p) == 1 for agent_p in a_probs_t]), "Action probabilities should sum up to 1 for both agents {}".format(a_probs_t)
 
             # Break if either agent is out of actions
             if any([a is None for a in a_t]):
@@ -258,6 +258,7 @@ class Overcooked(gym.Env):
             # environments. The effect is negligible, as all other randomness
             # is controlled by the actual run seeds
             # np.random.seed(0)
+            pass
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()

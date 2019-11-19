@@ -48,8 +48,7 @@ class Action(object):
         Direction.EAST: "→",
         Direction.WEST: "←",
         STAY: "stay",
-        INTERACT: INTERACT,
-        # BAD: BAD
+        INTERACT: INTERACT
     }
     NUM_ACTIONS = len(ALL_ACTIONS)
 

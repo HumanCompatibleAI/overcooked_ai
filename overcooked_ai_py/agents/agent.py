@@ -43,7 +43,8 @@ class AgentGroup(object):
             assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
 
     def joint_action(self, state):
-        return tuple(a.action(state) for a in self.agents)
+        actions_and_probs_n = tuple(a.action(state) for a in self.agents)
+        return actions_and_probs_n
 
     def set_mdp(self, mdp):
         for a in self.agents:
@@ -76,10 +77,10 @@ class AgentPair(AgentGroup):
             # When using the same instance of an agent for self-play, 
             # reset agent index at each turn to prevent overwriting it
             self.a0.set_agent_index(0)
-            action_0 = self.a0.action(state)
+            action_and_probs_0 = self.a0.action(state)
             self.a1.set_agent_index(1)
-            action_1 = self.a1.action(state)
-            return (action_0, action_1)
+            action_and_probs_1 = self.a1.action(state)
+            return (action_and_probs_0, action_and_probs_1)
         else:
             return super().joint_action(state)
 
@@ -190,10 +191,10 @@ class FixedPlanAgent(Agent):
     
     def action(self, state):
         if self.i >= len(self.plan):
-            return Action.STAY
+            return Action.STAY, self.a_probs_from_action(Action.STAY)
         curr_action = self.plan[self.i]
         self.i += 1
-        return curr_action
+        return curr_action, self.a_probs_from_action(curr_action)
     
     def reset(self):
         self.i = 0
