@@ -114,7 +114,7 @@ class AgentEvaluator(object):
         for idx in range(len(trajectories["ep_observations"])):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
-            assert all(type(a) is tuple for a in actions)
+            assert all(type(j_a) is tuple for j_a in actions)
             assert all(type(s) is OvercookedState for s in states)
             assert type(mdp_params) is dict
             assert type(env_params) is dict
@@ -191,11 +191,26 @@ class AgentEvaluator(object):
     def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
         assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
+        AgentEvaluator.check_trajectories(trajectory)
+        trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
+        save_as_json(filename, trajectory)
 
-        dict_traj = copy.deepcopy(trajectory)
-        dict_traj["ep_observations"] = [[ob.to_dict() for ob in one_ep_obs] for one_ep_obs in trajectory["ep_observations"]]
-
-        save_as_json(filename, dict_traj)
+    @staticmethod
+    def make_trajectories_json_serializable(trajectories):
+        """
+        Cannot convert np.arrays or special types of ints to JSON.
+        This method converts all components of a trajectory to standard types.
+        """
+        dict_traj = copy.deepcopy(trajectories)
+        dict_traj["ep_observations"] = [[ob.to_dict() for ob in one_ep_obs] for one_ep_obs in trajectories["ep_observations"]]
+        for k in dict_traj.keys():
+            dict_traj[k] = list(dict_traj[k])
+        dict_traj['ep_actions'] = [list(lst) for lst in dict_traj['ep_actions']]
+        dict_traj['ep_rewards'] = [list(lst) for lst in dict_traj['ep_rewards']]
+        dict_traj['ep_dones'] = [int(lst) for lst in dict_traj['ep_dones']]
+        dict_traj['ep_returns_sparse'] = [int(val) for val in dict_traj['ep_returns_sparse']]
+        dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
+        return dict_traj
 
     @staticmethod
     def load_traj_from_json(filename):

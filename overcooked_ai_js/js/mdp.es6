@@ -156,8 +156,7 @@ export class OvercookedState {
     constructor ({
         players,
         objects,
-        order_list = [],
-        pot_explosion=false
+        order_list = []
     }) {
         // Represents a state in Overcooked.
         // players: List of PlayerStates.
@@ -174,9 +173,7 @@ export class OvercookedState {
         }
         this.players = players.map((p) => {return p.deepcopy()});
         this.objects = objects;
-        // assert all([o in OvercookedGridworld.ORDER_TYPES for o in order_list])
         this.order_list = order_list;
-        this.pot_explosion = pot_explosion;
     }
 
     static from_object(obj) {
@@ -224,8 +221,7 @@ export class OvercookedState {
             objects: _.fromPairs(_.map(this.objects, (obj, pos) => {
                 return [pos, obj.deepcopy()]
             })),
-            order_list: this.order_list.map((i) => i),
-            pot_explosion: this.pot_explosion
+            order_list: ((this.order_list === null) ? null : this.order_list.map((i) => i))
         })
     }
 
@@ -325,26 +321,19 @@ export class OvercookedGridworld {
     constructor ({
         terrain,
         player_positions,
-        explosion_time=Number.MAX_SAFE_INTEGER,
         COOK_TIME = OvercookedGridworld.COOK_TIME,
         DELIVERY_REWARD = OvercookedGridworld.DELIVERY_REWARD,
-        num_items_for_soup = OvercookedGridworld.num_items_for_soup,
-        always_serve = false //when this is set to a string, its what's always served
+        num_items_for_soup = OvercookedGridworld.num_items_for_soup
     }) {
         this.terrain_mtx = terrain;
         this.terrain_pos_dict = this._get_terrain_type_pos_dict();
         this.start_player_positions = player_positions;
-        this.explosion_time = explosion_time;
         this.COOK_TIME = COOK_TIME
         this.DELIVERY_REWARD = DELIVERY_REWARD
-        this.always_serve = always_serve;
         this.num_items_for_soup = num_items_for_soup;
     }
 
     get_start_state (order_list) {
-        if (this.always_serve) {
-            order_list = [this.always_serve]
-        }
         return OvercookedState.from_player_positions(
             this.start_player_positions,
             order_list
@@ -368,7 +357,7 @@ export class OvercookedGridworld {
     }
 
     is_terminal ({state}) {
-        return (state.order_list.length === 0) || (state.pot_explosion)
+        return (state.order_list === null) || (state.order_list.length === 0)
     }
 
     get_transition_states_and_probs ({state, joint_action}) {
@@ -476,18 +465,15 @@ export class OvercookedGridworld {
                         let [soup_type, num_items, cook_time] = obj.state;
                         assert(_.includes(ObjectState.SOUP_TYPES, soup_type));
                         assert(num_items === this.num_items_for_soup &&
-                               cook_time >= this.COOK_TIME &&
-                               cook_time < this.explosion_time);
+                               cook_time >= this.COOK_TIME);
                         player.remove_object();
 
-                        //If the delivered soup is the one currently required
-                        let current_order = new_state.order_list[0];
-                        if ((current_order === 'any') || (soup_type === current_order)) {
+                        if (new_state.order_list === null) {
+                            reward += this.DELIVERY_REWARD;
+                        } else if ((new_state.order_list[0] === 'any') || (soup_type === new_state.order_list[0])) {    
+                            // If the delivered soup is the one currently required
                             new_state.order_list = new_state.order_list.slice(1);
                             reward += this.DELIVERY_REWARD;
-                        }
-                        if (this.always_serve) {
-                            new_state.order_list = [this.always_serve, ]
                         }
                     }
                 }
@@ -648,12 +634,8 @@ export class OvercookedGridworld {
                 let [soup_type, num_items, cook_time] = obj.state;
                 if (
                         (this.terrain_mtx[y][x] === 'P') &&
-                        (cook_time < this.explosion_time) &&
                         (num_items === this.num_items_for_soup)) {
                     obj.state = [soup_type, num_items, Math.min(cook_time + 1, this.COOK_TIME)];
-                }
-                if ((obj.state[2] === this.explosion_time) && (num_items === this.num_items_for_soup)) {
-                    state.pot_explosion = true
                 }
             }
         }

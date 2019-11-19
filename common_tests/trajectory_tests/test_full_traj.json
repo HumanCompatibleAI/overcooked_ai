@@ -27,10 +27,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -58,10 +55,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -96,10 +90,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -141,10 +132,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -186,10 +174,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -237,10 +222,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -288,10 +270,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -346,10 +325,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -397,10 +373,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -448,10 +421,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -499,10 +469,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -550,10 +517,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -601,10 +565,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -652,10 +613,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -703,10 +661,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -761,10 +716,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -819,10 +771,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -868,10 +817,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -917,10 +863,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -966,10 +909,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1015,10 +955,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1064,10 +1001,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "onion",
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1102,9 +1036,7 @@
                     }
                 ],
                 "objects": [],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1145,9 +1077,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1195,9 +1125,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1245,9 +1173,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1302,9 +1228,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1359,9 +1283,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1416,9 +1338,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             },
             {
                 "players": [
@@ -1478,9 +1398,7 @@
                         ]
                     }
                 ],
-                "order_list": [
-                    "any"
-                ]
+                "order_list": null
             }
         ]
     ],
@@ -1751,36 +1669,36 @@
         ]
     ],
     "ep_dones": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
     ],
     "ep_returns": [
         20
@@ -1795,10 +1713,7 @@
         {
             "layout_name": "mdp_test",
             "cook_time": 5,
-            "start_order_list": [
-                "onion",
-                "any"
-            ],
+            "start_order_list": null,
             "num_items_for_soup": 3,
             "rew_shaping_params": null
         }
