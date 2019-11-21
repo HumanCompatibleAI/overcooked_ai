@@ -1,4 +1,4 @@
-import gym, tqdm, math
+import gym, tqdm
 import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err
 from overcooked_ai_py.mdp.actions import Action
@@ -134,6 +134,7 @@ class OvercookedEnv(object):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t).
         """
+        from overcooked_ai_py.agents.agent import Agent
         assert self.cumulative_sparse_rewards == self.cumulative_shaped_rewards == 0, \
             "Did not reset environment before running agents"
         trajectory = []
@@ -145,7 +146,9 @@ class OvercookedEnv(object):
 
             # Getting actions and action probs for both agents
             a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
-            assert all([math.isclose(sum(agent_p), 1.0, rel_tol=1e-4) for agent_p in a_probs_t]), "Action probabilities should sum up to approximately 1 for both agents {}".format(a_probs_t)
+
+            for agent_probs in a_probs_t:
+                Agent.check_action_probs(agent_probs)
 
             # Break if either agent is out of actions
             if any([a is None for a in a_t]):
@@ -194,7 +197,8 @@ class OvercookedEnv(object):
             "env_params": [] # Custom Env params for each episode
         }
 
-        for _ in tqdm.trange(num_games):
+        range_fn = tqdm.trange if info else range
+        for _ in range_fn(num_games):
             agent_pair.set_mdp(self.mdp)
 
             trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)

@@ -1,4 +1,4 @@
-import itertools
+import itertools, math
 import numpy as np
 
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -16,6 +16,12 @@ class Agent(object):
     def a_probs_from_action(action):
         action_idx = Action.ACTION_TO_INDEX[action]
         return np.eye(Action.NUM_ACTIONS)[action_idx]
+
+    @staticmethod
+    def check_action_probs(action_probs, tolerance=1e-4):
+        """Check that action probabilities sum to ≈ 1.0"""
+        probs_sum = sum(action_probs)
+        assert math.isclose(probs_sum, 1.0, rel_tol=tolerance), "Action probabilities {} should sum up to approximately 1 but sum up to {}".format(list(action_probs), probs_sum)
 
     def set_agent_index(self, agent_index):
         self.agent_index = agent_index
