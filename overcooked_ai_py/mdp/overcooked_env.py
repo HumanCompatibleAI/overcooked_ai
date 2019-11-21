@@ -1,5 +1,4 @@
-import gym
-import tqdm
+import gym, tqdm, math
 import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err
 from overcooked_ai_py.mdp.actions import Action
@@ -146,7 +145,7 @@ class OvercookedEnv(object):
 
             # Getting actions and action probs for both agents
             a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
-            assert all([sum(agent_p) == 1 for agent_p in a_probs_t]), "Action probabilities should sum up to 1 for both agents {}".format(a_probs_t)
+            assert all([math.isclose(sum(agent_p), 1.0, rel_tol=1e-4) for agent_p in a_probs_t]), "Action probabilities should sum up to approximately 1 for both agents {}".format(a_probs_t)
 
             # Break if either agent is out of actions
             if any([a is None for a in a_t]):

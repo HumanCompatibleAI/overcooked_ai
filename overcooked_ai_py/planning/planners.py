@@ -902,7 +902,7 @@ class MediumLevelPlanner(object):
         return MediumLevelPlanner(mdp, params, mlp_action_manager)
     
     @staticmethod
-    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False):
+    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False, info=True):
         assert isinstance(mdp, OvercookedGridworld)
 
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
@@ -921,7 +921,8 @@ class MediumLevelPlanner(object):
             print("Recomputing planner due to:", e)
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
-        print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
+        if info:
+            print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
         return mlp
 
     @staticmethod
