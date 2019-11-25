@@ -766,7 +766,7 @@ class ToMModel(Agent):
 
         # if number_of_pots == 2:
             #0.5, for the first timestep Prob~0.5, then Prob-->1 quickly as time increases. Then using this prob
-        it randomly determines if the player should take an alternative action."""
+        it randomly determines if the player should take an alternative action"""
 
         Prob_taking_alternative = 1 - (1 / (np.exp(self.timesteps_stuck*10))) ** (1 - self.perseverance ** (1 / 10))
         rand = random.random()
