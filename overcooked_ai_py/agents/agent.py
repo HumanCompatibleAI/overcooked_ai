@@ -27,7 +27,7 @@ class Agent(object):
 
 
 class AgentFromPolicy(Agent):
-    
+
     def __init__(self, state_policy, direct_policy, stochastic=True, action_probs=False):
         self.state_policy = state_policy
         self.direct_policy = direct_policy
@@ -46,7 +46,9 @@ class AgentFromPolicy(Agent):
         try:
             return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
         except AttributeError as e:
-            raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
+            raise AttributeError(
+                "{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(
+                    e))
 
     def direct_action(self, obs):
         """
@@ -59,6 +61,7 @@ class AgentFromPolicy(Agent):
     def reset(self):
         self.history = []
 
+
 class RandomAgent(Agent):
     """
     An agent that randomly picks actions.
@@ -67,7 +70,7 @@ class RandomAgent(Agent):
 
     def __init__(self, sim_threads=None):
         self.sim_threads = sim_threads
-    
+
     def action(self, state):
         idx = np.random.randint(4)
         return Action.ALL_ACTIONS[idx]
@@ -80,9 +83,9 @@ class StayAgent(Agent):
 
     def __init__(self, sim_threads=None):
         self.sim_threads = sim_threads
-    
+
     def action(self, state):
-        #TODO RS: This used to be Direction.STAY
+        # TODO RS: This used to be Direction.STAY
         return Action.STAY
 
     def direct_action(self, obs):
@@ -90,11 +93,11 @@ class StayAgent(Agent):
 
 
 class FixedPlanAgent(Agent):
-    
+
     def __init__(self, plan):
         self.plan = plan
         self.i = 0
-    
+
     def action(self, state):
         if self.i >= len(self.plan):
             return None
@@ -115,7 +118,9 @@ class CoupledPlanningAgent(Agent):
 
     def action(self, state):
         try:
-            joint_action_plan = self.mlp.get_low_level_action_plan(state, self.heuristic, delivery_horizon=self.delivery_horizon, goal_info=True)
+            joint_action_plan = self.mlp.get_low_level_action_plan(state, self.heuristic,
+                                                                   delivery_horizon=self.delivery_horizon,
+                                                                   goal_info=True)
         except TimeoutError:
             print("COUPLED PLANNING FAILURE")
             self.mlp.failures += 1
@@ -184,16 +189,17 @@ class EmbeddedPlanningAgent(Agent):
         self.other_agent.stochastic = initial_other_agent_type
 
         first_joint_action = first_s_a[0][0]
-        if self.debug: 
+        if self.debug:
             print("expected joint action", first_joint_action)
         action = first_joint_action[self.agent_index]
         return action
+
 
 class GreedyHumanModel_mc(Agent):
     """
     Agent that at each step selects a medium level action corresponding
     to the most intuitively high-priority thing to do
-    
+
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS
     """
 
@@ -202,7 +208,7 @@ class GreedyHumanModel_mc(Agent):
         self.mdp = self.mlp.mdp
         self.prev_state = None
         self.boltzmann_rational = boltzmann_rational
-        self.temperature = temp # Some measure of rationality
+        self.temperature = temp  # Some measure of rationality
 
     def action(self, state):
         motion_goals = self.ml_action(state)
@@ -219,7 +225,7 @@ class GreedyHumanModel_mc(Agent):
             goal_idx = np.random.choice(len(motion_goals), p=softmax_probs)
             chosen_action = action_plan[goal_idx][0]
 
-        else:  
+        else:
             min_cost = np.Inf
             best_action = None
             for goal in motion_goals:
@@ -228,7 +234,7 @@ class GreedyHumanModel_mc(Agent):
                     best_action = action_plan[0]
                     min_cost = plan_cost
             chosen_action = best_action
-        
+
         # HACK: if two agents get stuck, select an action at random that would
         # change the player positions if the other player were not to move
         if self.prev_state is not None and state.players_pos_and_or == self.prev_state.players_pos_and_or:
@@ -256,7 +262,7 @@ class GreedyHumanModel_mc(Agent):
         player = state.players[self.agent_index]
         other_player = state.players[1 - self.agent_index]
         am = self.mlp.ml_action_manager
-        
+
         counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
         pot_states_dict = self.mlp.mdp.get_pot_states(state)
 
@@ -271,30 +277,31 @@ class GreedyHumanModel_mc(Agent):
             else:
                 ready_soups = pot_states_dict[next_order]['ready']
                 cooking_soups = pot_states_dict[next_order]['cooking']
-            
+
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
-            
+
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(state, counter_objects)
             else:
                 next_order = None
                 if len(state.order_list) > 1:
                     next_order = state.order_list[1]
-                
+
                 if next_order == 'onion':
                     motion_goals = am.pickup_onion_actions(state, counter_objects)
                 elif next_order == 'tomato':
                     motion_goals = am.pickup_tomato_actions(state, counter_objects)
                 elif next_order is None or next_order == 'any':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state,
+                                                                                                              counter_objects)
 
         else:
             player_obj = player.get_object()
-            
+
             if player_obj.name == 'onion':
                 motion_goals = am.put_onion_in_pot_actions(pot_states_dict)
-            
+
             elif player_obj.name == 'tomato':
                 motion_goals = am.put_tomato_in_pot_actions(pot_states_dict)
 
@@ -306,12 +313,14 @@ class GreedyHumanModel_mc(Agent):
 
             else:
                 raise ValueError()
-        
-        motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+
+        motion_goals = list(
+            filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+            motion_goals = list(
+                filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
             assert len(motion_goals) != 0
 
         return motion_goals
@@ -353,10 +362,12 @@ class AgentPair(object):
             return joint_action
         elif type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
             # Reduce computation by half if both agents are coupled planning agents
-            joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
+            joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic,
+                                                                      delivery_horizon=self.a0.delivery_horizon,
+                                                                      goal_info=True)
             return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
         elif self.a0 is self.a1:
-            # When using the same instance of an agent for self-play, 
+            # When using the same instance of an agent for self-play,
             # reset agent index at each turn to prevent overwriting it
             self.a0.set_agent_index(0)
             action_0 = self.a0.action(state)
@@ -365,7 +376,7 @@ class AgentPair(object):
             return (action_0, action_1)
         else:
             return (self.a0.action(state), self.a1.action(state))
-        
+
     def reset(self):
         for a in self.agents:
             a.reset()
@@ -421,58 +432,58 @@ class GreedyHumanModelv2(Agent):
             take_alternative = self.take_alternative_action()
             # logging.info('Player {} timesteps stuck: {}'.format(self.agent_index, self.timesteps_stuck))
             if take_alternative:
-                 # logging.info('Taking alternative action!')
-                 # Select an action at random that would change the player positions if the other player were not to move
-                 if self.agent_index == 0:
-                     joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
-                 elif self.agent_index == 1:
-                     joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
-                 else:
-                     raise ValueError("Player index not recognized")
+                # logging.info('Taking alternative action!')
+                # Select an action at random that would change the player positions if the other player were not to move
+                if self.agent_index == 0:
+                    joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
+                elif self.agent_index == 1:
+                    joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
+                else:
+                    raise ValueError("Player index not recognized")
 
-                 unblocking_joint_actions = []
-                 for j_a in joint_actions:
-                     new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
-                     if new_state.player_positions != self.prev_state.player_positions:
-                         unblocking_joint_actions.append(j_a)
+                unblocking_joint_actions = []
+                for j_a in joint_actions:
+                    new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    if new_state.player_positions != self.prev_state.player_positions:
+                        unblocking_joint_actions.append(j_a)
 
-                 """Prefer adjacent actions if available:"""
-                 # Adjacent actions only exist if best_action is N, S, E, W
-                 if best_action in Direction.ALL_DIRECTIONS:
+                """Prefer adjacent actions if available:"""
+                # Adjacent actions only exist if best_action is N, S, E, W
+                if best_action in Direction.ALL_DIRECTIONS:
 
-                     # Find the adjacent actions:
-                     if self.agent_index == 0:
-                         joint_adjacent_actions = list(itertools.product(Direction.get_adjacent_directions(best_action),
-                                                                         [Action.STAY]))
-                     elif self.agent_index == 1:
-                         joint_adjacent_actions = list(itertools.product([Action.STAY],
-                                                                         Direction.get_adjacent_directions(best_action)))
-                     else:
-                         raise ValueError("Player index not recognized")
+                    # Find the adjacent actions:
+                    if self.agent_index == 0:
+                        joint_adjacent_actions = list(itertools.product(Direction.get_adjacent_directions(best_action),
+                                                                        [Action.STAY]))
+                    elif self.agent_index == 1:
+                        joint_adjacent_actions = list(itertools.product([Action.STAY],
+                                                                        Direction.get_adjacent_directions(best_action)))
+                    else:
+                        raise ValueError("Player index not recognized")
 
-                     # If at least one of the adjacent actions is in the set of unblocking_joint_actions, then select these:
-                     if (joint_adjacent_actions[0] in unblocking_joint_actions
-                             or joint_adjacent_actions[1] in unblocking_joint_actions):
-                         preferred_unblocking_joint_actions = []
-                         # There are only ever two adjacent actions:
-                         if joint_adjacent_actions[0] in unblocking_joint_actions:
-                             preferred_unblocking_joint_actions.append(joint_adjacent_actions[0])
-                         if joint_adjacent_actions[1] in unblocking_joint_actions:
-                             preferred_unblocking_joint_actions.append(joint_adjacent_actions[1])
-                     elif (joint_adjacent_actions[0] not in unblocking_joint_actions
-                           and joint_adjacent_actions[1] not in unblocking_joint_actions):
-                         # No adjacent actions in the set of unblocking_joint_actions, so keep these actions
-                         preferred_unblocking_joint_actions = unblocking_joint_actions
-                     else:
-                         raise ValueError("Binary truth value is neither true nor false")
+                    # If at least one of the adjacent actions is in the set of unblocking_joint_actions, then select these:
+                    if (joint_adjacent_actions[0] in unblocking_joint_actions
+                            or joint_adjacent_actions[1] in unblocking_joint_actions):
+                        preferred_unblocking_joint_actions = []
+                        # There are only ever two adjacent actions:
+                        if joint_adjacent_actions[0] in unblocking_joint_actions:
+                            preferred_unblocking_joint_actions.append(joint_adjacent_actions[0])
+                        if joint_adjacent_actions[1] in unblocking_joint_actions:
+                            preferred_unblocking_joint_actions.append(joint_adjacent_actions[1])
+                    elif (joint_adjacent_actions[0] not in unblocking_joint_actions
+                          and joint_adjacent_actions[1] not in unblocking_joint_actions):
+                        # No adjacent actions in the set of unblocking_joint_actions, so keep these actions
+                        preferred_unblocking_joint_actions = unblocking_joint_actions
+                    else:
+                        raise ValueError("Binary truth value is neither true nor false")
 
-                 # If adjacent actions don't exist then keep unblocking_joint_actions as it is
-                 else:
-                     preferred_unblocking_joint_actions = unblocking_joint_actions
+                # If adjacent actions don't exist then keep unblocking_joint_actions as it is
+                else:
+                    preferred_unblocking_joint_actions = unblocking_joint_actions
 
-                 best_action = preferred_unblocking_joint_actions[
-                     np.random.choice(len(preferred_unblocking_joint_actions))][self.agent_index]
-                 # Note: np.random isn't actually random!
+                best_action = preferred_unblocking_joint_actions[
+                    np.random.choice(len(preferred_unblocking_joint_actions))][self.agent_index]
+                # Note: np.random isn't actually random!
 
         else:
             self.timesteps_stuck = 0  # Reset to zero if prev & current player states aren't the same (they're not stuck)
@@ -484,7 +495,7 @@ class GreedyHumanModelv2(Agent):
     def ml_action(self, state):
         """Selects a medium level action for the current state"""
         player = state.players[self.agent_index]
-        #other_player = state.players[1 - self.agent_index]
+        # other_player = state.players[1 - self.agent_index]
         am = self.mlp.ml_action_manager
 
         counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
@@ -501,7 +512,7 @@ class GreedyHumanModelv2(Agent):
             cooking_soups = pot_states_dict[next_order]['cooking']
 
         soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
-        #other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'  <-- no longer used
+        # other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'  <-- no longer used
 
         # Determine if any soups need onions
         pots_empty = len(pot_states_dict['empty'])
@@ -514,7 +525,7 @@ class GreedyHumanModelv2(Agent):
                 motion_goals = am.pickup_dish_actions(state, counter_objects)
             else:
                 next_order = None
-                #TODO: This seems to look at the next-but-one order? Should it be order_list[0]? Check this, and modify if needed
+                # TODO: This seems to look at the next-but-one order? Should it be order_list[0]? Check this, and modify if needed
                 if len(state.order_list) > 1:
                     next_order = state.order_list[1]
 
@@ -523,10 +534,11 @@ class GreedyHumanModelv2(Agent):
                 elif next_order == 'tomato':
                     motion_goals = am.pickup_tomato_actions(state, counter_objects)
                 elif next_order is None or next_order == 'any':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state,
+                                                                                                              counter_objects)
 
             # If there's a soup on the counter, then override other goals and get the soup
-            #TODO: This can cause issues in unident <-- fix it
+            # TODO: This can cause issues in unident <-- fix it
             if 'soup' in counter_objects:
                 motion_goals = am.pickup_counter_soup_actions(state, counter_objects)
 
@@ -557,12 +569,14 @@ class GreedyHumanModelv2(Agent):
                 raise ValueError()
 
         # Remove invalid goals:
-        motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+        motion_goals = list(
+            filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
 
         # If no goals, then just go to nearest feature
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = list(filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
+            motion_goals = list(
+                filter(lambda goal: self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, goal), motion_goals))
             assert len(motion_goals) != 0
 
         return motion_goals
@@ -576,13 +590,14 @@ class GreedyHumanModelv2(Agent):
             #0.5, for the first timestep Prob~0.5, then Prob-->1 quickly as time increases. Then using this prob
         it randomly determines if the player should take an alternative action."""
 
-        Prob_taking_alternative = 1 - (1 / (np.exp(self.timesteps_stuck*10))) ** (1 - self.perseverance ** (1 / 10))
+        Prob_taking_alternative = 1 - (1 / (np.exp(self.timesteps_stuck * 10))) ** (1 - self.perseverance ** (1 / 10))
         rand = random.random()
         take_alternative = rand < Prob_taking_alternative
 
         # logging.info('time stuck: {}, perserv: {}, Prob_taking_alt: {}, Taking alt: {}'.format(self.timesteps_stuck, self.perseverance, Prob_taking_alternative, take_alternative))
 
         return take_alternative
+
 
 class ToMModel(Agent):
     """
@@ -610,7 +625,7 @@ class ToMModel(Agent):
         self.only_take_dispenser_onions = False  # Only used for layout Forced Coordination: when an onion is
         # deliberately dropped on a shared counter, then from then on only take onions from the dispenser
         self.only_take_dispenser_dishes = False
-        self.GHM = GreedyHumanModelv2(self.mlp, player_index=1-self.agent_index)  # For ToM of other players
+        self.GHM = GreedyHumanModelv2(self.mlp, player_index=1 - self.agent_index)  # For ToM of other players
         self.human_model = True
 
         # "Personality" parameters (within 0 to 1, except rationality_coefficient)
@@ -625,7 +640,7 @@ class ToMModel(Agent):
         self.path_teamwork = path_teamwork  # Prob of considering the other agent's location in the path choice
         self.rationality_coefficient = rationality_coefficient  # Setting to 0 means random actions; inf means always takes
         # lowest cost path. In practice inf ~ 100
-        self.prob_pausing = prob_pausing # Probability of pausing on a given timestep, instead of acting. From a
+        self.prob_pausing = prob_pausing  # Probability of pausing on a given timestep, instead of acting. From a
         # quick initial look at the human data, the humans pause very approx 50% of the time
 
     def action(self, state):
@@ -642,15 +657,15 @@ class ToMModel(Agent):
             # OR iii) if the agent is stuck for >1 timestep; OR iv) if reached a goal (then a new one is needed)
             rand = random.random()
             if self.prev_best_action == None or rand > self.retain_goals or \
-                    self.prev_best_action == 'interact' or self.prev_best_action == (0,0):
+                    self.prev_best_action == 'interact' or self.prev_best_action == (0, 0):
 
                 logging.info('Getting a new motion goal...')
 
-                if (self.prev_best_action == 'interact' or self.prev_best_action == (0,0)) \
+                if (self.prev_best_action == 'interact' or self.prev_best_action == (0, 0)) \
                         and (random.random() > self.thinking_prob):
 
                     logging.info('Agent is pausing to "think"...')
-                    best_action = (0,0)
+                    best_action = (0, 0)
 
                 else:
 
@@ -670,14 +685,14 @@ class ToMModel(Agent):
         # The agent sometimes just pauses instead of acting:
         else:
             logging.info('Agent pausing')
-            best_action = (0,0)
+            best_action = (0, 0)
 
         return best_action
 
     def ml_action(self, state):
         """Selects a medium level action for the current state"""
 
-        #TODO: Here, or in future codes, I should use dictionaries instead of return a long list of variables. E.g.
+        # TODO: Here, or in future codes, I should use dictionaries instead of return a long list of variables. E.g.
         # make a dictionary info_for_decisions, with name:variable pairs. Then pass that dict in to other methods
         # that need info, and extract the info from the dict only when you need it...
         player, other_player, am, counter_objects, pot_states_dict, soup_nearly_ready, count_soups_nearly_ready, \
@@ -691,10 +706,10 @@ class ToMModel(Agent):
                 default_motion_goals = am.pickup_dish_actions(state, counter_objects)  # (Exclude
                 # self.only_take_dispenser_dishes here because we are considering the goals for both players)
                 motion_goals, temp_dont_drop = self.revise_pickup_dish_goal_considering_other_player_and_noise(
-                                                    player, default_motion_goals, other_player, state,
-                                                    other_has_dish, am, counter_objects, temp_dont_drop)
+                    player, default_motion_goals, other_player, state,
+                    other_has_dish, am, counter_objects, temp_dont_drop)
                 motion_goals = self.sometimes_overwrite_goal_with_greedy(motion_goals, am, state, counter_objects,
-                                                                   greedy_goal='pickup_dish')
+                                                                         greedy_goal='pickup_dish')
 
             # Otherwise get onion:
             elif not soup_nearly_ready:
@@ -702,15 +717,15 @@ class ToMModel(Agent):
                 default_motion_goals = am.pickup_onion_actions(state, counter_objects)  # (Exclude
                 # self.only_take_dispenser_onions here because we are considering the goals for both players)
                 motion_goals, temp_dont_drop = self.revise_pickup_onion_goal_considering_other_player_and_noise(
-                                            number_of_pots, player, default_motion_goals, other_player, state,
-                                            other_has_onion, counter_objects, am, temp_dont_drop)
+                    number_of_pots, player, default_motion_goals, other_player, state,
+                    other_has_onion, counter_objects, am, temp_dont_drop)
                 motion_goals = self.sometimes_overwrite_goal_with_greedy(motion_goals, am, state, counter_objects,
                                                                          greedy_goal='pickup_onion')
             else:
                 raise ValueError('Failed logic')
 
             motion_goals = self.override_goal_if_soup_on_counter(motion_goals, counter_objects, am, state, player,
-                                                           other_player)
+                                                                 other_player)
 
         elif player.has_object():
 
@@ -723,11 +738,12 @@ class ToMModel(Agent):
                     soups_need_onions, state, temp_dont_drop, counter_objects, am, pot_states_dict, player,
                     default_motion_goals, other_player, number_of_pots)
                 motion_goals = self.sometimes_overwrite_goal_with_greedy(motion_goals, am, state, counter_objects,
-                                            greedy_goal='drop_or_use_onion', soups_need_onions=soups_need_onions,
-                                            pot_states_dict=pot_states_dict)
+                                                                         greedy_goal='drop_or_use_onion',
+                                                                         soups_need_onions=soups_need_onions,
+                                                                         pot_states_dict=pot_states_dict)
                 # If we're on forced_coord then we need to consider goals that pass the object to the other player:
                 motion_goals = self.special_onion_motion_goals_for_forced_coord(soups_need_onions, player,
-                                                                                    motion_goals, state)
+                                                                                motion_goals, state)
 
             elif player_obj.name == 'dish':
 
@@ -736,17 +752,18 @@ class ToMModel(Agent):
                     count_soups_nearly_ready, number_of_pots, temp_dont_drop, state, counter_objects, am,
                     pot_states_dict, player, default_motion_goals, other_player)
                 motion_goals = self.sometimes_overwrite_goal_with_greedy(motion_goals, am, state, counter_objects,
-                                   greedy_goal='drop_or_use_dish', pot_states_dict=pot_states_dict,
-                                   soup_nearly_ready=soup_nearly_ready)
+                                                                         greedy_goal='drop_or_use_dish',
+                                                                         pot_states_dict=pot_states_dict,
+                                                                         soup_nearly_ready=soup_nearly_ready)
                 # If we're on forced_coord then we need to consider goals that pass the object to the other player:
                 motion_goals = self.special_dish_motion_goals_for_forced_coord(count_soups_nearly_ready, player,
-                                                                                        motion_goals, state)
+                                                                               motion_goals, state)
 
             elif player_obj.name == 'soup':
                 # Deliver soup whatever the other player is doing
                 motion_goals = am.deliver_soup_actions()
                 motion_goals = self.sometimes_make_wrong_decision(motion_goals, state, counter_objects, am,
-                                  current_goal='use_dish')
+                                                                  current_goal='use_dish')
             else:
                 raise ValueError()
         else:
@@ -756,8 +773,7 @@ class ToMModel(Agent):
 
         return motion_goals
 
-
-#============== Sub-methods (mainly for ToMModel) ======================#
+    # ============== Sub-methods (mainly for ToMModel) ======================#
 
     def take_alternative_action(self):
         """This first gives Prob(taking alternative action)=1 if perseverance=0 and Prob=0 if perseverance=1. Otherwise,
@@ -768,7 +784,7 @@ class ToMModel(Agent):
             #0.5, for the first timestep Prob~0.5, then Prob-->1 quickly as time increases. Then using this prob
         it randomly determines if the player should take an alternative action"""
 
-        Prob_taking_alternative = 1 - (1 / (np.exp(self.timesteps_stuck*10))) ** (1 - self.perseverance ** (1 / 10))
+        Prob_taking_alternative = 1 - (1 / (np.exp(self.timesteps_stuck * 10))) ** (1 - self.perseverance ** (1 / 10))
         rand = random.random()
         take_alternative = rand < Prob_taking_alternative
 
@@ -792,7 +808,6 @@ class ToMModel(Agent):
         #     else:
         #         _, num_items, _ = state.get_object(self.mlp.mdp.get_pot_locations()[0]).state
         #     current_list = full_list[num_items:num_items+number_of_tasks]
-
 
         number_of_pots = self.mlp.mdp.get_pot_locations().__len__()
         order_length = state.order_list.__len__()
@@ -891,11 +906,11 @@ class ToMModel(Agent):
     def boltz_rationality(self, x):
         """Compute softmax values for each sets of scores in x."""
         temperature = self.rationality_coefficient
-        exponent = [-y*temperature for y in x]
-        #TODO: We take -ve exponents because we want to prioritise the smallest costs. Is taking -ve a good way to do it??
+        exponent = [-y * temperature for y in x]
+        # TODO: We take -ve exponents because we want to prioritise the smallest costs. Is taking -ve a good way to do it??
 
         # if np.isnan(np.sum(np.exp(exponent), axis=0)) or np.sum(np.exp(exponent), axis=0) == 0:
-            # print('Dividing by zero or NaN in function boltz_rationality')
+        # print('Dividing by zero or NaN in function boltz_rationality')
 
         return np.exp(exponent) / np.sum(np.exp(exponent), axis=0)
 
@@ -911,7 +926,6 @@ class ToMModel(Agent):
         plan_goals = []
 
         for start_pos_and_or in valid_next_pos_and_ors:
-
             plan_goal, plan_cost = self.find_plan_from_start_pos_and_or(start_pos_and_or, motion_goals)
 
             # action_plans.append(action_plan)  # <-- this is the action plan from the next position, not current position
@@ -923,8 +937,8 @@ class ToMModel(Agent):
         #  the cost of just changing direction. To recify this we reduce the cost by 1. BUT this under-inflates the cost
         #  of being in one place but not needing to change direction! Anyhow, if a human was in the right place it's v
         #  unlikely they'd randomly step away?!
-        if plan_goals[len(plan_goals)-1][0] == player_pos_and_or[0]:
-            plan_costs[len(plan_costs)-1] -= 1
+        if plan_goals[len(plan_goals) - 1][0] == player_pos_and_or[0]:
+            plan_costs[len(plan_costs) - 1] -= 1
 
         # Next: convert costs into probability distributions
         plan_probs = self.boltz_rationality(plan_costs)
@@ -938,7 +952,7 @@ class ToMModel(Agent):
         # Now we have a chosen goal, we need to choose the chosen NEXT POS_OR from the valid ones:
         chosen_next_pos_and_or = valid_next_pos_and_ors[chosen_index]
 
-        if chosen_index == (len(valid_next_pos_and_ors)-1) and chosen_next_pos_and_or[0] == chosen_goal[0]:
+        if chosen_index == (len(valid_next_pos_and_ors) - 1) and chosen_next_pos_and_or[0] == chosen_goal[0]:
             # In this case we choose the action that leaves us in the same location. BUT we might want to change direction,
             # so we need to find whether the action to reach the chosen goal just requires a change of direction. If so,
             # then take this action.
@@ -983,7 +997,8 @@ class ToMModel(Agent):
                 # best_action = joint_action_plan[0][self.agent_index]
                 min_cost = plan_lengths[self.agent_index]
                 best_goal = goal
-            elif plan_lengths[self.agent_index] == min_cost and plan_lengths[self.agent_index] != np.Inf and random.random() > 0.5:
+            elif plan_lengths[self.agent_index] == min_cost and plan_lengths[
+                self.agent_index] != np.Inf and random.random() > 0.5:
                 # If the cost is the same, then pick randomly
                 best_goal = goal
 
@@ -998,14 +1013,14 @@ class ToMModel(Agent):
         player_pos_and_or = state.players_pos_and_or[self.agent_index]
 
         # Find valid actions: (INCLUDING NOT MOVING). This assumes the other player doesn't move
-        #TODO: Assume the other moves to take a greedy action?
+        # TODO: Assume the other moves to take a greedy action?
         valid_next_pos_and_ors = self.find_valid_next_pos_and_ors(state) + [player_pos_and_or]
 
         # Assume other player is GreedyHumanModel and find what action they would do:
         other_player_pos_and_or = state.players_pos_and_or[1 - self.agent_index]
         others_predicted_goals = self.GHM.ml_action(state)
         # Find their closest goal
-        #TODO: Can use helper function find_plan, after some modification
+        # TODO: Can use helper function find_plan, after some modification
         min_cost = np.Inf
         others_predicted_goal = None
         for goal in others_predicted_goals:
@@ -1019,7 +1034,7 @@ class ToMModel(Agent):
         plan_goals = []
 
         for start_pos_and_or in valid_next_pos_and_ors:
-            #TODO: Currently i) assuming other player doesn't move initially and ii) finding joint optimal action... this
+            # TODO: Currently i) assuming other player doesn't move initially and ii) finding joint optimal action... this
             # is inconsistent -- we should assume first step of other is Greedy. Anyway, we're simulating sub-optimal
             # trajectories so it's not too bad to do this
             plan_goal, plan_cost = self.find_joint_plan_from_start_pos_and_or(
@@ -1034,8 +1049,8 @@ class ToMModel(Agent):
         #  the cost of just changing direction. To recify this we reduce the cost by 1. BUT this under-inflates the cost
         #  of being in one place but not needing to change direction! Anyhow, if a human was in the right place it's v
         #  unlikely they'd randomly step away anyway?!
-        if plan_goals[len(plan_goals)-1] != None and plan_goals[len(plan_goals)-1][0] == player_pos_and_or[0]:
-            plan_costs[len(plan_costs)-1] -= 1
+        if plan_goals[len(plan_goals) - 1] != None and plan_goals[len(plan_goals) - 1][0] == player_pos_and_or[0]:
+            plan_costs[len(plan_costs) - 1] -= 1
 
         # Next: convert costs into probability distributions
         plan_probs = self.boltz_rationality(plan_costs)
@@ -1050,7 +1065,7 @@ class ToMModel(Agent):
         if chosen_goal == None:
             chosen_action = None
 
-        elif chosen_index == (len(valid_next_pos_and_ors)-1) and chosen_next_pos_and_or[0] == chosen_goal[0]:
+        elif chosen_index == (len(valid_next_pos_and_ors) - 1) and chosen_next_pos_and_or[0] == chosen_goal[0]:
             # In this case we choose the action that leaves us in the same location. BUT we might want to change direction,
             # so we need to find whether the action to reach the chosen goal just requires a change of direction. If so,
             # then take this action.
@@ -1079,7 +1094,7 @@ class ToMModel(Agent):
     def find_plan_including_other(self, state, motion_goals):
 
         start_pos_and_or = state.players_pos_and_or[self.agent_index]
-        start_pos_and_or_other = state.players_pos_and_or[1-self.agent_index]
+        start_pos_and_or_other = state.players_pos_and_or[1 - self.agent_index]
         # # Assume other player is going to closest feature (otherwise it's not a valid motion goal!!)
         # closet_feature_for_other = self.mlp.ml_action_manager.go_to_closest_feature_actions(state.players[1-self.agent_index])[0]
         # Assume other player is GreedyHumanModel and find what action they would do:
@@ -1107,7 +1122,8 @@ class ToMModel(Agent):
             else:
                 raise ValueError('Index error')
 
-            joint_action_plan, end_jm_state, plan_lengths = self.mlp.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
+            joint_action_plan, end_jm_state, plan_lengths = self.mlp.jmp.get_low_level_action_plan(start_jm_state,
+                                                                                                   goal_jm_state)
             if plan_lengths[self.agent_index] < min_cost:
                 best_action = joint_action_plan[0][self.agent_index]
                 min_cost = plan_lengths[self.agent_index]
@@ -1361,7 +1377,7 @@ class ToMModel(Agent):
 
         return motion_goals
 
-    #TODO: An alternative way for the agent to make the wrong decision is just to take a random action at the end of
+    # TODO: An alternative way for the agent to make the wrong decision is just to take a random action at the end of
     # the section "if not player.has_object()" then again after section "elif player.has_object()". This will
     # sometimes give goals that can't be achieved, but will neaten the code up.
     def sometimes_make_wrong_decision(self, motion_goals, state, counter_objects, am, current_goal=None,
@@ -1411,7 +1427,7 @@ class ToMModel(Agent):
         return motion_goals
 
     def sometimes_overwrite_goal_with_greedy(self, motion_goals, am, state, counter_objects, greedy_goal=None,
-                                soups_need_onions=None, pot_states_dict=None, soup_nearly_ready=None):
+                                             soups_need_onions=None, pot_states_dict=None, soup_nearly_ready=None):
         if random.random() > self.teamwork:
             logging.info('Overwriting motion_goal with the greedy option')
             if greedy_goal == 'pickup_dish':
@@ -1427,7 +1443,8 @@ class ToMModel(Agent):
                     # Player has an onion but there are no soups to put it in, then drop the onion
                     motion_goals = am.place_obj_on_counter_actions(state)
                     motion_goals = self.sometimes_make_wrong_decision(motion_goals, state, counter_objects, am,
-                                      current_goal='drop_onion', pot_states_dict_temp=pot_states_dict)
+                                                                      current_goal='drop_onion',
+                                                                      pot_states_dict_temp=pot_states_dict)
                 else:
                     motion_goals = am.put_onion_in_pot_actions(pot_states_dict)
                     motion_goals = self.sometimes_make_wrong_decision(motion_goals, state, counter_objects, am,
@@ -1437,7 +1454,8 @@ class ToMModel(Agent):
                     # Player has a dish but there are no longer any "nearly ready" soups: drop the dish
                     motion_goals = am.place_obj_on_counter_actions(state)
                     motion_goals = self.sometimes_make_wrong_decision(motion_goals, state, counter_objects, am,
-                                                current_goal='drop_dish', pot_states_dict_temp=pot_states_dict)
+                                                                      current_goal='drop_dish',
+                                                                      pot_states_dict_temp=pot_states_dict)
                 elif soup_nearly_ready:
                     motion_goals = am.pickup_soup_with_dish_actions(pot_states_dict, only_nearly_ready=True)
                     motion_goals = self.sometimes_make_wrong_decision(motion_goals, state, counter_objects, am,
@@ -1464,7 +1482,9 @@ class ToMModel(Agent):
     # Functions specific to each part of the decision tree:
 
     def revise_pickup_onion_goal_considering_other_player_and_noise(self, number_of_pots, player,
-                    default_motion_goals, other_player, state, other_has_onion, counter_objects, am, temp_dont_drop):
+                                                                    default_motion_goals, other_player, state,
+                                                                    other_has_onion, counter_objects, am,
+                                                                    temp_dont_drop):
         """Revise what the best goal is, depending on whether the other player is in a better/worse position to
         achieve the default goal. Noise refers to making wrong decisions with a given prob.
         Note: If there are two pots, then we can only get inside this 'if' when both pots have onion first on the
@@ -1744,9 +1764,7 @@ class ToMModel(Agent):
     #         actions.append(self.action(multi_thread_state[i]))
     #     return actions
 
-
-
-#============ DEPRECIATED =========================#
+# ============ DEPRECIATED =========================#
 #
 # class SimpleComplementaryModel(Agent):
 #     """
