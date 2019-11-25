@@ -1073,7 +1073,7 @@ class MediumLevelPlanner(object):
             
             if not self.mdp.is_terminal(end_state):
                 # Adding interact action and deriving last state
-                other_agent_action = other_agent.action(end_state)
+                other_agent_action, _ = other_agent.action(end_state)
                 last_joint_action = (Action.INTERACT, other_agent_action) if other_agent_idx == 1 else (other_agent_action, Action.INTERACT)
                 action_plan = action_plan + (last_joint_action,)
                 cost = cost + 1
@@ -1100,7 +1100,7 @@ class MediumLevelPlanner(object):
         return action_plan, end_state, cost
 
     def embedded_mdp_succ_fn(self, state, other_agent):
-        other_agent_action = other_agent.action(state)
+        other_agent_action, _ = other_agent.action(state)
 
         successors = []
         for a in Action.ALL_ACTIONS:

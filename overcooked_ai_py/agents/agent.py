@@ -9,7 +9,14 @@ from overcooked_ai_py.planning.search import SearchTree
 class Agent(object):
 
     def action(self, state):
-        """Returns action and action probabilities"""
+        """
+        Should return an action, and an action info dictionary.
+        If collecting trajectories of the agent with OvercookedEnv, the action
+        info data will be included in the trajectory data under `ep_infos`.
+
+        This allows agents to optionally store useful information about them 
+        in the trajectory for further analysis.
+        """
         return NotImplementedError()
 
     @staticmethod
@@ -83,10 +90,11 @@ class AgentPair(AgentGroup):
             # When using the same instance of an agent for self-play, 
             # reset agent index at each turn to prevent overwriting it
             self.a0.set_agent_index(0)
-            action_and_probs_0 = self.a0.action(state)
+            action_and_infos_0 = self.a0.action(state)
             self.a1.set_agent_index(1)
-            action_and_probs_1 = self.a1.action(state)
-            return (action_and_probs_0, action_and_probs_1)
+            action_and_infos_1 = self.a1.action(state)
+            joint_action_and_infos = (action_and_infos_0, action_and_infos_1)
+            return joint_action_and_infos
         else:
             return super().joint_action(state)
 
@@ -103,7 +111,13 @@ class CoupledPlanningPair(AgentPair):
     def joint_action(self, state):
         # Reduce computation by half if both agents are coupled planning agents
         joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
-        return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
+        
+        if len(joint_action_plan) == 0:
+            return ((Action.STAY, {}), (Action.STAY, {}))
+        
+        joint_action_and_infos = [(a, {}) for a in joint_action_plan[0]]
+        return joint_action_and_infos
+            
 
 
 class AgentFromPolicy(Agent):
@@ -166,7 +180,7 @@ class RandomAgent(Agent):
             legal_actions.append(Action.INTERACT)
         legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
         action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
-        return Action.sample(action_probs), action_probs
+        return Action.sample(action_probs), {"action_probs": action_probs}
 
     def direct_action(self, obs):
         return [np.random.randint(4) for _ in range(self.sim_threads)]
@@ -179,7 +193,7 @@ class StayAgent(Agent):
     
     def action(self, state):
         a = Action.STAY
-        return a, self.a_probs_from_action(a)
+        return a, {}
 
     def direct_action(self, obs):
         return [Action.ACTION_TO_INDEX[Action.STAY]] * self.sim_threads
@@ -197,10 +211,10 @@ class FixedPlanAgent(Agent):
     
     def action(self, state):
         if self.i >= len(self.plan):
-            return Action.STAY, self.a_probs_from_action(Action.STAY)
+            return Action.STAY, {}
         curr_action = self.plan[self.i]
         self.i += 1
-        return curr_action, self.a_probs_from_action(curr_action)
+        return curr_action, {}
     
     def reset(self):
         self.i = 0
@@ -226,7 +240,7 @@ class CoupledPlanningAgent(Agent):
             print("COUPLED PLANNING FAILURE")
             self.mlp.failures += 1
             return Direction.ALL_DIRECTIONS[np.random.randint(4)]
-        return joint_action_plan[0][self.agent_index] if len(joint_action_plan) > 0 else None
+        return (joint_action_plan[0][self.agent_index], {}) if len(joint_action_plan) > 0 else (Action.STAY, {})
 
 
 class EmbeddedPlanningAgent(Agent):
@@ -290,7 +304,7 @@ class EmbeddedPlanningAgent(Agent):
         if self.logging_level >= 1: 
             print("expected joint action", first_joint_action)
         action = first_joint_action[self.agent_index]
-        return action
+        return action, {}
 
 
 class GreedyHumanModel(Agent):
@@ -298,7 +312,7 @@ class GreedyHumanModel(Agent):
     Agent that at each step selects a medium level action corresponding
     to the most intuitively high-priority thing to do
     
-    NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example random1.layout,
+    NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
     in which an individual agent cannot complete the task on their own.
     """
 
@@ -323,12 +337,12 @@ class GreedyHumanModel(Agent):
         self.prev_state = None
 
     def actions(self, states, agent_indices):
-        actions = []
+        actions_and_infos_n = []
         for state, agent_idx in zip(states, agent_indices):
             self.set_agent_index(agent_idx)
             self.reset()
-            actions.append(self.action(state))
-        return actions
+            actions_and_infos_n.append(self.action(state))
+        return actions_and_infos_n
 
     def action(self, state):
         possible_motion_goals = self.ml_action(state)
@@ -364,7 +378,7 @@ class GreedyHumanModel(Agent):
 
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
-        return chosen_action, action_probs
+        return chosen_action, {"action_probs": action_probs}
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
         """
@@ -381,8 +395,7 @@ class GreedyHumanModel(Agent):
             chosen_goal_action = possible_plans[goal_idx][0][0]
         else:
             chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
-            action_probs = self.a_probs_from_action(chosen_action)
-        
+            action_probs = self.a_probs_from_action(chosen_goal_action)
         return chosen_goal, chosen_goal_action, action_probs
 
     def get_boltzmann_rational_action_idx(self, costs, temperature):
@@ -424,9 +437,6 @@ class GreedyHumanModel(Agent):
             future_costs.append(sign * plan_cost)
 
         action_idx, action_probs = self.get_boltzmann_rational_action_idx(future_costs, self.ll_temperature)
-        if inverted_costs:
-            # highest_cost_actions = [i for i in range(len(future_costs)) if max(future_costs) == future_costs[i]]
-            assert np.argmax(action_probs) in np.argmax(future_costs)
         return Action.ALL_ACTIONS[action_idx], action_probs
 
     def ml_action(self, state):

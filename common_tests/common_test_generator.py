@@ -1,4 +1,3 @@
-from overcooked_ai_py.agents.agent import Agent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, ObjectState, PlayerState
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
@@ -50,9 +49,9 @@ traj = {
     "ep_actions": [[tuple(s_a_r[1]) for s_a_r in s_a_r_pairs]],
     "ep_rewards": [curr_ep_rewards],
     "ep_dones": [False] * len(s_a_r_pairs),
+    "ep_infos": [{}] * len(s_a_r_pairs),
 
     "ep_returns": [sum(curr_ep_rewards)],
-    "ep_returns_sparse": [sum(curr_ep_rewards)],
     "ep_lengths": [len(curr_ep_rewards)],
     "mdp_params": [{
         "layout_name": "mdp_test",
@@ -64,9 +63,8 @@ traj = {
     "env_params": [{
         "horizon": 100,
         "start_state_fn": None
-    }]
+    }],
+    "metadatas": {}
 }
-
-traj["ep_actions_probs"] = [[tuple(list(Agent.a_probs_from_action(a)) for a in j_a) for j_a in traj["ep_actions"][0]]]
 
 AgentEvaluator.save_traj_as_json(traj, "trajectory_tests/test_full_traj")

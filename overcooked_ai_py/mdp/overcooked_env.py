@@ -1,6 +1,6 @@
 import gym, tqdm
 import numpy as np
-from overcooked_ai_py.utils import mean_and_std_err
+from overcooked_ai_py.utils import mean_and_std_err, merge_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
@@ -132,9 +132,8 @@ class OvercookedEnv(object):
 
     def run_agents(self, agent_pair, include_final_state=False, display=False, display_until=np.Inf):
         """
-        Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t).
+        Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
         """
-        from overcooked_ai_py.agents.agent import Agent
         assert self.cumulative_sparse_rewards == self.cumulative_shaped_rewards == 0, \
             "Did not reset environment before running agents"
         trajectory = []
@@ -144,18 +143,17 @@ class OvercookedEnv(object):
         while not done:
             s_t = self.state
 
-            # Getting actions and action probs for both agents
-            a_t, a_probs_t = zip(*agent_pair.joint_action(s_t))
+            # Getting actions and action infos (optional) for both agents
+            joint_action_and_infos = agent_pair.joint_action(s_t)
+            a_t, a_info_t = zip(*joint_action_and_infos)
 
-            for agent_probs in a_probs_t:
-                Agent.check_action_probs(agent_probs)
-
-            # Break if either agent is out of actions
-            if any([a is None for a in a_t]):
-                break
+            print(a_t, a_info_t)
+            assert all(a in Action.ALL_ACTIONS for a in a_t)
+            assert all(type(a_info) is dict for a_info in a_info_t)
 
             s_tp1, r_t, done, info = self.step(a_t)
-            trajectory.append((s_t, a_t, a_probs_t, r_t, done))
+            info["agent_infos"] = a_info_t
+            trajectory.append((s_t, a_t, r_t, done, info))
 
             if display and self.t < display_until:
                 self.print_state_transition(a_t, r_t, info)
@@ -164,11 +162,11 @@ class OvercookedEnv(object):
 
         # Add final state
         if include_final_state:
-            trajectory.append((s_tp1, (None, None), 0, True))
+            trajectory.append((s_tp1, (None, None), 0, True, None))
 
         return np.array(trajectory), self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
 
-    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, agent_idx=0, reward_shaping=0.0, display_until=np.Inf, info=True):
+    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, agent_idx=0, reward_shaping=0.0, display_until=np.Inf, info=True, metadata_fn=lambda x: {}):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -179,40 +177,46 @@ class OvercookedEnv(object):
         Returning excessive information to be able to convert trajectories to any required format 
         (baselines, stable_baselines, etc)
 
+        metadata_fn returns some metadata information computed at the end of each trajectory based on
+        some of the trajectory data.
+
         NOTE: standard trajectories format used throughout the codebase
         """
         trajectories = {
             # With shape (n_timesteps, game_len), where game_len might vary across games:
             "ep_observations": [],
             "ep_actions": [],
-            "ep_actions_probs": [],
             "ep_rewards": [], # Individual dense (= sparse + shaped * rew_shaping) reward values
             "ep_dones": [], # Individual done values
+            "ep_infos": [],
 
             # With shape (n_episodes, ):
-            "ep_returns": [], # Sum of dense and sparse rewards across each episode
-            "ep_returns_sparse": [], # Sum of sparse rewards across each episode
+            "ep_returns": [], # Sum of sparse rewards across each episode
             "ep_lengths": [], # Lengths of each episode
             "mdp_params": [], # Custom MDP params to for each episode
-            "env_params": [] # Custom Env params for each episode
+            "env_params": [], # Custom Env params for each episode
+
+            # Custom metadata key value pairs
+            "metadatas": [] # Final data type is a dictionary of similar format to trajectories
         }
 
         range_fn = tqdm.trange if info else range
-        for _ in range_fn(num_games):
+        for i in range_fn(num_games):
             agent_pair.set_mdp(self.mdp)
 
-            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
-            obs, actions, action_probs, rews, dones = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
+            rollout_info = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
+            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = rollout_info
+            obs, actions, rews, dones, infos = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
             trajectories["ep_observations"].append(obs)
             trajectories["ep_actions"].append(actions)
-            trajectories["ep_actions_probs"].append(action_probs)
             trajectories["ep_rewards"].append(rews)
             trajectories["ep_dones"].append(dones)
-            trajectories["ep_returns"].append(tot_rews_sparse + tot_rews_shaped * reward_shaping)
-            trajectories["ep_returns_sparse"].append(tot_rews_sparse)
+            trajectories["ep_infos"].append(infos)
+            trajectories["ep_returns"].append(tot_rews_sparse)
             trajectories["ep_lengths"].append(time_taken)
             trajectories["mdp_params"].append(self.mdp.mdp_params)
             trajectories["env_params"].append(self.env_params)
+            trajectories["metadatas"].append(metadata_fn(rollout_info))
 
             self.reset()
             agent_pair.reset()
@@ -225,10 +229,38 @@ class OvercookedEnv(object):
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
 
+        # Merging all metadata dictionaries, assumes same keys throughout all
+        trajectories["metadatas"] = merge_dictionaries(trajectories["metadatas"])
+
         # TODO: should probably transfer check methods over to Env class
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
         AgentEvaluator.check_trajectories(trajectories)
         return trajectories
+
+    @staticmethod
+    def get_agent_infos_for_trajectories(trajectories, agent_idx):
+        """
+        Returns a dictionary of the form
+        {
+            "[agent_info_0]": [ [episode_values], [], ... ],
+            "[agent_info_1]": [ [], [], ... ],
+            ...
+        }
+        with as keys the keys returned by the agent in it's agent_info dictionary
+        """
+        agent_infos = []
+        for traj_idx in range(len(trajectories["ep_lengths"])):
+            ep_infos = trajectories["ep_infos"][traj_idx]
+            traj_agent_infos = [step_info["agent_infos"][agent_idx] for step_info in ep_infos]
+
+            # Append all dictionaries together
+            traj_agent_infos = merge_dictionaries(traj_agent_infos)
+            agent_infos.append(traj_agent_infos)
+        
+        # Append all dictionaries together once again
+        agent_infos = merge_dictionaries(agent_infos)
+        agent_infos = {k: np.array(v) for k, v in agent_infos.items()}
+        return agent_infos
 
 
 class Overcooked(gym.Env):

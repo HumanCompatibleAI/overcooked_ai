@@ -4,22 +4,22 @@ import numpy as np
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import Agent, AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 
 DEFAULT_TRAJ_KEYS = [
-    "ep_observations", 
+    "ep_observations",
     "ep_actions",
-    "ep_actions_probs",
     "ep_rewards",
-    "ep_dones", 
-    "ep_returns", 
-    "ep_returns_sparse", 
-    "ep_lengths", 
-    "mdp_params", 
-    "env_params"
+    "ep_dones",
+    "ep_infos",
+    "ep_returns",
+    "ep_lengths",
+    "mdp_params",
+    "env_params",
+    "metadatas"
 ]
 
 
@@ -208,7 +208,7 @@ class AgentEvaluator(object):
         dict_traj['ep_actions'] = [list(lst) for lst in dict_traj['ep_actions']]
         dict_traj['ep_rewards'] = [list(lst) for lst in dict_traj['ep_rewards']]
         dict_traj['ep_dones'] = [int(lst) for lst in dict_traj['ep_dones']]
-        dict_traj['ep_returns_sparse'] = [int(val) for val in dict_traj['ep_returns_sparse']]
+        dict_traj['ep_returns'] = [int(val) for val in dict_traj['ep_returns']]
         dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
         return dict_traj
 
