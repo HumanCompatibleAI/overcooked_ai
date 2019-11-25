@@ -357,7 +357,7 @@ export class OvercookedGridworld {
     }
 
     is_terminal ({state}) {
-        return (state.order_list === null) || (state.order_list.length === 0)
+        return (state.order_list.length === 0)
     }
 
     get_transition_states_and_probs ({state, joint_action}) {

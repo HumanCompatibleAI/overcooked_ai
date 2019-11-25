@@ -78,8 +78,7 @@ class LayoutGenerator(object):
                 prop_features=rnd_uniform(*prop_feats),
                 display=display
             )
-        
-        # variable_mdp = (mdp_choices is None) or (mdp_choices is not None and len(mdp_choices) != 1)
+
         return mdp_generator_fn
 
     def padded_mdp(self, mdp, display=False):
