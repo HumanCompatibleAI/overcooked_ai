@@ -677,6 +677,9 @@ class ToMModel(Agent):
     def ml_action(self, state):
         """Selects a medium level action for the current state"""
 
+        #TODO: Here, or in future codes, I should use dictionaries instead of return a long list of variables. E.g.
+        # make a dictionary info_for_decisions, with name:variable pairs. Then pass that dict in to other methods
+        # that need info, and extract the info from the dict only when you need it...
         player, other_player, am, counter_objects, pot_states_dict, soup_nearly_ready, count_soups_nearly_ready, \
         other_has_dish, other_has_onion, number_of_pots, temp_dont_drop = self.get_info_for_making_decisions(state)
 
@@ -1074,7 +1077,6 @@ class ToMModel(Agent):
         return chosen_action, chosen_goal
 
     def find_plan_including_other(self, state, motion_goals):
-
 
         start_pos_and_or = state.players_pos_and_or[self.agent_index]
         start_pos_and_or_other = state.players_pos_and_or[1-self.agent_index]
