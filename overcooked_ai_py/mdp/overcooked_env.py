@@ -146,8 +146,6 @@ class OvercookedEnv(object):
             # Getting actions and action infos (optional) for both agents
             joint_action_and_infos = agent_pair.joint_action(s_t)
             a_t, a_info_t = zip(*joint_action_and_infos)
-
-            print(a_t, a_info_t)
             assert all(a in Action.ALL_ACTIONS for a in a_t)
             assert all(type(a_info) is dict for a_info in a_info_t)
 
