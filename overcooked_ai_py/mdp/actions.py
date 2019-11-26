@@ -1,4 +1,5 @@
-import itertools
+import itertools, copy
+import numpy as np
 
 
 class Direction(object):
@@ -47,8 +48,9 @@ class Action(object):
         Direction.EAST: "→",
         Direction.WEST: "←",
         STAY: "stay",
-        INTERACT: "interact"
+        INTERACT: INTERACT
     }
+    NUM_ACTIONS = len(ALL_ACTIONS)
 
     @staticmethod
     def move_in_direction(point, direction):
@@ -73,6 +75,30 @@ class Action(object):
         direction = (new_x - old_x, new_y - old_y)
         assert direction in Direction.ALL_DIRECTIONS
         return direction
+
+    @staticmethod
+    def sample(action_probs):
+        return np.random.choice(Action.ALL_ACTIONS, p=action_probs)
+    
+    @staticmethod
+    def argmax(action_probs):
+        action_idx = np.argmax(action_probs)
+        return Action.INDEX_TO_ACTION[action_idx]
+
+    @staticmethod
+    def remove_indices_and_renormalize(probs, indices, eps=0.0):
+        probs = copy.deepcopy(probs)
+        if len(np.array(probs).shape) > 1:
+            probs = np.array(probs)
+            for row_idx, row in enumerate(indices):
+                for idx in indices:
+                    probs[row_idx][idx] = eps
+            norm_probs =  probs.T / np.sum(probs, axis=1)
+            return norm_probs.T
+        else:
+            for idx in indices:
+                probs[idx] = eps
+            return probs / sum(probs)
 
     @staticmethod
     def to_char(action):

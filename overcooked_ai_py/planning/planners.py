@@ -902,7 +902,7 @@ class MediumLevelPlanner(object):
         return MediumLevelPlanner(mdp, params, mlp_action_manager)
     
     @staticmethod
-    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False):
+    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False, info=True):
         assert isinstance(mdp, OvercookedGridworld)
 
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
@@ -912,15 +912,17 @@ class MediumLevelPlanner(object):
         
         try:
             mlp = MediumLevelPlanner.from_action_manager_file(filename)
-        except (FileNotFoundError, ModuleNotFoundError, EOFError) as e:
+
+            if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
+                print("Mlp with different params or mdp found, computing from scratch")
+                return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
             print("Recomputing planner due to:", e)
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
 
-        if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
-            print("Mlp with different params or mdp found, computing from scratch")
-            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
-
-        print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
+        if info:
+            print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
         return mlp
 
     @staticmethod
@@ -1071,7 +1073,7 @@ class MediumLevelPlanner(object):
             
             if not self.mdp.is_terminal(end_state):
                 # Adding interact action and deriving last state
-                other_agent_action = other_agent.action(end_state)
+                other_agent_action, _ = other_agent.action(end_state)
                 last_joint_action = (Action.INTERACT, other_agent_action) if other_agent_idx == 1 else (other_agent_action, Action.INTERACT)
                 action_plan = action_plan + (last_joint_action,)
                 cost = cost + 1
@@ -1098,7 +1100,7 @@ class MediumLevelPlanner(object):
         return action_plan, end_state, cost
 
     def embedded_mdp_succ_fn(self, state, other_agent):
-        other_agent_action = other_agent.action(state)
+        other_agent_action, _ = other_agent.action(state)
 
         successors = []
         for a in Action.ALL_ACTIONS:
