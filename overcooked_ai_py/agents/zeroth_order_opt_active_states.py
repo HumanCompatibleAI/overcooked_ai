@@ -1,7 +1,7 @@
 import time
 from argparse import ArgumentParser
 from human_aware_rl.human.process_dataframes import get_trajs_from_data
-from human_aware_rl.pbt.pbt_hms import HMAgent
+from human_aware_rl.pbt.pbt_hms import ToMAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.agents.agent import GreedyHumanModelv2
@@ -333,7 +333,7 @@ def find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr
 
     hm_number = ''
     # Make multiple hm agents:
-    multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
+    multi_hm_agent = ToMAgent(params, hm_number).get_multi_agent(mlp)
 
     loss = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use)
 
@@ -364,7 +364,7 @@ def find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr
 
     # Find loss for new params
     hm_number = 'eps'
-    multi_hm_agent_eps = HMAgent(params, hm_number).get_multi_agent(mlp)
+    multi_hm_agent_eps = ToMAgent(params, hm_number).get_multi_agent(mlp)
     loss_eps = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent_eps, num_ep_to_use)
     delta_loss = loss - loss_eps
 
@@ -373,7 +373,7 @@ def find_gradient_and_step_multi_hm(params, mlp, expert_trajs, num_ep_to_use, lr
 
     # What's the loss after this grad step:
     # hm_number = ''
-    # multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
+    # multi_hm_agent = ToMAgent(params, hm_number).get_multi_agent(mlp)
     # loss_final = find_cross_entropy_loss(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use)
     # return loss_final
 
@@ -544,7 +544,7 @@ if __name__ == "__main__":
     #-----------------------------#
     lr = base_learning_rate / num_ep_to_use  # learning rate: the more episodes we use the more the loss will be,
     # so we need to scale it down by num_ep_to_use
-    params["sim_threads"] = number_hms  # Needed when using HMAgent
+    params["sim_threads"] = number_hms  # Needed when using ToMAgent
     actions_from_data = expert_trajs['ep_actions']
     # First find the probability of the data not acting:
     prob_data_doesnt_act, number_states_with_acting = find_prob_not_acting(actions_from_data, num_ep_to_use)
@@ -562,12 +562,12 @@ if __name__ == "__main__":
     elif check_accuracy_only:
         # Just find the top-1 and top-2 accuracy:
 
-        PERSON_PARAMS_HMcheck = {"PERSEVERANCE_HMcheck": 0, "TEAMWORK_HMcheck": 0,
-            "RETAIN_GOALS_HMcheck": 0, "WRONG_DECISIONS_HMcheck": 0, "THINKING_PROB_HMcheck": 0,
-            "PATH_TEAMWORK_HMcheck": 0, "RATIONALITY_COEFF_HMcheck": 0, "PROB_PAUSING_HMcheck": 0}
+        PERSON_PARAMS_HMcheck = {"PERSEVERANCE_HMcheck": 0.8, "TEAMWORK_HMcheck": 0.7,
+            "RETAIN_GOALS_HMcheck": 0.6, "WRONG_DECISIONS_HMcheck": 0.1, "THINKING_PROB_HMcheck": 0.5,
+            "PATH_TEAMWORK_HMcheck": 0.4, "RATIONALITY_COEFF_HMcheck": 3, "PROB_PAUSING_HMcheck": 0.2}
         params["PERSON_PARAMS_HMcheck"] = PERSON_PARAMS_HMcheck
         hm_number = 'check'
-        multi_hm_agent = HMAgent(params, hm_number).get_multi_agent(mlp)
+        multi_hm_agent = ToMAgent(params, hm_number).get_multi_agent(mlp)
         start_time = time.time()
         top_1_acc, top_2_acc = find_top_12_accuracy(actions_from_data, expert_trajs, multi_hm_agent, num_ep_to_use,
                                                     number_states_with_acting)

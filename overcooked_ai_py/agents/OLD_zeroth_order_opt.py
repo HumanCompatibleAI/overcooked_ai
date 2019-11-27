@@ -1,5 +1,5 @@
 from human_aware_rl.human.process_dataframes import get_trajs_from_data
-from human_aware_rl.pbt.pbt_hms import HMAgent
+from human_aware_rl.pbt.pbt_hms import ToMAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.agents.agent import GreedyHumanModelv2
@@ -250,7 +250,7 @@ def shift_by_gradient(PERSON_PARAMS_HM, PERSON_PARAMS_FIXED, epsilon, delta_loss
 #
 #     hm_number = ''
 #     player_index = 99  # We will change player index later (setting to 99 in case we forget!)
-#     hm_agent = HMAgent(params, mdp, hm_number, player_index).get_agent()
+#     hm_agent = ToMAgent(params, mdp, hm_number, player_index).get_agent()
 #
 #     # Find the actions from the HM for all states:
 #     hm_actions = choose_hm_actions(expert_trajs, hm_agent, num_ep_to_use=num_ep_to_use)
@@ -274,7 +274,7 @@ def shift_by_gradient(PERSON_PARAMS_HM, PERSON_PARAMS_FIXED, epsilon, delta_loss
 #
 #     # Find loss for new params
 #     hm_number = 'eps'
-#     hm_agent_eps = HMAgent(params, mdp, hm_number).get_agent()
+#     hm_agent_eps = ToMAgent(params, mdp, hm_number).get_agent()
 #     hm_actions_eps = choose_hm_actions(expert_trajs, hm_agent_eps, num_ep_to_use=num_ep_to_use)
 #     loss_eps = deterministic_loss(hm_actions_eps, actions_from_data)
 #     delta_loss = loss - loss_eps
@@ -284,7 +284,7 @@ def shift_by_gradient(PERSON_PARAMS_HM, PERSON_PARAMS_FIXED, epsilon, delta_loss
 #
 #     # What's the loss after this grad step:
 #     hm_number = ''
-#     hm_agent = HMAgent(params, mdp, hm_number).get_agent()
+#     hm_agent = ToMAgent(params, mdp, hm_number).get_agent()
 #     hm_actions = choose_hm_actions(expert_trajs, hm_agent, num_ep_to_use=num_ep_to_use)
 #     loss_final = deterministic_loss(hm_actions, actions_from_data)
 #
@@ -300,7 +300,7 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, ac
 
     hm_number = ''
     # Make multiple hm agents:
-    multi_hm_agent = HMAgent(params, mdp, hm_number).get_multi_agent()
+    multi_hm_agent = ToMAgent(params, mdp, hm_number).get_multi_agent()
 
     loss = find_cross_entropy_loss(expert_trajs, multi_hm_agent, num_ep_to_use)
 
@@ -321,7 +321,7 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, ac
 
     # Find loss for new params
     hm_number = 'eps'
-    multi_hm_agent_eps = HMAgent(params, mdp, hm_number).get_multi_agent()
+    multi_hm_agent_eps = ToMAgent(params, mdp, hm_number).get_multi_agent()
     loss_eps = find_cross_entropy_loss(expert_trajs, multi_hm_agent_eps, num_ep_to_use)
     delta_loss = loss - loss_eps
 
@@ -330,11 +330,11 @@ def find_gradient_and_step_multi_hm(params, mdp, expert_trajs, num_ep_to_use, ac
 
     # What's the loss after this grad step:
     hm_number = ''
-    multi_hm_agent = HMAgent(params, mdp, hm_number).get_multi_agent()
+    multi_hm_agent = ToMAgent(params, mdp, hm_number).get_multi_agent()
     loss_final = find_cross_entropy_loss(expert_trajs, multi_hm_agent, num_ep_to_use)
 
     # Also get deterministic loss for comparison
-    # hm_agent = HMAgent(params, mdp, hm_number).get_agent()
+    # hm_agent = ToMAgent(params, mdp, hm_number).get_agent()
     # hm_actions = choose_hm_actions(expert_trajs, hm_agent, num_ep_to_use=num_ep_to_use)
     # loss_final_deterministic = deterministic_loss(hm_actions, actions_from_data)
     loss_final_deterministic = np.Inf  # Could be any value!
@@ -436,7 +436,7 @@ if __name__ == "__main__":
     lr = base_learning_rate / num_ep_to_use  # learning rate: the more episodes we use the more the loss will be,
     # so we need to scale it down by num_ep_to_use
     number_hms = 3
-    params["sim_threads"] = number_hms  # Needed when using HMAgent
+    params["sim_threads"] = number_hms  # Needed when using ToMAgent
 
     #-----------------------------#
     # For each gradient decent step, find the gradient and step:

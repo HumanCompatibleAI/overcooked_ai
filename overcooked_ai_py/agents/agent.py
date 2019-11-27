@@ -665,6 +665,7 @@ class ToMModel(Agent):
                 motion_goals = self.prev_motion_goal
                 best_action = self.choose_best_action(state, motion_goals)
 
+            # If stuck, take avoiding action:
             best_action = self.take_alternative_action_if_stuck(best_action, state)
 
         # The agent sometimes just pauses instead of acting:
@@ -709,7 +710,7 @@ class ToMModel(Agent):
             else:
                 raise ValueError('Failed logic')
 
-            motion_goals = self.override_goal_if_soup_on_counter(motion_goals, counter_objects, am, state, player,
+            motion_goals = self.overwrite_goal_if_soup_on_counter(motion_goals, counter_objects, am, state, player,
                                                            other_player)
 
         elif player.has_object():
@@ -1571,7 +1572,7 @@ class ToMModel(Agent):
 
         return motion_goals, temp_dont_drop
 
-    def override_goal_if_soup_on_counter(self, motion_goals, counter_objects, am, state, player, other_player):
+    def overwrite_goal_if_soup_on_counter(self, motion_goals, counter_objects, am, state, player, other_player):
         """If there's a soup on the counter, then override other goals and get the soup, unless other player is (
         # strictly) closer"""
         if 'soup' in counter_objects:
