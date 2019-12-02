@@ -630,6 +630,7 @@ class ToMModel(Agent):
         # quick initial look at the human data, the humans pause very approx 50% of the time
 
     def reset_agent(self):
+        # Reset agent -- wipe it's history
         self.prev_state = None
         self.timesteps_stuck = 0
         self.dont_drop = False
