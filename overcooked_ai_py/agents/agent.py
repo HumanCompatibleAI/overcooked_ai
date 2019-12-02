@@ -586,6 +586,7 @@ class GreedyHumanModelv2(Agent):
 
 class ToMModel(Agent):
     """
+    #TODO: need to update this description:
     Built on greedy human model
     - added a simple heuristic that's used to factor in other player's expected moves
     - motion goals can be retained rather than re-finding goals every timestep
@@ -627,6 +628,17 @@ class ToMModel(Agent):
         # lowest cost path. In practice inf ~ 100
         self.prob_pausing = prob_pausing # Probability of pausing on a given timestep, instead of acting. From a
         # quick initial look at the human data, the humans pause very approx 50% of the time
+
+    def reset_agent(self):
+        self.prev_state = None
+        self.timesteps_stuck = 0
+        self.dont_drop = False
+        self.prev_motion_goal = None
+        self.prev_best_action = None
+        self.only_take_dispenser_onions = False
+        self.only_take_dispenser_dishes = False
+        self.GHM.timesteps_stuck = 0
+        self.GHM.prev_state = None
 
     def action(self, state):
 
