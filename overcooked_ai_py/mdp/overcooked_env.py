@@ -260,6 +260,26 @@ class OvercookedEnv(object):
         agent_infos = {k: np.array(v) for k, v in agent_infos.items()}
         return agent_infos
 
+    @staticmethod
+    def proportion_stuck_time(trajectories, agent_idx, stuck_time=3):
+        stuck_matrix = []
+        for traj_idx in range(len(trajectories["ep_lengths"])):
+            stuck_matrix.append([])
+            obs = trajectories["ep_observations"][traj_idx]
+            for traj_timestep in range(stuck_time, trajectories["ep_lengths"][traj_idx]):
+                if traj_timestep >= stuck_time:
+                    recent_states = obs[traj_timestep - stuck_time : traj_timestep + 1]
+                    recent_player_pos_and_or = [s.players[agent_idx].pos_and_or for s in recent_states]
+                    
+                    if len({item for item in recent_player_pos_and_or}) == 1:
+                        # If there is only one item in the last stuck_time steps, then we classify the agent as stuck
+                        stuck_matrix[traj_idx].append(True)
+                    else:
+                        stuck_matrix[traj_idx].append(False)
+                else:
+                    stuck_matrix[traj_idx].append(False)
+        return stuck_matrix
+
 
 class Overcooked(gym.Env):
     """

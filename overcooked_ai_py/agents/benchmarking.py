@@ -93,6 +93,16 @@ class AgentEvaluator(object):
         self.env.reset()
         return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
+    def get_agent_pair_trajs(self, a0, a1=None, num_games=100, display=False):
+        """Evaluate agent pair on both indices, and return trajectories by index"""
+        if a1 is None:
+            ap = AgentPair(a0, a0, allow_duplicate_agents=True)
+            trajs_0 = trajs_1 = self.evaluate_agent_pair(ap, num_games=num_games, display=display)
+        else:
+            trajs_0 = self.evaluate_agent_pair(AgentPair(a0, a1), num_games=num_games, display=display)
+            trajs_1 = self.evaluate_agent_pair(AgentPair(a1, a0), num_games=num_games, display=display)
+        return trajs_0, trajs_1
+
     @staticmethod
     def check_trajectories(trajectories):
         """
