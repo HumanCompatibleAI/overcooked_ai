@@ -47,7 +47,7 @@ class Agent(object):
 
 class AgentGroup(object):
     """
-    AgentGroup is a group of N agents used to sample
+    AgentGroup is a group of N agents used to sample 
     joint actions in the context of an OvercookedEnv instance.
     """
 
@@ -82,7 +82,7 @@ class AgentPair(AgentGroup):
     for both fields can lead to problems if the agents have state / history)
     """
 
-    def __init__(self, *agents, allow_duplicate_agents=False):
+    def __init__(self, *agents, allow_duplicate_agents=False): 
         super().__init__(*agents, allow_duplicate_agents=allow_duplicate_agents)
         assert self.n == 2
         self.a0, self.a1 = self.agents
@@ -431,6 +431,7 @@ class GreedyHumanModel(Agent):
         """
         Computes the plan cost to reach the goal after taking each possible low level action.
         Selects a low level action boltzmann rationally based on the one-step-ahead plan costs.
+
         If `inverted_costs` is True, it will make a boltzmann "irrational" choice, exponentially
         favouring high cost plans rather than low cost ones.
         """

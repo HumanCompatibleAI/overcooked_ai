@@ -20,14 +20,12 @@ export class OvercookedGame {
         show_post_cook_time = false,
 
         COOK_TIME = 2,
-        explosion_time = Number.MAX_SAFE_INTEGER,
-        DELIVERY_REWARD = OvercookedMDP.OvercookedGridworld.DELIVERY_REWARD,
-        always_serve = false
+        DELIVERY_REWARD = OvercookedMDP.OvercookedGridworld.DELIVERY_REWARD
     }){
         this.gameWidth = gameWidth;
         this.gameHeight = gameHeight;
         this.container_id = container_id;
-        let params = {COOK_TIME, explosion_time, DELIVERY_REWARD, always_serve};
+        let params = {COOK_TIME, DELIVERY_REWARD};
         this.mdp = OvercookedMDP.OvercookedGridworld.from_grid(start_grid, params);
         this.state = this.mdp.get_start_state();
         this.joint_action = [OvercookedMDP.Direction.STAY, OvercookedMDP.Direction.STAY];
@@ -176,12 +174,9 @@ export class OvercookedGame {
                         [souptype, n_ingredients, cooktime] = obj.state;
 
                         // select pot sprite
-                        if (cooktime <= this.mdp.COOK_TIME) {
+                        if (cooktime < this.mdp.COOK_TIME) {
                             spriteframe =
                                 `soup-${souptype}-${n_ingredients}-cooking.png`;
-                        }
-                        else if (cooktime >= this.mdp.explosion_time) {
-                            spriteframe = 'pot-explosion.png';
                         }
                         else {
                             spriteframe = `soup-${souptype}-cooked.png`;

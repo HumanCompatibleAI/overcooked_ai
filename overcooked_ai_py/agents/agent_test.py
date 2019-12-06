@@ -3,7 +3,7 @@ import time
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import Agent, AgentPair, FixedPlanAgent, CoupledPlanningAgent, GreedyHumanModel, CoupledPlanningPair, EmbeddedPlanningAgent, RandomAgent
+from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, CoupledPlanningAgent, GreedyHumanModel, CoupledPlanningPair, EmbeddedPlanningAgent, RandomAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -20,14 +20,14 @@ P, Obj = PlayerState, ObjectState
 force_compute_large = False
 force_compute = True
 DISPLAY = True
-simple_mdp = OvercookedGridworld.from_layout_name('simple', start_order_list=['any'], cook_time=5)
+simple_mdp = OvercookedGridworld.from_layout_name('cramped_room', start_order_list=['any'], cook_time=5)
 large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
 
 
 class TestAgentEvaluator(unittest.TestCase):
 
     def setUp(self):
-        self.agent_eval = AgentEvaluator({"layout_name": "simple"}, {"horizon": 100})
+        self.agent_eval = AgentEvaluator({"layout_name": "cramped_room"}, {"horizon": 100})
         
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
@@ -132,7 +132,7 @@ class TestAgents(unittest.TestCase):
         self.assertEqual(len(end_state.order_list), 0)
 
     def test_embedded_planning_agent(self):
-        agent_evaluator = AgentEvaluator({"layout_name": "simple"}, {"horizon": 100})
+        agent_evaluator = AgentEvaluator({"layout_name": "cramped_room"}, {"horizon": 100})
         other_agent = GreedyHumanModel(agent_evaluator.mlp)
         epa = EmbeddedPlanningAgent(other_agent, agent_evaluator.mlp, agent_evaluator.env, delivery_horizon=1)
         ap = AgentPair(epa, other_agent)
@@ -364,7 +364,7 @@ class TestScenarios(unittest.TestCase):
     def test_unidentifiable_s(self):
         # Same as above, but smaller layout to facilitate DRL training
 
-        eva = AgentEvaluator({"layout_name": "unident_s", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
+        eva = AgentEvaluator({"layout_name": "asymmetric_advantages", "start_order_list": ["any", "any"], "cook_time": 5}, force_compute=force_compute)
         start_state = eva.env.mdp.get_standard_start_state()
         start_state.objects = {(4, 2): Obj('soup', (4, 2), ('onion', 2, 0)),
                                (4, 3): Obj('soup', (4, 3), ('onion', 3, 5))}

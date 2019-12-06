@@ -156,7 +156,7 @@ def random_joint_action():
 class TestFeaturizations(unittest.TestCase):
 
     def setUp(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlp = MediumLevelPlanner.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlp), GreedyHumanModel(self.mlp))
@@ -178,7 +178,7 @@ class TestFeaturizations(unittest.TestCase):
 class TestOvercookedEnvironment(unittest.TestCase):
 
     def setUp(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([stay, w, w]), FixedPlanAgent([stay, e, e]))
         np.random.seed(0)
@@ -213,7 +213,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
     def test_one_player_env(self):
-        mdp = OvercookedGridworld.from_layout_name("simple_single")
+        mdp = OvercookedGridworld.from_layout_name("cramped_room_single")
         env = OvercookedEnv(mdp, horizon=12)
         a0 = FixedPlanAgent([stay, w, w, e, e, n, e, interact, w, n, interact])
         ag = AgentGroup(a0)
@@ -239,8 +239,8 @@ class TestOvercookedEnvironment(unittest.TestCase):
         )
 
     def test_multiple_mdp_env(self):
-        mdp0 = OvercookedGridworld.from_layout_name("simple")
-        mdp1 = OvercookedGridworld.from_layout_name("random0")
+        mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
+        mdp1 = OvercookedGridworld.from_layout_name("counter_circuit")
         mdp_fn = lambda: np.random.choice([mdp0, mdp1])
         
         # Default env
@@ -248,7 +248,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env.get_rollouts(self.rnd_agent_pair, 5)
 
     def test_starting_position_randomization(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=True, rnd_obj_prob_thresh=0.0)
         env = OvercookedEnv(self.base_mdp, start_state_fn)
         start_state = env.state.players_pos_and_or
@@ -259,7 +259,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
             self.assertFalse(np.array_equal(start_state, curr_terrain))
 
     def test_starting_obj_randomization(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=False, rnd_obj_prob_thresh=0.8)
         env = OvercookedEnv(self.base_mdp, start_state_fn)
         start_state = env.state.all_objects_list
@@ -287,7 +287,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
             curr_terrain = env.mdp.terrain_mtx
             self.assertFalse(np.array_equal(start_terrain, curr_terrain))
 
-        mdp_gen_params = {"mdp_choices": ['simple', 'unident_s']}
+        mdp_gen_params = {"mdp_choices": ['cramped_room', 'asymmetric_advantages']}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
         env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
         
@@ -302,7 +302,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 class TestGymEnvironment(unittest.TestCase):
 
     def setUp(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("simple")
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)

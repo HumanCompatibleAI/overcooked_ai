@@ -1,26 +1,21 @@
 # Overcooked-AI
 <p align="center">
-<img src="overcooked_ai_js/images/screenshot.png" width="350">
+  <!-- <img src="overcooked_ai_js/images/screenshot.png" width="350"> -->
+  <img src="overcooked_ai_js/images/layouts.gif" width="100%"> 
+  <i>5 of the available layouts. New layouts are easy to hardcode or generate programmatically.</i>
 </p>
-<br>
 
 ## Introduction
 
-Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance, based on the widly popular video game [Overcooked](http://www.ghosttowngames.com/overcooked/).
+Overcooked-AI is a benchmark environment for fully cooperative multi-agent performance, based on the wildly popular video game [Overcooked](http://www.ghosttowngames.com/overcooked/). 
 
 The goal of the game is to deliver soups as fast as possible. Each soup requires taking 3 items and placing them in a pot, waiting for the soup to cook, and then having an agent pick up the soup and delivering it. The agents should split up tasks on the fly and coordinate effectively in order to achieve high reward.
 
-To play the game with some previously trained DRL agents, use [Overcooked-Demo](https://github.com/HumanCompatibleAI/overcooked-demo).
+You can **try out the game [here](https://humancompatibleai.github.io/overcooked-demo/)** (playing with some previously trained DRL agents). To play with your own trained agents using this interface, you can use [this repo](https://github.com/HumanCompatibleAI/overcooked-demo)). To run human-AI experiments, check out [this repo](https://github.com/HumanCompatibleAI/overcooked-hAI-exp). You can find some human-human gameplay data already collected [here](https://github.com/HumanCompatibleAI/human_aware_rl/tree/master/human_aware_rl/data/human/anonymized).
 
-For DRL implementations compatible with the environment and reproducibile results to [our paper](https://bit.ly/2XoYHAm), check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl).
+For DRL implementations compatible with the environment and reproducible results to our paper, *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* ([blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)), check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl).
 
 ## Installation
-
-When cloning the repo, make sure you also clone the submodules.
-
-```
-git clone --recurse-submodules -j8 git@github.com:HumanCompatibleAI/overcooked_ai.git
-```
 
 It is useful to setup a conda environment with Python 3.7:
 
@@ -29,7 +24,7 @@ conda create -n overcooked_ai python=3.7
 conda activate overcooked_ai
 ```
 
-To complete the installation, run the following commands:
+To complete the installation after cloning the repo, run the following commands:
 
 ```
 cd overcooked_ai
@@ -39,12 +34,8 @@ python setup.py develop
 In `overcooked_ai_js` there is a javascript implementation of the Overcooked MDP and game visualizer.
 
 To install it, cd into `overcooked_ai_js` and set up the package with `npm install`.
+For development, you will also need to install browserify: `npm install -g browserify`
 
-For development, you will also need to install browserify:
-
-```
-npm install -g browserify
-```
 
 ### Verifying Installation
 
@@ -56,10 +47,7 @@ To verify your python installation, you can try running the following command fr
 python run_tests_fast.py
 ```
 
-or (this can take 5-10 mins):
-```
-python run_tests_full.py
-```
+or alternatively (this can take 5-10 mins): `python run_tests_full.py`
 
 #### Javascript Code
 
@@ -99,3 +87,8 @@ transitions in the game (requires having npm installed):
 ```
 $ npm run demo
 ```
+
+## Further Issues and questions
+
+If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
+

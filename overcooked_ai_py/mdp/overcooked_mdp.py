@@ -296,8 +296,9 @@ class OvercookedState(object):
             order_list_equal
 
     def __hash__(self):
+        order_list_hash = tuple(self.order_list) if self.order_list is not None else None
         return hash(
-            (self.players, tuple(self.objects.values()), tuple(self.order_list))
+            (self.players, tuple(self.objects.values()), order_list_hash)
         )
 
     def __str__(self):
@@ -688,6 +689,7 @@ class OvercookedGridworld(object):
 
         sparse_reward, shaped_reward = 0, 0
         for player, action in zip(new_state.players, joint_action):
+
             if action != Action.INTERACT:
                 continue
 
@@ -837,7 +839,7 @@ class OvercookedGridworld(object):
     def _move_if_direction(self, position, orientation, action):
         """Returns position and orientation that would 
         be obtained after executing action"""
-        if action == Action.INTERACT:
+        if action not in Action.MOTION_ACTIONS:
             return position, orientation
         new_pos = Action.move_in_direction(position, action)
         new_orientation = orientation if action == Action.STAY else action

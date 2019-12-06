@@ -4,6 +4,7 @@ from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
+large_mdp_tests = False
 force_compute = True
 force_compute_large = False
 
@@ -41,36 +42,38 @@ action_manger_filename = "simple_2_am.pkl"
 or_ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
     simple_mdp, mlp_params=base_params_start_or, custom_filename=action_manger_filename, force_compute=force_compute)
 
+if large_mdp_tests:
+    # Not testing by default
 
-# Large MDP Setup
-large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
+    # Large MDP Setup
+    large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
 
-no_counters_params = {
-    'start_orientations': False,
-    'wait_allowed': False,
-    'counter_goals': [],
-    'counter_drop': [],
-    'counter_pickup': [],
-    'same_motion_goals': False
-}
-action_manger_filename = "corridor_no_shared_motion_goals_am.pkl"
-ml_planner_large_no_shared = MediumLevelPlanner.from_pickle_or_compute(
-    large_mdp, no_counters_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
+    no_counters_params = {
+        'start_orientations': False,
+        'wait_allowed': False,
+        'counter_goals': [],
+        'counter_drop': [],
+        'counter_pickup': [],
+        'same_motion_goals': False
+    }
+    action_manger_filename = "corridor_no_shared_motion_goals_am.pkl"
+    ml_planner_large_no_shared = MediumLevelPlanner.from_pickle_or_compute(
+        large_mdp, no_counters_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
 
-same_goals_params = {
-    'start_orientations': False,
-    'wait_allowed': False,
-    'counter_goals': [],
-    'counter_drop': [],
-    'counter_pickup': [],
-    'same_motion_goals': True
-}
-action_manger_filename = "corridor_am.pkl"
-ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
-    large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
+    same_goals_params = {
+        'start_orientations': False,
+        'wait_allowed': False,
+        'counter_goals': [],
+        'counter_drop': [],
+        'counter_pickup': [],
+        'same_motion_goals': True
+    }
+    action_manger_filename = "corridor_am.pkl"
+    ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
+        large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
 
-hlam = HighLevelActionManager(ml_planner_large)
-hlp = HighLevelPlanner(hlam)
+    hlam = HighLevelActionManager(ml_planner_large)
+    hlp = HighLevelPlanner(hlam)
 
 class TestMotionPlanner(unittest.TestCase):
 
@@ -126,8 +129,9 @@ class TestMotionPlanner(unittest.TestCase):
         self.check_single_motion_plan(planner, start_status, goal_status, expected_length=3)
 
     def test_larger_mdp(self):
-        planner = ml_planner_large.ml_action_manager.joint_motion_planner.motion_planner
-        self.large_mdp_basic_plan(planner)
+        if large_mdp_tests:
+            planner = ml_planner_large.ml_action_manager.joint_motion_planner.motion_planner
+            self.large_mdp_basic_plan(planner)
 
     def large_mdp_basic_plan(self, planner):
         start_status = ((1, 2), n)
@@ -252,11 +256,12 @@ class TestJointMotionPlanner(unittest.TestCase):
         self.check_joint_plan(planner, start, goal, times=(3, 1))
 
     def test_large_mdp_suite_shared_motion_goals(self):
-        jmp = ml_planner_large.ml_action_manager.joint_motion_planner
-        self.large_mdp_test_basic_plan(jmp)
-        self.large_mdp_test_shared_motion_goal(jmp)
-        self.large_mdp_test_shared_motion_goal_with_conflict(jmp)
-        self.large_mdp_test_shared_motion_goal_with_conflict_other(jmp)
+        if large_mdp_tests:
+            jmp = ml_planner_large.ml_action_manager.joint_motion_planner
+            self.large_mdp_test_basic_plan(jmp)
+            self.large_mdp_test_shared_motion_goal(jmp)
+            self.large_mdp_test_shared_motion_goal_with_conflict(jmp)
+            self.large_mdp_test_shared_motion_goal_with_conflict_other(jmp)
 
     def large_mdp_test_basic_plan(self, planner):
         a1_start = ((5, 1), n)
@@ -337,20 +342,22 @@ class TestMediumLevelPlanner(unittest.TestCase):
         self.simple_mdp_two_deliveries(mlp)
 
     def test_large_mdp(self):
-        print("Corridor - shared motion goals")
-        mlp = ml_planner_large
-        self.large_mdp_get_and_serve_soup(mlp)
-        self.large_mdp_get_onion_then_serve(mlp)
-        self.large_mdp_one_delivery_from_start(mlp)
-        self.large_mdp_two_deliveries_from_start(mlp)
+        if large_mdp_tests:
+            print("Corridor - shared motion goals")
+            mlp = ml_planner_large
+            self.large_mdp_get_and_serve_soup(mlp)
+            self.large_mdp_get_onion_then_serve(mlp)
+            self.large_mdp_one_delivery_from_start(mlp)
+            self.large_mdp_two_deliveries_from_start(mlp)
 
     def test_large_mdp_no_shared(self):
-        print("Corridor - no shared motion goals")
-        mlp = ml_planner_large_no_shared
-        self.large_mdp_get_and_serve_soup(mlp)
-        self.large_mdp_get_onion_then_serve(mlp)
-        self.large_mdp_one_delivery_from_start(mlp)
-        self.large_mdp_two_deliveries_from_start(mlp)
+        if large_mdp_tests:
+            print("Corridor - no shared motion goals")
+            mlp = ml_planner_large_no_shared
+            self.large_mdp_get_and_serve_soup(mlp)
+            self.large_mdp_get_onion_then_serve(mlp)
+            self.large_mdp_one_delivery_from_start(mlp)
+            self.large_mdp_two_deliveries_from_start(mlp)
 
     def simple_mpd_already_done(self, planner):
         s = OvercookedState(
@@ -431,19 +438,20 @@ class TestHighLevelPlanner(unittest.TestCase):
     """The HighLevelPlanner class has been mostly discontinued"""
     
     def test_basic_hl_planning(self):
-        s = OvercookedState(
-            [P((2, 2), n),
-             P((2, 1), n)],
-            {}, order_list=[])
-        h = Heuristic(hlp.mp)
-        hlp.get_hl_plan(s, h.simple_heuristic)
+        if large_mdp_tests:
+            s = OvercookedState(
+                [P((2, 2), n),
+                P((2, 1), n)],
+                {}, order_list=[])
+            h = Heuristic(hlp.mp)
+            hlp.get_hl_plan(s, h.simple_heuristic)
 
-        s = OvercookedState(
-            [P((2, 2), n),
-             P((2, 1), n)],
-            {}, order_list=['any', 'any', 'any'])
-        
-        hlp.get_low_level_action_plan(s, h.simple_heuristic)
+            s = OvercookedState(
+                [P((2, 2), n),
+                P((2, 1), n)],
+                {}, order_list=['any', 'any', 'any'])
+            
+            hlp.get_low_level_action_plan(s, h.simple_heuristic)
         # hlp.get_low_level_action_plan(s, h.hard_heuristic)
 
         # heuristic = Heuristic(ml_planner_large.mp)
