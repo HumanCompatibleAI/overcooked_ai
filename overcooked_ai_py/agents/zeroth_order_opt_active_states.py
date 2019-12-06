@@ -4,7 +4,7 @@ from human_aware_rl.human.process_dataframes import get_trajs_from_data
 from human_aware_rl.pbt.pbt_hms import ToMAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.agents.agent import GreedyHumanModelv2
+from overcooked_ai_py.agents.agent import GreedyHumanModel_pk
 from overcooked_ai_py.planning.planners import MediumLevelPlanner
 import logging, pickle
 import numpy as np
@@ -40,7 +40,7 @@ def choose_hm_actions(expert_trajs, hm_agent, num_ep_to_use):
         hm_agent.dont_drop = False
         hm_agent.prev_motion_goal = None
         hm_agent.prev_best_action = None
-        hm_agent.GHM = GreedyHumanModelv2(hm_agent.mlp, player_index=1-hm_agent.agent_index)
+        hm_agent.GHM = GreedyHumanModel_pk(hm_agent.mlp, player_index=1 - hm_agent.agent_index)
 
         # For each state in the episode trajectory:
         for j in range(actions_from_data[i].__len__()):

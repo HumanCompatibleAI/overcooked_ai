@@ -126,3 +126,4 @@ dmypy.json
 # OS generated files
 .DS_Store
 .Trashes
+/overcooked_ai_py/agents/old/

@@ -4,7 +4,7 @@ import numpy as np
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel_mc
+from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
@@ -49,8 +49,8 @@ class AgentEvaluator(object):
         return self._mlp
 
     def evaluate_human_model_pair(self, display=True):
-        a0 = GreedyHumanModel_mc(self.mlp)
-        a1 = GreedyHumanModel_mc(self.mlp)
+        a0 = GreedyHumanModel(self.mlp)
+        a1 = GreedyHumanModel(self.mlp)
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, display=display)
 
@@ -69,7 +69,7 @@ class AgentEvaluator(object):
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_one_optimal_one_greedy_human(self, h_idx=0, display=True):
-        h = GreedyHumanModel_mc(self.mlp)
+        h = GreedyHumanModel(self.mlp)
         r = CoupledPlanningAgent(self.mlp)
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
         return self.evaluate_agent_pair(agent_pair, display=display)
