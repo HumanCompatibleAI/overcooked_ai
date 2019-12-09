@@ -499,8 +499,7 @@ class GreedyHumanModel(Agent):
                 elif next_order == 'tomato':
                     motion_goals = am.pickup_tomato_actions(state, counter_objects)
                 elif next_order is None or next_order == 'any':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state,
-                                                                                                              counter_objects)
+                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state, counter_objects)
 
         else:
             player_obj = player.get_object()
@@ -524,8 +523,7 @@ class GreedyHumanModel(Agent):
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = [mg for mg in motion_goals if
-                            self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+            motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
             assert len(motion_goals) != 0
 
         return motion_goals
