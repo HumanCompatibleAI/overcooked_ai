@@ -130,18 +130,18 @@ class AgentFromPolicy(Agent):
     Defines an agent from a `state_policy` and `direct_policy` functions
     """
 
-    def __init__(self, state_policy, direct_policy, stochastic=True, action_probs=False):
+    def __init__(self, state_policy, direct_policy, stochastic=True, return_action_probs=False):
         """
         state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
         direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
         stochastic (Bool): Whether the agent should sample from policy or take argmax
-        action_probs (Bool): Whether agent should return action probabilities or a sampled action
+        return_action_probs (Bool): Whether agent should return action probabilities or a sampled action
         """
         self.state_policy = state_policy
         self.direct_policy = direct_policy
         self.history = []
         self.stochastic = stochastic
-        self.action_probs = action_probs
+        self.return_action_probs = return_action_probs
 
     def action(self, state):
         """
@@ -152,7 +152,7 @@ class AgentFromPolicy(Agent):
         """
         self.history.append(state)
         try:
-            return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
+            return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.return_action_probs)
         except AttributeError as e:
             raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
 
@@ -340,6 +340,9 @@ class GreedyHumanModel(Agent):
         self.auto_unstuck = auto_unstuck
         self.reset()
 
+        # Set to true to return action probs:
+        self.return_action_probs = True
+
     def reset(self):
         self.prev_state = None
 
@@ -386,7 +389,11 @@ class GreedyHumanModel(Agent):
 
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
-        return chosen_action, {"action_probs": action_probs}
+
+        if self.return_action_probs:
+            return chosen_action, {"action_probs": action_probs}
+        else:
+            return chosen_action
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
         """
@@ -837,6 +844,8 @@ class ToMModel(Agent):
         # lowest cost path. In practice inf ~ 100
         self.prob_pausing = prob_pausing # Probability of pausing on a given timestep, instead of acting. From a
         # quick initial look at the human data, the humans pause very approx 50% of the time
+
+        self.return_action_probs = False  # Don't return action probs
 
     def reset_agent(self):
         # Reset agent -- wipe it's history
