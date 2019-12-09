@@ -16,6 +16,7 @@ DEFAULT_TRAJ_KEYS = [
     "ep_dones",
     "ep_infos",
     "ep_returns",
+    "ep_returns_shaped",
     "ep_lengths",
     "mdp_params",
     "env_params",
