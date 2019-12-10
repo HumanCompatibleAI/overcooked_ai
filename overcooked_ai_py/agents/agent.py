@@ -130,7 +130,7 @@ class AgentFromPolicy(Agent):
     Defines an agent from a `state_policy` and `direct_policy` functions
     """
 
-    def __init__(self, state_policy, direct_policy, stochastic=True, return_action_probs=False):
+    def __init__(self, state_policy, direct_policy, stochastic=True, return_action_probs=True):
         """
         state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
         direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
@@ -209,16 +209,20 @@ class FixedPlanAgent(Agent):
     # NOTE: Assumes that calls to action are sequential (agent has history)
     """
 
-    def __init__(self, plan):
+    def __init__(self, plan, return_action_probs=True):
         self.plan = plan
         self.i = 0
+        self.return_action_probs = return_action_probs
     
     def action(self, state):
         if self.i >= len(self.plan):
             return Action.STAY, {}
         curr_action = self.plan[self.i]
         self.i += 1
-        return curr_action, {}
+        if self.return_action_probs:
+            return curr_action, {}
+        else:
+            return curr_action
 
     def reset(self):
         self.i = 0
