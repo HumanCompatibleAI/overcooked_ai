@@ -314,14 +314,13 @@ class Overcooked(gym.Env):
         base_env: OvercookedEnv
         featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
         """
-        # if baselines_reproducible: # pk commented out this if statement (it makes all threads have the same index
-        # each time -- it's only needed for reproducibility)
+        if baselines_reproducible:
             # NOTE: To prevent the randomness of choosing agent indexes
             # from leaking when using subprocess-vec-env in baselines (which 
             # seeding does not) reach, we set the same seed internally to all
             # environments. The effect is negligible, as all other randomness
             # is controlled by the actual run seeds
-            # np.random.seed(0)
+            np.random.seed(0)
 
         self.base_env = base_env
         self.featurize_fn = featurize_fn
