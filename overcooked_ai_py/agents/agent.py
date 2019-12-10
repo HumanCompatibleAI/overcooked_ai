@@ -528,59 +528,59 @@ class GreedyHumanModel(Agent):
 
         return motion_goals
 
-
-class AgentPair(object):
-    """
-    The AgentPair object is to be used in the context of a OvercookedEnv, in which
-    it can be queried to obtain actions for both the agents.
-    """
-
-    def __init__(self, *agents):
-        """
-        If the pair of agents is in fact a single joint agent, set the agent
-        index (used to order the processed observations) to 0, that is consistent
-        with training.
-
-        Otherwise, set the agent indices in the same order as the agents have been passed in.
-        """
-        self.agents = agents
-
-        if len(agents) == 1:
-            self.is_joint_agent = True
-            self.joint_agent = agents[0]
-            self.joint_agent.set_agent_index(0)
-        else:
-            self.is_joint_agent = False
-            self.a0, self.a1 = agents
-            self.a0.set_agent_index(0)
-            self.a1.set_agent_index(1)
-
-    def set_mdp(self, mdp):
-        for a in self.agents:
-            a.set_mdp(mdp)
-
-    def joint_action(self, state):
-        if self.is_joint_agent:
-            joint_action = self.joint_agent.action(state)
-            return joint_action
-        elif type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-            # Reduce computation by half if both agents are coupled planning agents
-            joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
-            return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
-        elif self.a0 is self.a1:
-            # When using the same instance of an agent for self-play,
-            # reset agent index at each turn to prevent overwriting it
-            self.a0.set_agent_index(0)
-            action_0 = self.a0.action(state)
-            self.a1.set_agent_index(1)
-            action_1 = self.a1.action(state)
-            return (action_0, action_1)
-        else:
-            return (self.a0.action(state), self.a1.action(state))
-
-    def reset(self):
-        for a in self.agents:
-            a.reset()
+#
+# class AgentPair(object):
+#     """
+#     The AgentPair object is to be used in the context of a OvercookedEnv, in which
+#     it can be queried to obtain actions for both the agents.
+#     """
+#
+#     def __init__(self, *agents):
+#         """
+#         If the pair of agents is in fact a single joint agent, set the agent
+#         index (used to order the processed observations) to 0, that is consistent
+#         with training.
+#
+#         Otherwise, set the agent indices in the same order as the agents have been passed in.
+#         """
+#         self.agents = agents
+#
+#         if len(agents) == 1:
+#             self.is_joint_agent = True
+#             self.joint_agent = agents[0]
+#             self.joint_agent.set_agent_index(0)
+#         else:
+#             self.is_joint_agent = False
+#             self.a0, self.a1 = agents
+#             self.a0.set_agent_index(0)
+#             self.a1.set_agent_index(1)
+#
+#     def set_mdp(self, mdp):
+#         for a in self.agents:
+#             a.set_mdp(mdp)
+#
+#     def joint_action(self, state):
+#         if self.is_joint_agent:
+#             joint_action = self.joint_agent.action(state)
+#             return joint_action
+#         elif type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
+#             # Reduce computation by half if both agents are coupled planning agents
+#             joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
+#             return joint_action_plan[0] if len(joint_action_plan) > 0 else (None, None)
+#         elif self.a0 is self.a1:
+#             # When using the same instance of an agent for self-play,
+#             # reset agent index at each turn to prevent overwriting it
+#             self.a0.set_agent_index(0)
+#             action_0 = self.a0.action(state)
+#             self.a1.set_agent_index(1)
+#             action_1 = self.a1.action(state)
+#             return (action_0, action_1)
+#         else:
+#             return (self.a0.action(state), self.a1.action(state))
+#
+#     def reset(self):
+#         for a in self.agents:
+#             a.reset()
 
 
 # ============================ Agents make by pk ===================================#
