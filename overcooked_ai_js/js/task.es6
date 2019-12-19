@@ -252,20 +252,23 @@ export class OvercookedGame {
                 }
 
                 //draw order list
-                let order_list = "Orders: "+state.order_list.join(", ");
-                if (typeof(sprites['order_list']) !== 'undefined') {
-                    sprites['order_list'].setText(order_list);
+                if (state.order_list !== null) {
+                    let order_list = "Orders: "+state.order_list.join(", ");
+                    if (typeof(sprites['order_list']) !== 'undefined') {
+                        sprites['order_list'].setText(order_list);
+                    }
+                    else {
+                        sprites['order_list'] = this.add.text(
+                            5, 45, order_list,
+                            {
+                                font: "20px Arial",
+                                fill: "yellow",
+                                align: "left"
+                            }
+                        )
+                    }
                 }
-                else {
-                    sprites['order_list'] = this.add.text(
-                        5, 5, order_list,
-                        {
-                            font: "20px Arial",
-                            fill: "yellow",
-                            align: "left"
-                        }
-                    )
-                }
+                
             },
             _drawScore: function(score, sprites) {
                 score = "Score: "+score;
@@ -290,7 +293,7 @@ export class OvercookedGame {
                 }
                 else {
                     sprites['time_left'] = this.add.text(
-                        5, 45, time_left,
+                        5, 5, time_left,
                         {
                             font: "20px Arial",
                             fill: "yellow",
