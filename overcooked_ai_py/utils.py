@@ -25,7 +25,7 @@ def save_dict_to_file(dic, filename):
 def load_dict_from_txt(filename):
     return load_dict_from_file(fix_filetype(filename, ".txt"))
 
-def save_as_json(filename, data):
+def save_as_json(data, filename):
     with open(fix_filetype(filename, ".json"), "w") as outfile:
         json.dump(data, outfile)
 
@@ -33,7 +33,7 @@ def load_from_json(filename):
     with open(fix_filetype(filename, ".json"), "r") as json_file:
         return json.load(json_file)
 
-def iterate_over_files_in_dir(dir_path):
+def iterate_over_json_files_in_dir(dir_path):
     pathlist = Path(dir_path).glob("*.json")
     return [str(path) for path in pathlist]
 
