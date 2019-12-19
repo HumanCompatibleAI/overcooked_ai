@@ -8,7 +8,7 @@ from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
-from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_files_in_dir
+from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir
 
 
 START_ORDER_LIST = ["any"]
@@ -133,7 +133,7 @@ class TestGridworld(unittest.TestCase):
             {}, order_list=['onion', 'any']))
 
     def test_common_mdp_jsons(self):
-        traj_test_json_paths = iterate_over_files_in_dir("../common_tests/trajectory_tests/")
+        traj_test_json_paths = iterate_over_json_files_in_dir("../common_tests/trajectory_tests/")
         for test_json_path in traj_test_json_paths:
             test_trajectory = AgentEvaluator.load_traj_from_json(test_json_path)
             try:

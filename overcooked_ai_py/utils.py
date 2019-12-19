@@ -33,7 +33,7 @@ def load_from_json(filename):
     with open(fix_filetype(filename, ".json"), "r") as json_file:
         return json.load(json_file)
 
-def iterate_over_files_in_dir(dir_path):
+def iterate_over_json_files_in_dir(dir_path):
     pathlist = Path(dir_path).glob("*.json")
     return [str(path) for path in pathlist]
 
