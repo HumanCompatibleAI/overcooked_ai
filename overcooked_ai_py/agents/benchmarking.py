@@ -203,7 +203,7 @@ class AgentEvaluator(object):
         assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
         AgentEvaluator.check_trajectories(trajectory)
         trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
-        save_as_json(filename, trajectory)
+        save_as_json(trajectory, filename)
 
     @staticmethod
     def make_trajectories_json_serializable(trajectories):

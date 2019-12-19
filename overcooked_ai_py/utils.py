@@ -25,7 +25,7 @@ def save_dict_to_file(dic, filename):
 def load_dict_from_txt(filename):
     return load_dict_from_file(fix_filetype(filename, ".txt"))
 
-def save_as_json(filename, data):
+def save_as_json(data, filename):
     with open(fix_filetype(filename, ".json"), "w") as outfile:
         json.dump(data, outfile)
 
