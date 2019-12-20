@@ -175,7 +175,7 @@ class RandomAgent(Agent):
     
     def action(self, state):
         action_probs = np.zeros(Action.NUM_ACTIONS)
-        legal_actions = Action.MOTION_ACTIONS
+        legal_actions = list(Action.MOTION_ACTIONS)
         if self.interact:
             legal_actions.append(Action.INTERACT)
         legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
