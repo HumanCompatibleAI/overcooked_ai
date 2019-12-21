@@ -3,7 +3,7 @@ import numpy as np
 from functools import reduce
 from collections import defaultdict
 from overcooked_ai_py.utils import pos_distance, load_from_json
-from overcooked_ai_py.data.layouts import read_layout_dict
+from overcooked_ai_py import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
