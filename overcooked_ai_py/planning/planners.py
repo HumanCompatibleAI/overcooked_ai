@@ -813,11 +813,9 @@ class MediumLevelActionManager(object):
 
     def pickup_onion_actions(self, state, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take onions from the dispensers"""
+        onion_pickup_locations = self.mdp.get_onion_dispenser_locations()
         if not only_use_dispensers:
-            onion_dispenser_locations = self.mdp.get_onion_dispenser_locations()
-            onion_pickup_locations = onion_dispenser_locations + counter_objects['onion']
-        else:
-            onion_pickup_locations = self.mdp.get_onion_dispenser_locations()
+            onion_pickup_locations += counter_objects['onion']
         return self._get_ml_actions_for_positions(onion_pickup_locations)
 
     def pickup_tomato_actions(self, state, counter_objects):
@@ -827,11 +825,9 @@ class MediumLevelActionManager(object):
 
     def pickup_dish_actions(self, state, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take dishes from the dispensers"""
+        dish_pickup_locations = self.mdp.get_dish_dispenser_locations()
         if not only_use_dispensers:
-            dish_dispenser_locations = self.mdp.get_dish_dispenser_locations()
-            dish_pickup_locations = dish_dispenser_locations + counter_objects['dish']
-        else:
-            dish_pickup_locations = self.mdp.get_dish_dispenser_locations()
+            dish_pickup_locations += counter_objects['dish']
         return self._get_ml_actions_for_positions(dish_pickup_locations)
 
     def pickup_counter_soup_actions(self, state, counter_objects):

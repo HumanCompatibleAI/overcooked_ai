@@ -145,20 +145,12 @@ class OvercookedEnv(object):
 
             # Getting actions and action infos (optional) for both agents
             joint_action_and_infos = agent_pair.joint_action(s_t)
-
-            assert ((agent_pair.a0.return_action_probs and agent_pair.a1.return_action_probs) or
-                    (not agent_pair.a0.return_action_probs and not agent_pair.a1.return_action_probs)), \
-                "We need either both agents or neither agents to have return_action_probs=True"
-
-            if agent_pair.a0.return_action_probs and agent_pair.a1.return_action_probs:
-                a_t, a_info_t = zip(*joint_action_and_infos)
-                assert all(type(a_info) is dict for a_info in a_info_t)
-                info["agent_infos"] = a_info_t
-            elif not agent_pair.a0.return_action_probs and not agent_pair.a1.return_action_probs:
-                a_t = joint_action_and_infos
-
+            a_t, a_info_t = zip(*joint_action_and_infos)
             assert all(a in Action.ALL_ACTIONS for a in a_t)
+            assert all(type(a_info) is dict for a_info in a_info_t)
+
             s_tp1, r_t, done, info = self.step(a_t)
+            info["agent_infos"] = a_info_t
             trajectory.append((s_t, a_t, r_t, done, info))
 
             if display and self.t < display_until:
