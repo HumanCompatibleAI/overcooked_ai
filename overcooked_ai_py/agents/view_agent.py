@@ -28,11 +28,12 @@ def make_agent_pair(mlp):
     # teamwork0 = random.random()
     teamwork0 = 0.5
     # retain_goals0 = random.random()
-    retain_goals0 = 0.5
+    retain_goals0 = 0.9
     # wrong_decisions0 = random.random()**30
-    wrong_decisions0 = 0.1
+    wrong_decisions0 = 0
+    wrong_decisions1 = 0.5
     # thinking_prob0 = 1 - random.random()**30
-    thinking_prob0 = 0.5
+    thinking_prob0 = 1
     # path_teamwork0 = 1 - random.random()**2
     path_teamwork0 = 0.5
     # rat_coeff0 = 2+random.random()*8
@@ -43,15 +44,17 @@ def make_agent_pair(mlp):
                   thinking_prob=thinking_prob0, prob_pausing=prob_pausing0,
                   path_teamwork=path_teamwork0, rationality_coefficient=rat_coeff0)
     a1 = ToMModel(mlp, player_index=1, perseverance=perseverance0, teamwork=teamwork0,
-                  retain_goals=retain_goals0, wrong_decisions=wrong_decisions0,
+                  retain_goals=retain_goals0, wrong_decisions=wrong_decisions1,
                   thinking_prob=thinking_prob0, prob_pausing=prob_pausing0,
                   path_teamwork=path_teamwork0, rationality_coefficient=rat_coeff0)
+    a0.use_OLD_ml_action = False
+    a1.use_OLD_ml_action = True
     # a0 = ToMModel(mlp, player_index=0, perseverance=0.9, teamwork=1, retain_goals=0.9,
     #                                  wrong_decisions=0.02, thinking_prob=1, path_teamwork=1, rationality_coefficient=2)
     # a1 = GreedyHumanModel_pk(mlp, player_index=0, perseverance=0.8)
     # a1 = RandomAgent(mlp)
-    print(perseverance0, teamwork0, retain_goals0, wrong_decisions0, thinking_prob0, prob_pausing0, path_teamwork0,
-          rat_coeff0)
+    # print(perseverance0, teamwork0, retain_goals0, wrong_decisions0, thinking_prob0, prob_pausing0, path_teamwork0,
+    #       rat_coeff0)
     # print('Player 0: teamwork: {:.1f}, retain: {:.1f}, wrong dec: {:.1f}'.format(teamwork0, retain_goals0, wrong_decisions0))
     return AgentPair(a0, a1)
 
@@ -67,7 +70,7 @@ if __name__ == "__main__" :
     parser.add_argument("-l", "--layout",
                         help="layout, (Choose from: sim, sc1, sch, uni, ran1, ran0)", required=True)
     print("\n****************************************\nNOTE: To watch play in debug, put breakpoint in "
-          "overcooked_env.OvercookedEnv.run_agents\n*****************************************\n")
+          "overcooked_env.OvercookedEnv.run_agents, within loop 'while not done'\n*****************************************\n")
     args = parser.parse_args()
     layout = args.layout
 
@@ -86,6 +89,7 @@ if __name__ == "__main__" :
     horizon = 2000
     explosion_time = 500
     r_shaping = 0
+    cook_time = 5
 
     no_counters_params = {
         'start_orientations': False,
@@ -112,7 +116,6 @@ if __name__ == "__main__" :
     if layout == 'sc1':
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time=5
         mdp = OvercookedGridworld.from_layout_name('scenario1_s', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -141,8 +144,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
-
         mdp = OvercookedGridworld.from_layout_name('unident_s', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -171,7 +172,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
         mdp = OvercookedGridworld.from_layout_name('simple', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -200,7 +200,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
         mdp = OvercookedGridworld.from_layout_name('random1', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -229,7 +228,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
         mdp = OvercookedGridworld.from_layout_name('random0', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -258,7 +256,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
         mdp = OvercookedGridworld.from_layout_name('random3', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
@@ -287,7 +284,6 @@ if __name__ == "__main__" :
 
         # Set up mdp and mlp:
         # am_filename = "data/planners/LAYOUT_am.pkl"
-        cook_time = 5
         mdp = OvercookedGridworld.from_layout_name('schelling_s', start_order_list=start_order_list,
                                                    cook_time=cook_time, rew_shaping_params=None)
         # pk: When can I set explosion_time?
