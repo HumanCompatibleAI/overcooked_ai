@@ -184,13 +184,12 @@ class OvercookedEnv(object):
             # With shape (n_timesteps, game_len), where game_len might vary across games:
             "ep_observations": [],
             "ep_actions": [],
-            "ep_rewards": [], # Individual dense (= sparse + shaped * rew_shaping) reward values
+            "ep_rewards": [], # Individual (sparse) reward values
             "ep_dones": [], # Individual done values
             "ep_infos": [],
 
             # With shape (n_episodes, ):
             "ep_returns": [], # Sum of sparse rewards across each episode
-            "ep_returns_shaped": [], # Sum of dense and sparse rewards across each episode
             "ep_lengths": [], # Lengths of each episode
             "mdp_params": [], # Custom MDP params to for each episode
             "env_params": [], # Custom Env params for each episode
@@ -212,7 +211,6 @@ class OvercookedEnv(object):
             trajectories["ep_dones"].append(dones)
             trajectories["ep_infos"].append(infos)
             trajectories["ep_returns"].append(tot_rews_sparse)
-            trajectories["ep_returns_shaped"].append(tot_rews_sparse + tot_rews_shaped * reward_shaping)
             trajectories["ep_lengths"].append(time_taken)
             trajectories["mdp_params"].append(self.mdp.mdp_params)
             trajectories["env_params"].append(self.env_params)
