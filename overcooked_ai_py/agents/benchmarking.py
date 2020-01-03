@@ -233,27 +233,45 @@ class AgentEvaluator(object):
     ### VIZUALIZATION METHODS ###
 
     @staticmethod
-    def interactive_from_traj(trajectories, traj_idx=0):
+    def interactive_from_traj(trajectories, traj_idx=0, nested_keys_to_print=[]):
         """
         Displays ith trajectory of trajectories (in standard format) 
         interactively in a Jupyter notebook.
+
+        keys_to_print is a list of keys of info to be printed. By default
+        states and actions (corresponding to the previous timestep will be printed)
+        will be printed.
         """
         from ipywidgets import widgets, interactive_output
 
         states = trajectories["ep_observations"][traj_idx]
         joint_actions = trajectories["ep_actions"][traj_idx]
+        
+        other_info = {}
+        for nested_k in nested_keys_to_print:
+            inner_data = trajectories
+            for k in nested_k:
+                inner_data = inner_data[k]
+            inner_data = inner_data[traj_idx]
+            
+            assert np.array(inner_data).shape == np.array(states).shape, "{} vs {}".format(np.array(inner_data).shape, np.array(states).shape)
+            other_info[k] = inner_data
+
         cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
         mdp_params = trajectories["mdp_params"][traj_idx]
         env_params = trajectories["env_params"][traj_idx]
         env = AgentEvaluator(mdp_params, env_params=env_params).env
 
         def update(t = 1.0):
-            env.state = states[int(t)]
-            joint_action = joint_actions[int(t - 1)] if t > 0 else (Action.STAY, Action.STAY)
+            traj_timestep = int(t)
+            env.state = states[traj_timestep]
+            joint_action = joint_actions[traj_timestep - 1] if traj_timestep > 0 else (Action.STAY, Action.STAY)
             print(env)
             print("Joint Action: {} \t Score: {}".format(Action.joint_action_to_char(joint_action), cumulative_rewards[t]))
-            
-            
+
+            for k, data in other_info.items():
+                print("{}: {}".format(k, data[traj_timestep]))
+
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})
         display(out, t)

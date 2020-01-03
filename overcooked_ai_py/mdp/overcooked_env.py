@@ -196,6 +196,7 @@ class OvercookedEnv(object):
 
             # Custom metadata key value pairs
             "metadatas": [] # Final data type is a dictionary of similar format to trajectories
+                            # (key value pairs of the same form as ep_observations, ep_returns, or others...)
         }
 
         range_fn = tqdm.trange if info else range
