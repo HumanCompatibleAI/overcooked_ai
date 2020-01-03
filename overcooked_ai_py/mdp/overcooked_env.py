@@ -164,13 +164,10 @@ class OvercookedEnv(object):
 
         return np.array(trajectory), self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
 
-    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, agent_idx=0, reward_shaping=0.0, display_until=np.Inf, info=True, metadata_fn=lambda x: {}):
+    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, info=True, metadata_fn=lambda x: {}):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
-
-        Only returns the trajectories for one of the agents (the actions _that_ agent took), 
-        namely the one indicated by `agent_idx`.
 
         Returning excessive information to be able to convert trajectories to any required format 
         (baselines, stable_baselines, etc)
@@ -178,7 +175,7 @@ class OvercookedEnv(object):
         metadata_fn returns some metadata information computed at the end of each trajectory based on
         some of the trajectory data.
 
-        NOTE: standard trajectories format used throughout the codebase
+        NOTE: this is the standard trajectories format used throughout the codebase
         """
         trajectories = {
             # With shape (n_timesteps, game_len), where game_len might vary across games:
