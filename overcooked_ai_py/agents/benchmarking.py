@@ -217,7 +217,7 @@ class AgentEvaluator(object):
             dict_traj[k] = list(dict_traj[k])
         dict_traj['ep_actions'] = [list(lst) for lst in dict_traj['ep_actions']]
         dict_traj['ep_rewards'] = [list(lst) for lst in dict_traj['ep_rewards']]
-        dict_traj['ep_dones'] = [int(lst) for lst in dict_traj['ep_dones']]
+        dict_traj['ep_dones'] = [list(lst) for lst in dict_traj['ep_dones']]
         dict_traj['ep_returns'] = [int(val) for val in dict_traj['ep_returns']]
         dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
         return dict_traj

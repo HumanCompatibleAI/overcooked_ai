@@ -48,7 +48,7 @@ traj = {
     "ep_observations": [[s_a_r[0] for s_a_r in s_a_r_pairs]],
     "ep_actions": [[tuple(s_a_r[1]) for s_a_r in s_a_r_pairs]],
     "ep_rewards": [curr_ep_rewards],
-    "ep_dones": [False] * len(s_a_r_pairs),
+    "ep_dones": [[False] * len(s_a_r_pairs)],
     "ep_infos": [{}] * len(s_a_r_pairs),
 
     "ep_returns": [sum(curr_ep_rewards)],
