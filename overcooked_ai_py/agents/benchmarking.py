@@ -220,6 +220,10 @@ class AgentEvaluator(object):
         dict_traj['ep_dones'] = [list(lst) for lst in dict_traj['ep_dones']]
         dict_traj['ep_returns'] = [int(val) for val in dict_traj['ep_returns']]
         dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
+
+        # NOTE: Currently saving to JSON does not support ep_infos (due to nested np.arrays) or metadata
+        del dict_traj['ep_infos']
+        del dict_traj['metadatas']
         return dict_traj
 
     @staticmethod
