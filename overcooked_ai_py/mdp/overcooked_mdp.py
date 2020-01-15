@@ -884,6 +884,18 @@ class OvercookedGridworld(object):
         for obj_state in all_objects:
             assert obj_state.is_valid()
 
+    def find_free_counters_valid_for_both_players(self, state, mlp):
+        """Finds all empty counter locations that are accessible to both players"""
+        one_player, other_player = state.players
+        free_counters = self.get_empty_counter_locations(state)
+        free_counters_valid_for_both = []
+        for free_counter in free_counters:
+            goals = mlp.mp.motion_goals_for_pos[free_counter]
+            if any([mlp.mp.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
+            any([mlp.mp.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
+                free_counters_valid_for_both.append(free_counter)
+        return free_counters_valid_for_both
+
     @staticmethod
     def _assert_valid_grid(grid):
         """Raises an AssertionError if the grid is invalid.
