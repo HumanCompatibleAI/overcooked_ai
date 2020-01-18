@@ -49,6 +49,7 @@ class AgentGroup(object):
     def __init__(self, *agents, allow_duplicate_agents=False):
         self.agents = agents
         self.n = len(self.agents)
+        self.reset()
         for i, agent in enumerate(self.agents):
             agent.set_agent_index(i)
 
@@ -160,6 +161,7 @@ class AgentFromPolicy(Agent):
         return self.direct_policy(obs)
 
     def reset(self):
+        super().reset()
         self.history = []
 
 
@@ -173,7 +175,7 @@ class RandomAgent(Agent):
         self.sim_threads = sim_threads
         self.interact = interact
     
-    def action(self, state):
+    def action(self, state, parallel_agent_index=None):
         action_probs = np.zeros(Action.NUM_ACTIONS)
         legal_actions = list(Action.MOTION_ACTIONS)
         if self.interact:
@@ -217,6 +219,7 @@ class FixedPlanAgent(Agent):
         return curr_action, {}
     
     def reset(self):
+        super().reset()
         self.i = 0
 
 
@@ -334,6 +337,7 @@ class GreedyHumanModel(Agent):
         self.reset()
 
     def reset(self):
+        super().reset()
         self.prev_state = None
 
     def actions(self, states, agent_indices):

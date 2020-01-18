@@ -89,18 +89,21 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
         return self.evaluate_agent_pair(agent_pair, display=display)
 
-    def evaluate_agent_pair(self, agent_pair, num_games=1, display=False, info=True):
-        self.env.reset()
-        return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, display=False, info=True):
+        horizon_env = self.env.copy()
+        horizon_env.horizon = self.env.horizon if game_length is None else game_length
+        horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
+        horizon_env.reset()
+        return horizon_env.get_rollouts(agent_pair, num_games, display=display, info=info)
 
-    def get_agent_pair_trajs(self, a0, a1=None, num_games=100, display=False):
+    def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""
         if a1 is None:
             ap = AgentPair(a0, a0, allow_duplicate_agents=True)
-            trajs_0 = trajs_1 = self.evaluate_agent_pair(ap, num_games=num_games, display=display)
+            trajs_0 = trajs_1 = self.evaluate_agent_pair(ap, num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
         else:
-            trajs_0 = self.evaluate_agent_pair(AgentPair(a0, a1), num_games=num_games, display=display)
-            trajs_1 = self.evaluate_agent_pair(AgentPair(a1, a0), num_games=num_games, display=display)
+            trajs_0 = self.evaluate_agent_pair(AgentPair(a0, a1), num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
+            trajs_1 = self.evaluate_agent_pair(AgentPair(a1, a0), num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
         return trajs_0, trajs_1
 
     @staticmethod
