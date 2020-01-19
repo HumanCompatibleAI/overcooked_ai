@@ -89,12 +89,12 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
         return self.evaluate_agent_pair(agent_pair, display=display)
 
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, display=False, info=True):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True):
         horizon_env = self.env.copy()
         horizon_env.horizon = self.env.horizon if game_length is None else game_length
         horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
         horizon_env.reset()
-        return horizon_env.get_rollouts(agent_pair, num_games, display=display, info=info)
+        return horizon_env.get_rollouts(agent_pair, num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""

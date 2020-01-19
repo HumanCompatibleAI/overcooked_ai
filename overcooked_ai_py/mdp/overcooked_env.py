@@ -164,7 +164,7 @@ class OvercookedEnv(object):
 
         return np.array(trajectory), self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
 
-    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, info=True, metadata_fn=lambda x: {}):
+    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -196,8 +196,10 @@ class OvercookedEnv(object):
                             # (key value pairs of the same form as ep_observations, ep_returns, or others...)
         }
 
-        range_fn = tqdm.trange if info else range
-        for i in range_fn(num_games):
+        metadata_fn = (lambda x: {}) if metadata_fn is None else metadata_fn
+        metadata_info_fn = (lambda x: "") if metadata_info_fn is None else metadata_info_fn
+        range_iterator = tqdm.trange(num_games, desc='', leave=True) if info else range(num_games)
+        for i in range_iterator:
             agent_pair.set_mdp(self.mdp)
 
             rollout_info = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
@@ -217,10 +219,13 @@ class OvercookedEnv(object):
             self.reset()
             agent_pair.reset()
 
-        mu, se = mean_and_std_err(trajectories["ep_returns"])
-        if info: print("Avg reward {:.2f} (std: {:.2f}, se: {:.2f}) over {} games of avg length {}".format(
-            mu, np.std(trajectories["ep_returns"]), se, num_games, np.mean(trajectories["ep_lengths"]))
-        )
+            if info:
+                mu, se = mean_and_std_err(trajectories["ep_returns"])
+                description = "Avg rew: {:.2f} (std: {:.2f}, se: {:.2f}); avg len: {:.2f}; ".format(
+                    mu, np.std(trajectories["ep_returns"]), se, np.mean(trajectories["ep_lengths"]))
+                description += metadata_info_fn(trajectories["metadatas"])
+                range_iterator.set_description(description)
+                range_iterator.refresh()
 
         # Converting to numpy arrays
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
