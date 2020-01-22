@@ -184,6 +184,9 @@ class RandomAgent(Agent):
         action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
         return Action.sample(action_probs), {"action_probs": action_probs}
 
+    def actions(self, states, agent_indices):
+        return [self.action(state) for state in states]
+
     def direct_action(self, obs):
         return [np.random.randint(4) for _ in range(self.sim_threads)]
 
