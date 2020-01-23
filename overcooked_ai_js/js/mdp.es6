@@ -156,7 +156,7 @@ export class OvercookedState {
     constructor ({
         players,
         objects,
-        order_list = []
+        order_list = null
     }) {
         // Represents a state in Overcooked.
         // players: List of PlayerStates.
