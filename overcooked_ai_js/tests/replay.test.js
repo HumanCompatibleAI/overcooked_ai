@@ -66,7 +66,7 @@ function trajectoryTest(trajectoryFile) {
 		        assets_loc: "assets/",
 		        ANIMATION_DURATION: 200*.9,
 		        tileSize: 80,
-		        COOK_TIME: 5,
+		        COOK_TIME: 20,
 		        explosion_time: Number.MAX_SAFE_INTEGER,
 		        DELIVERY_REWARD: 20,
 		        player_colors: player_colors

@@ -663,7 +663,7 @@ export class OvercookedGridworld {
         return new OvercookedGridworld(params)
     }
 }
-OvercookedGridworld.COOK_TIME = 5;
+OvercookedGridworld.COOK_TIME = 20;
 OvercookedGridworld.DELIVERY_REWARD = 20;
 OvercookedGridworld.ORDER_TYPES = ObjectState.SOUP_TYPES + ['any'];
 OvercookedGridworld.num_items_for_soup = 3; 
