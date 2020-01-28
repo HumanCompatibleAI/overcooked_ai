@@ -219,7 +219,8 @@ class OvercookedState(object):
         ones held by players.
         """
         all_objs_by_type = self.unowned_objects_by_type.copy()
-        all_objs_by_type.update(self.player_objects_by_type)
+        for obj_type, player_objs in self.player_objects_by_type.items():
+            all_objs_by_type[obj_type].extend(player_objs)
         return all_objs_by_type
 
     @property
@@ -1169,7 +1170,7 @@ class OvercookedGridworld(object):
         ordered_features_p0 = np.squeeze(np.concatenate([p0_features, p1_features, p1_rel_to_p0, abs_pos_p0]))
 
         p0_rel_to_p1 = np.array(pos_distance(p0.position, p1.position))
-        abs_pos_p1 = np.array(p0.position)
+        abs_pos_p1 = np.array(p1.position)
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
 
