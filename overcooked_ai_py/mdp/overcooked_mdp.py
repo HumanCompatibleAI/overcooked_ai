@@ -565,7 +565,7 @@ class OvercookedGridworld(object):
         pos = player.position
         for d in Direction.ALL_DIRECTIONS:
             adj_pos = Action.move_in_direction(pos, d)
-            adj_feats.append((pos, self.get_terrain_type_at_pos(adj_pos)))
+            adj_feats.append((adj_pos, self.get_terrain_type_at_pos(adj_pos)))
         return adj_feats
 
     def get_terrain_type_at_pos(self, pos):
