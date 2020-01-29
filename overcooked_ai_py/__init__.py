@@ -8,6 +8,7 @@ register(
 )
 
 DATA_DIR = os.path.dirname(os.path.abspath(__file__)) + "/data/"
+HUMAN_DATA_DIR = DATA_DIR + "human_data/"
 LAYOUTS_DIR = DATA_DIR + "layouts/"
 
 def read_layout_dict(layout_name):
