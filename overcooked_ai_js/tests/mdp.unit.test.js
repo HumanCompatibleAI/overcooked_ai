@@ -433,58 +433,58 @@ test("Test Transitions and Environment", () => {
         expected_reward: 0
     });
 
-    let atraj = [
-        [stay, stay], [interact, interact],
-        [e, w], [e, s], [s, interact], [s, w], [interact, n], [e, interact],
-        [interact, s], [w, w], [n, interact], [interact, interact],
-        [s, interact], [interact, interact]
-    ];
-    let traj = [];
-    for (let i = 0; i < (atraj.length - 1); i++) {
-        let action = atraj[i];
-        let [[pred_state, prob], reward] = mdp.get_transition_states_and_probs({
-            state: state,
-            joint_action: action
-        });
-        let step = {
-            state: state,
-            expected_state: pred_state,
-            expected_reward: reward,
-            action: action
-        }
-        traj.push(step);
-        state = pred_state;
-    }
+    // let atraj = [
+    //     [stay, stay], [interact, interact],
+    //     [e, w], [e, s], [s, interact], [s, w], [interact, n], [e, interact],
+    //     [interact, s], [w, w], [n, interact], [interact, interact],
+    //     [s, interact], [interact, interact]
+    // ];
+    // let traj = [];
+    // for (let i = 0; i < (atraj.length - 1); i++) {
+    //     let action = atraj[i];
+    //     let [[pred_state, prob], reward] = mdp.get_transition_states_and_probs({
+    //         state: state,
+    //         joint_action: action
+    //     });
+    //     let step = {
+    //         state: state,
+    //         expected_state: pred_state,
+    //         expected_reward: reward,
+    //         action: action
+    //     }
+    //     traj.push(step);
+    //     state = pred_state;
+    // }
 
-    check_transition({
-        state,
-        action: [interact, interact],
-        expected_state: new OvercookedState({
-            players: [
-                new P({
-                    position: [2, 2],
-                    orientation: s
-                }),
-                new P({
-                    position: [1, 2],
-                    orientation: w,
-                    held_object: new Obj({name: 'tomato', position: [1, 2]})
-                })
-            ],
-            objects: {
-                '2,0': new Obj({
-                    name: 'soup',
-                    position: [2, 0],
-                    state: ['onion', 1, 0]
-                }),
-                '2,3': new Obj({
-                    name: 'soup',
-                    position: [2, 3],
-                    state: ['tomato', 1, 0]
-                }),
-            },
-            order_list: ['any']
-        }),
-        expected_reward: 0
-    });
+    // check_transition({
+    //     state,
+    //     action: [interact, interact],
+    //     expected_state: new OvercookedState({
+    //         players: [
+    //             new P({
+    //                 position: [2, 2],
+    //                 orientation: s
+    //             }),
+    //             new P({
+    //                 position: [1, 2],
+    //                 orientation: w,
+    //                 held_object: new Obj({name: 'tomato', position: [1, 2]})
+    //             })
+    //         ],
+    //         objects: {
+    //             '2,0': new Obj({
+    //                 name: 'soup',
+    //                 position: [2, 0],
+    //                 state: ['onion', 1, 0]
+    //             }),
+    //             '2,3': new Obj({
+    //                 name: 'soup',
+    //                 position: [2, 3],
+    //                 state: ['tomato', 1, 0]
+    //             }),
+    //         },
+    //         order_list: ['any']
+    //     }),
+    //     expected_reward: 0
+    // });
 })

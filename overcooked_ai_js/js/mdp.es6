@@ -249,11 +249,9 @@ export function dictToState(state_dict) {
             object_dict[item['position']] = dictToObjectState(item)
             })
         }
-    state_dict['objects'] = object_dict
-
     return new OvercookedState({
         players: [dictToPlayerState(state_dict['players'][0]), dictToPlayerState(state_dict['players'][1])], 
-        objects: state_dict['objects'], 
+        objects: object_dict,
         order_list: state_dict['order_list']
     })
 }

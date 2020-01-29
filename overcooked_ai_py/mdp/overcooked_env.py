@@ -178,7 +178,7 @@ class OvercookedEnv(object):
         NOTE: this is the standard trajectories format used throughout the codebase
         """
         trajectories = {
-            # With shape (n_timesteps, game_len), where game_len might vary across games:
+            # With shape (n_episodes, game_len), where game_len might vary across games:
             "ep_observations": [],
             "ep_actions": [],
             "ep_rewards": [], # Individual dense (= sparse + shaped * rew_shaping) reward values
