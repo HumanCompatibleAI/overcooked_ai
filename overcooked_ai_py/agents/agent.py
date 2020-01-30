@@ -120,13 +120,12 @@ class CoupledPlanningPair(AgentPair):
         return joint_action_and_infos
             
 
-
 class AgentFromPolicy(Agent):
     """
     Defines an agent from a `state_policy` and `direct_policy` functions
     """
     
-    def __init__(self, state_policy, direct_policy, stochastic=True, action_probs=False):
+    def __init__(self, state_policy, direct_policy, multi_state_policy, stochastic=True, action_probs=False):
         """
         state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
         direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
@@ -135,6 +134,7 @@ class AgentFromPolicy(Agent):
         """
         self.state_policy = state_policy
         self.direct_policy = direct_policy
+        self.multi_state_policy = multi_state_policy
         self.history = []
         self.stochastic = stochastic
         self.action_probs = action_probs
@@ -151,6 +151,15 @@ class AgentFromPolicy(Agent):
             return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
         except AttributeError as e:
             raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
+
+    def actions(self, states, agent_indices):
+        self.history = None # NOTE: THIs method won't support history based agents
+        action_probs_n = self.multi_state_policy(states, agent_indices)
+        actions_and_infos_n = []
+        for action_probs in action_probs_n:
+            action = Action.sample(action_probs)
+            actions_and_infos_n.append((action, {"action_probs": action_probs}))
+        return actions_and_infos_n
 
     def direct_action(self, obs):
         """
