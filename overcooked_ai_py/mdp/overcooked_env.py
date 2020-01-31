@@ -1,6 +1,6 @@
 import gym, tqdm
 import numpy as np
-from overcooked_ai_py.utils import mean_and_std_err, merge_dictionaries
+from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
@@ -231,7 +231,7 @@ class OvercookedEnv(object):
         trajectories = {k: np.array(v) for k, v in trajectories.items()}
 
         # Merging all metadata dictionaries, assumes same keys throughout all
-        trajectories["metadatas"] = merge_dictionaries(trajectories["metadatas"])
+        trajectories["metadatas"] = append_dictionaries(trajectories["metadatas"])
 
         # TODO: should probably transfer check methods over to Env class
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
@@ -255,11 +255,11 @@ class OvercookedEnv(object):
             traj_agent_infos = [step_info["agent_infos"][agent_idx] for step_info in ep_infos]
 
             # Append all dictionaries together
-            traj_agent_infos = merge_dictionaries(traj_agent_infos)
+            traj_agent_infos = append_dictionaries(traj_agent_infos)
             agent_infos.append(traj_agent_infos)
         
         # Append all dictionaries together once again
-        agent_infos = merge_dictionaries(agent_infos)
+        agent_infos = append_dictionaries(agent_infos)
         agent_infos = {k: np.array(v) for k, v in agent_infos.items()}
         return agent_infos
 
