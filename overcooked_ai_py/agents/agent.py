@@ -180,17 +180,26 @@ class RandomAgent(Agent):
     NOTE: Does not perform interact actions, unless specified
     """
 
-    def __init__(self, sim_threads=None, interact=False):
+    def __init__(self, sim_threads=None, all_actions=False, custom_wait_prob=None):
         self.sim_threads = sim_threads
-        self.interact = interact
+        self.all_actions = all_actions
+        self.custom_wait_prob = custom_wait_prob
     
-    def action(self, state, parallel_agent_index=None):
+    def action(self, state):
         action_probs = np.zeros(Action.NUM_ACTIONS)
         legal_actions = list(Action.MOTION_ACTIONS)
-        if self.interact:
-            legal_actions.append(Action.INTERACT)
+        if self.all_actions:
+            legal_actions = Action.ALL_ACTIONS
         legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
         action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
+
+        if self.custom_wait_prob is not None:
+            stay = Action.STAY
+            if np.random.random() < self.custom_wait_prob:
+                return stay, {"action_probs": Agent.a_probs_from_action(stay)}
+            else:
+                action_probs = Action.remove_indices_and_renormalize(action_probs, [Action.ACTION_TO_INDEX[stay]])
+
         return Action.sample(action_probs), {"action_probs": action_probs}
 
     def actions(self, states, agent_indices):
