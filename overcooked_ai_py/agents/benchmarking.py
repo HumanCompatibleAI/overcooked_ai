@@ -59,8 +59,8 @@ class AgentEvaluator(object):
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
         return self._mlp
 
-    def evaluate_random_pair(self, interact=True, display=False):
-        agent_pair = AgentPair(RandomAgent(interact=interact), RandomAgent(interact=interact))
+    def evaluate_random_pair(self, all_actions=True, display=False):
+        agent_pair = AgentPair(RandomAgent(all_actions=interact), RandomAgent(all_actions=interact))
         return self.evaluate_agent_pair(agent_pair, display=display)
 
     def evaluate_human_model_pair(self, display=True, num_games=1):

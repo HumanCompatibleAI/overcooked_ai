@@ -91,14 +91,18 @@ class OvercookedEnv(object):
         self.state = next_state
         self.t += 1
         done = self.is_done()
-        info = {'shaped_r': reward_shaping}
-        if done:
-            info['episode'] = {
-                'ep_sparse_r': self.cumulative_sparse_rewards,
-                'ep_shaped_r': self.cumulative_shaped_rewards,
-                'ep_length': self.t
-            }
-        return (next_state, sparse_reward, done, info)
+
+        infos = {"agent_infos": []}
+        for agent_idx in range(self.mdp.num_players):
+            info = {'shaped_r': reward_shaping}
+            if done:
+                info['episode'] = {
+                    'ep_sparse_r': self.cumulative_sparse_rewards,
+                    'ep_shaped_r': self.cumulative_shaped_rewards,
+                    'ep_length': self.t
+                }
+            infos["agent_infos"].append(info)
+        return (next_state, sparse_reward, done, infos)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -150,7 +154,10 @@ class OvercookedEnv(object):
             assert all(type(a_info) is dict for a_info in a_info_t)
 
             s_tp1, r_t, done, info = self.step(a_t)
-            info["agent_infos"] = a_info_t
+
+            for i in range(self.mdp.num_players):
+                info["agent_infos"][i].update(a_info_t[i])
+
             trajectory.append((s_t, a_t, r_t, done, info))
 
             if display and self.t < display_until:
@@ -351,6 +358,11 @@ class Overcooked(gym.Env):
         else:
             both_agents_ob = (ob_p1, ob_p0)
         
+        info = info["agent_infos"][self.agent_idx]
+
+        if 'episode' in info.keys():
+            info['episode']['policy_agent_idx'] = self.agent_idx
+
         obs = {"both_agent_obs": both_agents_ob,
                 "overcooked_state": next_state,
                 "other_agent_env_idx": 1 - self.agent_idx}
