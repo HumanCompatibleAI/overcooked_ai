@@ -246,6 +246,20 @@ class OvercookedEnv(object):
         return trajectories
 
     @staticmethod
+    def get_discounted_rewards(trajectories, gamma):
+        rews = trajectories['ep_rewards']
+        horizon = rews.shape[1]
+        return OvercookedEnv._get_discounted_rewards_with_horizon(rews, gamma, horizon)
+
+    @staticmethod
+    def _get_discounted_rewards_with_horizon(rewards_matrix, gamma, horizon):
+        rewards_matrix = np.array(rewards_matrix)
+        discount_array = [gamma**i for i in range(horizon)]
+        rewards_matrix = rewards_matrix[:, :horizon]
+        discounted_rews = np.sum(rewards_matrix * discount_array, axis=1)
+        return discounted_rews
+
+    @staticmethod
     def get_agent_infos_for_trajectories(trajectories, agent_idx):
         """
         Returns a dictionary of the form
