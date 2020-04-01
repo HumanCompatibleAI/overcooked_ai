@@ -1,7 +1,7 @@
 import json, copy
 import numpy as np
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
@@ -172,15 +172,15 @@ class AgentEvaluator(object):
     ### I/O METHODS ###
 
     @staticmethod
-    def save_trajectory(trajectory, filename):
-        AgentEvaluator.check_trajectories(trajectory)
-        save_pickle(trajectory, filename)
+    def save_trajectories(trajectories, filename):
+        AgentEvaluator.check_trajectories(trajectories)
+        save_pickle(trajectories, filename)
 
     @staticmethod
-    def load_trajectory(filename):
-        traj = load_pickle(filename)
-        AgentEvaluator.check_trajectories(traj)
-        return traj
+    def load_trajectories(filename):
+        trajs = load_pickle(filename)
+        AgentEvaluator.check_trajectories(trajs)
+        return trajs
 
     @staticmethod
     def save_traj_in_stable_baselines_format(rollout_trajs, filename):
@@ -236,6 +236,31 @@ class AgentEvaluator(object):
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
 
+    @staticmethod
+    def merge_trajs(trajs_n):
+        metadatas_merged = merge_dictionaries([trajs["metadatas"] for trajs in trajs_n])
+        merged_trajs = merge_dictionaries(trajs_n)
+        merged_trajs["metadatas"] = metadatas_merged
+        return merged_trajs
+
+    @staticmethod
+    def remove_traj_idx(trajs, idx):
+        # NOTE: MUTATING METHOD for trajs, returns the POPPED IDX
+        metadatas = trajs["metadatas"]
+        del trajs["metadatas"]
+        removed_idx_d = rm_idx_from_dict(trajs, idx)
+        removed_idx_metas = rm_idx_from_dict(metadatas, idx)
+        trajs["metadatas"] = metadatas
+        removed_idx_d["metadatas"] = removed_idx_metas
+        return removed_idx_d
+
+    @staticmethod
+    def take_traj_indices(trajs, indices):
+        # NOTE: non mutating method
+        subset_trajs = take_indexes_from_dict(trajs, indices)
+        # TODO: Make metadatas field into additional keys for trajs, rather than having a metadatas field?
+        subset_trajs["metadatas"] = take_indexes_from_dict(trajs["metadatas"], indices)
+        return subset_trajs
 
     ### VIZUALIZATION METHODS ###
 

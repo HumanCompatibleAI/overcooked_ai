@@ -84,13 +84,41 @@ def std_err(lst):
 # Other utils
 
 def append_dictionaries(dictionaries):
-    """Merge many dictionaries by appending them to one another."""
+    """Append many dictionaries by appending them to one another."""
     assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
     final_dict = defaultdict(list)
     for d in dictionaries:
         for k, v in d.items():
             final_dict[k].append(v)
     return dict(final_dict)
+
+def merge_dictionaries(dictionaries):
+    """Merge many dictionaries by extending them to one another."""
+    assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
+    final_dict = defaultdict(list)
+    for d in dictionaries:
+        for k, v in d.items():
+            final_dict[k].extend(v)
+    return dict(final_dict)
+
+def rm_idx_from_dict(d, idx):
+    """
+    Remove index form all value-lists of a dictionary.
+    NOTE: MUTATING METHOD, returns the POPPED IDX
+    """
+    new_d = {}
+    for k, v in d.items():
+        new_d[k] = [d[k].pop(idx)]
+    return new_d
+
+def take_indexes_from_dict(d, indices):
+    new_d = {}
+    for k, v in d.items():
+        if k == "metadatas":
+            continue
+        new_d[k] = np.take(d[k], indices)
+    return new_d
+
 
 def profile(fnc):
     """A decorator that uses cProfile to profile a function (from https://osf.io/upav8/)"""
