@@ -51,6 +51,11 @@ class AgentEvaluator(object):
         self.mlp_params = mlp_params
         self._mlp = None
 
+        # For easier exporting
+        self.env_params = env_params
+        self.mdp_params = mdp_params
+        self.mdp_fn_params = mdp_fn_params
+
     @property
     def mlp(self):
         assert not self.variable_mdp, "Variable mdp is not currently supported for planning"
@@ -58,6 +63,16 @@ class AgentEvaluator(object):
             if self.debug: print("Computing Planner")
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
         return self._mlp
+
+    def get_params(self):
+        return {
+            "mdp_params": self.mdp_params,
+            "env_params": self.env_params,
+            "mdp_fn_params": self.mdp_fn_params,
+            "force_compute": self.force_compute,
+            "mlp_params": self.mlp_params,
+            "debug": self.debug
+        }
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
