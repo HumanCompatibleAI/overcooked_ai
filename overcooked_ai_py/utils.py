@@ -83,6 +83,12 @@ def std_err(lst):
 
 # Other utils
 
+def dict_mean_and_std_err(d):
+    result = {}
+    for k, v in d.items():
+        result[k] = mean_and_std_err(v)
+    return result
+
 def append_dictionaries(dictionaries):
     """Append many dictionaries by appending them to one another."""
     assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
