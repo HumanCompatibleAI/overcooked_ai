@@ -18,11 +18,14 @@ class OvercookedEnv(object):
     it as the agent takes actions, and provides rewards to the agent.
     """
 
-    def __init__(self, mdp, start_state_fn=None, horizon=MAX_HORIZON, debug=False):
+    def __init__(self, mdp, start_state_fn=None, horizon=MAX_HORIZON, debug=False, hh_data_starts=False):
         """
         mdp (OvercookedGridworld or function): either an instance of the MDP or a function that returns MDP instances 
         start_state_fn (OvercookedState): function that returns start state for the MDP, called at each environment reset
         horizon (float): number of steps before the environment returns done=True
+
+        TODO: make the start state completely decided in the MDP. MDPs with different start states should be considered
+        different MDPs, and the env should not have any say in the start state.
         """
         if isinstance(mdp, OvercookedGridworld):
             self.mdp_generator_fn = lambda: mdp
@@ -33,6 +36,16 @@ class OvercookedEnv(object):
         else:
             raise ValueError("Mdp should be either OvercookedGridworld instance or a generating function")
         
+        if hh_data_starts:
+            assert start_state_fn is None, "Either you have hh_data_starts, or you set a custom start_state_fn"
+            assert not self.variable_mdp
+            dummy_mdp = self.mdp_generator_fn()
+            from human_aware_rl.human.process_dataframes import get_human_human_trajectories
+            layout_name = dummy_mdp.layout_name
+            hh_trajs_for_layout = get_human_human_trajectories([layout_name], "train")[layout_name]
+            hh_starts = np.concatenate(hh_trajs_for_layout["ep_observations"])
+            start_state_fn = lambda: np.random.choice(hh_starts)
+
         self.horizon = horizon
         self.start_state_fn = start_state_fn
         self.reset()
@@ -329,11 +342,15 @@ class Overcooked(gym.Env):
         featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
         """
         if baselines_reproducible:
-            # NOTE: To prevent the randomness of choosing agent indexes
-            # from leaking when using subprocess-vec-env in baselines (which 
-            # seeding does not) reach, we set the same seed internally to all
-            # environments. The effect is negligible, as all other randomness
-            # is controlled by the actual run seeds
+            # NOTE:
+            # This will cause all agent indices to be chosen in sync across simulation 
+            # envs (for each update, all envs will have index 0 or index 1).
+            # This is to prevent the randomness of choosing agent indexes
+            # from leaking when using subprocess-vec-env in baselines (which
+            # seeding does not reach) i.e. having different results for different
+            # runs with the same seed.
+            # The effect of this should be negligible, as all other randomness is 
+            # controlled by the actual run seeds
             np.random.seed(0)
         self.base_env = base_env
         self.featurize_fn = featurize_fn
