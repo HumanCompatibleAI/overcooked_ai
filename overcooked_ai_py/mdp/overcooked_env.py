@@ -2,7 +2,7 @@ import gym, tqdm
 import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
 
 
 DEFAULT_ENV_PARAMS = {
@@ -42,7 +42,13 @@ class OvercookedEnv(object):
             dummy_mdp = self.mdp_generator_fn()
             from human_aware_rl.human.process_dataframes import get_human_human_trajectories
             layout_name = dummy_mdp.layout_name
-            hh_trajs_for_layout = get_human_human_trajectories([layout_name], "train")[layout_name]
+            if hh_data_starts == "train" or hh_data_starts is True:
+                hh_trajs_for_layout = get_human_human_trajectories([layout_name], "train")[layout_name]
+            elif hh_data_starts == "test":
+                hh_trajs_for_layout = get_human_human_trajectories([layout_name], "test")[layout_name]
+            else:
+                raise ValueError()
+
             hh_starts = np.concatenate(hh_trajs_for_layout["ep_observations"])
             start_state_fn = lambda: np.random.choice(hh_starts)
 
@@ -98,24 +104,41 @@ class OvercookedEnv(object):
             ep_length: length of rollout
         """
         assert not self.is_done()
-        next_state, sparse_reward, reward_shaping = self.mdp.get_state_transition(self.state, joint_action)
-        self.cumulative_sparse_rewards += sparse_reward
-        self.cumulative_shaped_rewards += reward_shaping
+        next_state, sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos = self.mdp.get_state_transition(self.state, joint_action)
+        
+        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(sparse_reward_by_agent)
+        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(reward_shaping_by_agent)
+
+        timestep_sparse_reward, timestep_reward_shaping = sum(sparse_reward_by_agent), sum(reward_shaping_by_agent)
+
+        for event_type, bool_list_by_agent in game_stat_infos.items():
+            # For each event type, store the timestep if it occurred
+            event_occurred_by_idx = [int(x) for x in bool_list_by_agent]
+            for idx, event_by_agent in enumerate(event_occurred_by_idx):
+                if event_by_agent:
+                    self.game_stats[event_type][idx].append(self.t)
+
         self.state = next_state
+        # TODO: should this happen before or after the event code?
         self.t += 1
         done = self.is_done()
 
         infos = {"agent_infos": []}
         for agent_idx in range(self.mdp.num_players):
-            info = {'shaped_r': reward_shaping}
-            if done:
-                info['episode'] = {
-                    'ep_sparse_r': self.cumulative_sparse_rewards,
-                    'ep_shaped_r': self.cumulative_shaped_rewards,
-                    'ep_length': self.t
-                }
+            info = {'shaped_r': timestep_reward_shaping}
             infos["agent_infos"].append(info)
-        return (next_state, sparse_reward, done, infos)
+        
+        if done:
+            infos['episode'] = {
+                'ep_game_stats': self.game_stats,
+                'ep_sparse_r': sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
+                'ep_shaped_r': sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
+                'ep_sparse_r_by_agent': self.game_stats["cumulative_sparse_rewards_by_agent"],
+                'ep_shaped_r_by_agent': self.game_stats["cumulative_shaped_rewards_by_agent"],
+                'ep_length': self.t
+            }
+
+        return (next_state, timestep_sparse_reward, done, infos)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -124,8 +147,13 @@ class OvercookedEnv(object):
             self.state = self.mdp.get_standard_start_state()
         else:
             self.state = self.start_state_fn()
-        self.cumulative_sparse_rewards = 0
-        self.cumulative_shaped_rewards = 0
+
+        events_dict = { k : [[], []] for k in EVENT_TYPES }
+        rewards_dict = {
+            "cumulative_sparse_rewards_by_agent": np.array([0, 0]),
+            "cumulative_shaped_rewards_by_agent": np.array([0, 0])
+        }
+        self.game_stats = {**events_dict, **rewards_dict}
         self.t = 0
 
     def is_done(self):
@@ -151,7 +179,8 @@ class OvercookedEnv(object):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
         """
-        assert self.cumulative_sparse_rewards == self.cumulative_shaped_rewards == 0, \
+        assert all([rew == 0 for rew in self.game_stats["cumulative_shaped_rewards_by_agent"]]) and \
+            all([rew == 0 for rew in self.game_stats["cumulative_sparse_rewards_by_agent"]]), \
             "Did not reset environment before running agents"
         trajectory = []
         done = False
@@ -182,7 +211,9 @@ class OvercookedEnv(object):
         if include_final_state:
             trajectory.append((s_tp1, (None, None), 0, True, None))
 
-        return np.array(trajectory), self.t, self.cumulative_sparse_rewards, self.cumulative_shaped_rewards
+        total_sparse = sum(self.game_stats["cumulative_sparse_rewards_by_agent"])
+        total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
+        return np.array(trajectory), self.t, total_sparse, total_shaped
 
     def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
         """
@@ -389,7 +420,7 @@ class Overcooked(gym.Env):
         else:
             both_agents_ob = (ob_p1, ob_p0)
         
-        info = info["agent_infos"][self.agent_idx]
+        info['policy_agent_idx'] = self.agent_idx
 
         if 'episode' in info.keys():
             info['episode']['policy_agent_idx'] = self.agent_idx
