@@ -322,3 +322,9 @@ class AgentEvaluator(object):
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})
         display(out, t)
+
+    # EVENTS VISUALIZATION METHODS #
+    
+    @staticmethod
+    def events_visualization(trajs, traj_index):
+        pass

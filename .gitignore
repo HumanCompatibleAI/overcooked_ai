@@ -126,3 +126,7 @@ dmypy.json
 # OS generated files
 .DS_Store
 .Trashes
+
+# Custom gitignore items:
+/overcooked_ai_py/agents/old/
+/overcooked_ai_py/mdp/old/

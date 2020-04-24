@@ -232,7 +232,7 @@ class OvercookedEnv(object):
             # With shape (n_episodes, game_len), where game_len might vary across games:
             "ep_observations": [],
             "ep_actions": [],
-            "ep_rewards": [], # Individual dense (= sparse + shaped * rew_shaping) reward values
+            "ep_rewards": [], # Individual (sparse) reward values
             "ep_dones": [], # Individual done values
             "ep_infos": [],
 
@@ -322,7 +322,7 @@ class OvercookedEnv(object):
             # Append all dictionaries together
             traj_agent_infos = append_dictionaries(traj_agent_infos)
             agent_infos.append(traj_agent_infos)
-        
+
         # Append all dictionaries together once again
         agent_infos = append_dictionaries(agent_infos)
         agent_infos = {k: np.array(v) for k, v in agent_infos.items()}
@@ -338,7 +338,7 @@ class OvercookedEnv(object):
                 if traj_timestep >= stuck_time:
                     recent_states = obs[traj_timestep - stuck_time : traj_timestep + 1]
                     recent_player_pos_and_or = [s.players[agent_idx].pos_and_or for s in recent_states]
-                    
+
                     if len({item for item in recent_player_pos_and_or}) == 1:
                         # If there is only one item in the last stuck_time steps, then we classify the agent as stuck
                         stuck_matrix[traj_idx].append(True)
@@ -383,6 +383,7 @@ class Overcooked(gym.Env):
             # The effect of this should be negligible, as all other randomness is 
             # controlled by the actual run seeds
             np.random.seed(0)
+
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()

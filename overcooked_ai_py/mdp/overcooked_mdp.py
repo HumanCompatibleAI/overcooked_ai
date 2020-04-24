@@ -1262,7 +1262,7 @@ class OvercookedGridworld(object):
 
     def featurize_state(self, overcooked_state, mlp):
         """
-        Encode state with some manually designed features. 
+        Encode state with some manually designed features.
         NOTE: currently works for just two players.
         """
 
@@ -1270,10 +1270,11 @@ class OvercookedGridworld(object):
 
         def make_closest_feature(idx, name, locations):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
-            all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations, mlp)
+            all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
+                                                                                                   mlp)
 
         IDX_TO_OBJ = ["onion", "soup", "dish"]
-        OBJ_TO_IDX = { o_name:idx for idx, o_name in enumerate(IDX_TO_OBJ) }
+        OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
 
         counter_objects = self.get_counter_objects_dict(overcooked_state)
         pot_state = self.get_pot_states(overcooked_state)
@@ -1283,7 +1284,7 @@ class OvercookedGridworld(object):
             orientation_idx = Direction.DIRECTION_TO_INDEX[player.orientation]
             all_features["p{}_orientation".format(i)] = np.eye(4)[orientation_idx]
             obj = player.held_object
-            
+
             if obj is None:
                 held_obj_name = "none"
                 all_features["p{}_objs".format(i)] = np.zeros(len(IDX_TO_OBJ))
@@ -1328,11 +1329,11 @@ class OvercookedGridworld(object):
 
                 all_features["p{}_wall_{}".format(i, direction)] = [0] if feat == ' ' else [1]
 
-        features_np = { k:np.array(v) for k, v in all_features.items() }
-        
+        features_np = {k: np.array(v) for k, v in all_features.items()}
+
         p0, p1 = overcooked_state.players
-        p0_dict = { k:v for k,v in features_np.items() if k[:2] == "p0" }
-        p1_dict = { k:v for k,v in features_np.items() if k[:2] == "p1" }
+        p0_dict = {k: v for k, v in features_np.items() if k[:2] == "p0"}
+        p1_dict = {k: v for k, v in features_np.items() if k[:2] == "p1"}
         p0_features = np.concatenate(list(p0_dict.values()))
         p1_features = np.concatenate(list(p1_dict.values()))
 
@@ -1344,6 +1345,7 @@ class OvercookedGridworld(object):
         abs_pos_p1 = np.array(p1.position)
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
+
 
     def get_deltas_to_closest_location(self, player, locations, mlp):
         _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
