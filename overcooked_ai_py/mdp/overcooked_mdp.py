@@ -778,10 +778,8 @@ class OvercookedGridworld(object):
         _, num_items, cook_time = obj.state
         return num_items == self.num_items_for_soup and cook_time >= self.soup_cooking_time
 
-    def log_object_pickup(self, events_infos, state, obj, pot_states, player_index):
+    def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index):
         """Player picked an object up from a counter or a dispenser"""
-        obj_name = obj.name
-
         if obj_name == "soup":
             events_infos["soup_pickup"][player_index] = True
 
@@ -798,10 +796,8 @@ class OvercookedGridworld(object):
         else:
             raise ValueError()
 
-    def log_object_drop(self, events_infos, state, obj, pot_states, player_index):
+    def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index):
         """Player dropped the object on a counter"""
-        obj_name = obj.name
-
         if obj_name == "soup":
             events_infos["soup_drop"][player_index] = True
 
@@ -838,50 +834,59 @@ class OvercookedGridworld(object):
             i_pos = Action.move_in_direction(pos, o)
             terrain_type = self.get_terrain_type_at_pos(i_pos)
 
+            # NOTE: we always log pickup/drop before performing it, as that's
+            # what the logic of determining whether the pickup/drop is useful assumes
             if terrain_type == 'X':
 
                 if player.has_object() and not new_state.has_object(i_pos):
+                    obj_name = player.get_object().name
+                    self.log_object_drop(events_infos, new_state, obj_name, pot_states, player_idx)
+
                     # Drop object on counter
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
-                    self.log_object_drop(events_infos, new_state, obj, pot_states, player_idx)
                     
                 elif not player.has_object() and new_state.has_object(i_pos):
+                    obj_name = new_state.get_object(i_pos).name
+                    self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx)
+
                     # Pick up object from counter
                     obj = new_state.remove_object(i_pos)
                     player.set_object(obj)
-                    self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
+                    
 
             elif terrain_type == 'O' and player.held_object is None:
+                self.log_object_pickup(events_infos, new_state, "onion", pot_states, player_idx)
+
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
                 player.set_object(obj)
-                self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
                 player.set_object(ObjectState('tomato', pos))
 
             elif terrain_type == 'D' and player.held_object is None:
-                # Dish pickup from dispenser
-                obj = ObjectState('dish', pos)
-                player.set_object(obj)
+                self.log_object_pickup(events_infos, new_state, "dish", pot_states, player_idx)
 
                 # Give shaped reward if pickup is useful
                 if self.is_dish_pickup_useful(new_state, pot_states):
                     shaped_reward[player_idx] += self.reward_shaping_params["DISH_PICKUP_REWARD"]
 
-                self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
+                # Perform dish pickup from dispenser
+                obj = ObjectState('dish', pos)
+                player.set_object(obj)
 
             elif terrain_type == 'P' and player.has_object():
 
                 if player.get_object().name == 'dish' and self.soup_ready_at_location(new_state, i_pos):
+                    self.log_object_pickup(events_infos, new_state, "soup", pot_states, player_idx)
+
                     # Pick up soup
                     player.remove_object() # Remove the dish
                     obj = new_state.remove_object(i_pos) # Get soup
                     player.set_object(obj)
                     shaped_reward[player_idx] += self.reward_shaping_params["SOUP_PICKUP_REWARD"]
-                    self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
 
                 elif player.get_object().name in ['onion', 'tomato']:
                     item_type = player.get_object().name
