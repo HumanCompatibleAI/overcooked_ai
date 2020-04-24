@@ -90,7 +90,11 @@ def dict_mean_and_std_err(d):
     return result
 
 def append_dictionaries(dictionaries):
-    """Append many dictionaries by appending them to one another."""
+    """
+    Append many dictionaries with numbers as values into one dictionary with lists as values.
+
+    {a: 1, b: 2}, {a: 3, b: 0}  ->  {a: [1, 3], b: [2, 0]}
+    """
     assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
     final_dict = defaultdict(list)
     for d in dictionaries:
@@ -99,7 +103,10 @@ def append_dictionaries(dictionaries):
     return dict(final_dict)
 
 def merge_dictionaries(dictionaries):
-    """Merge many dictionaries by extending them to one another."""
+    """
+    Merge many dictionaries by extending them to one another.
+    {a: [1, 7], b: [2, 5]}, {a: [3], b: [0]}  ->  {a: [1, 7, 3], b: [2, 5, 0]}
+    """
     assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
     final_dict = defaultdict(list)
     for d in dictionaries:
