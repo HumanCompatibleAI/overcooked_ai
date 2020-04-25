@@ -12,9 +12,10 @@ from overcooked_ai_py.utils import save_as_json
 
 # Saving trajectory for dynamics consistency test
 np.random.seed(0)
-ae = AgentEvaluator(mdp_params={"layout_name": "cramped_room"}, env_params={"horizon": 1000})
+ae = AgentEvaluator(mdp_params={"layout_name": "cramped_room"}, env_params={"horizon": 1500})
 base_mdp = ae.mdp_fn()
-test_trajs = ae.evaluate_random_pair(all_actions=True, num_games=3)
+test_trajs = ae.evaluate_random_pair(all_actions=True, num_games=1)
+assert test_trajs["ep_returns"][0] > 0, "Choose a different seed, we should have a test trajectory that gets some reward"
 
 test_trajs_path = COMMON_TESTS_DIR + "trajectory_tests/trajs.json"
 AgentEvaluator.save_traj_as_json(test_trajs, test_trajs_path)
