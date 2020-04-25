@@ -121,7 +121,7 @@ class TestGridworld(unittest.TestCase):
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
-            pred_state, sparse_reward, dense_reward = self.base_mdp.get_state_transition(state, action)
+            pred_state, sparse_reward, dense_reward, _ = self.base_mdp.get_state_transition(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
@@ -137,7 +137,7 @@ class TestGridworld(unittest.TestCase):
         for test_json_path in traj_test_json_paths:
             test_trajectory = AgentEvaluator.load_traj_from_json(test_json_path)
             try:
-                AgentEvaluator.check_trajectories(test_trajectory)
+                AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
             except AssertionError as e:
                 self.fail("File {} failed with error:\n{}".format(test_json_path, e))
 

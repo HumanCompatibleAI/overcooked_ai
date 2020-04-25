@@ -4,7 +4,7 @@ import pickle, time
 from overcooked_ai_py.utils import pos_distance, manhattan_distance
 from overcooked_ai_py.planning.search import SearchTree, Graph
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
@@ -700,7 +700,8 @@ class JointMotionPlanner(object):
         # Interacts
         last_joint_action = tuple(a if a == Action.INTERACT else Action.STAY for a in action_plans[-1])
 
-        self.mdp.resolve_interacts(end_state, last_joint_action)
+        events_dict = { k : [ [] for _ in range(self.mdp.num_players) ] for k in EVENT_TYPES }
+        self.mdp.resolve_interacts(end_state, last_joint_action, events_dict)
         self.mdp.resolve_movement(end_state, last_joint_action)
         self.mdp.step_environment_effects(end_state)
         return end_state

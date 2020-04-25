@@ -55,13 +55,14 @@ fs.readdirSync(testTrajectoryFolder).forEach(function(item, index) {
 
 function trajectoryTest(trajectoryFile) {
 	var trajectoryData = require(trajectoryFile);
+
 	let game = new OvercookedGame({
 		        start_grid: [
-							    "XXPXX", 
-							    "O  2O", 
-							    "T1  T", 
-							    "XDPSX"
-							    ],
+								"XXPXX",
+								"O  2O",
+								"X1  X",
+								"XDXSX"
+							],
 		        container_id: "overcooked",
 		        assets_loc: "assets/",
 		        ANIMATION_DURATION: 200*.9,
@@ -92,7 +93,7 @@ function trajectoryTest(trajectoryFile) {
 		                        state: current_state,
 		                        joint_action: joint_action
 		                    }); 
-		        let next_trajectory_state = dictToState(observations[i+1]);
+		        let next_trajectory_state = dictToState(observations[i + 1]);
 		        alignedStartingStates.push(current_state); 
 		        alignedJointActions.push(joint_action); 
 		        alignedStates.push({'trajectory': next_trajectory_state,  'transitioned': next_transitioned_state}); 

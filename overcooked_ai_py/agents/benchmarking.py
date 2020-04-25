@@ -122,11 +122,13 @@ class AgentEvaluator(object):
         return trajs_0, trajs_1
 
     @staticmethod
-    def check_trajectories(trajectories):
+    def check_trajectories(trajectories, from_json=False):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
+        If the trajectories were saves as json, do not check that they have standard traj keys.
         """
-        AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
+        if not from_json:
+            AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
         AgentEvaluator._check_trajectories_dynamics(trajectories)
         # TODO: Check shapes?

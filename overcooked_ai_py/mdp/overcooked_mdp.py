@@ -677,7 +677,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
 
-        events_infos = { event : [False, False] for event in EVENT_TYPES }
+        events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -720,6 +720,7 @@ class OvercookedGridworld(object):
 
     def is_dish_pickup_useful(self, state, pot_states):
         """
+        NOTE: this only works if self.num_players == 2
         Useful if:
         - Pot is ready/cooking and there is no player with a dish               \ 
         - 2 pots are ready/cooking and there is one player with a dish          | -> number of dishes in players hands < number of ready/cooking/partially full soups 
@@ -738,10 +739,12 @@ class OvercookedGridworld(object):
 
     def is_dish_drop_useful(self, state, pot_states, player_index):
         """
+        NOTE: this only works if self.num_players == 2
         Useful if:
         - Onion is needed (all pots are non-full)
         - Nobody is holding onions
         """
+        if self.num_players != 2: return False
         all_non_full = len(self.get_full_pots(pot_states)) == 0
         other_player = state.players[1 - player_index]
         other_player_holding_onion = other_player.has_object() and other_player.get_object().name == "onion"
@@ -749,9 +752,11 @@ class OvercookedGridworld(object):
 
     def is_onion_pickup_useful(self, state, pot_states, player_index):
         """
+        NOTE: this only works if self.num_players == 2
         Always useful unless:
         - All pots are full & other agent is not holding a dish
         """
+        if self.num_players != 2: return False
         all_pots_full = self.num_pots == len(self.get_full_pots(pot_states))
         other_player = state.players[1 - player_index]
         other_player_has_dish = other_player.has_object() and other_player.get_object().name == "dish"
@@ -761,10 +766,12 @@ class OvercookedGridworld(object):
         
     def is_onion_drop_useful(self, state, pot_states, player_index):
         """
+        NOTE: this only works if self.num_players == 2
         Useful if:
         - Dish is needed (all pots are full)
         - Nobody is holding a dish
         """
+        if self.num_players != 2: return False
         all_pots_full = len(self.get_full_pots(pot_states)) == self.num_pots
         other_player = state.players[1 - player_index]
         other_player_holding_dish = other_player.has_object() and other_player.get_object().name == "dish"
@@ -792,6 +799,10 @@ class OvercookedGridworld(object):
             events_infos["onion_pickup"][player_index] = True
             if self.is_onion_pickup_useful(state, pot_states, player_index):
                 events_infos["useful_o_pickup"][player_index] = True
+
+        elif obj_name == "tomato":
+            # TODO: logging/events for tomatoes are not currently supported
+            pass
         
         else:
             raise ValueError()
@@ -811,6 +822,10 @@ class OvercookedGridworld(object):
             if self.is_onion_drop_useful(state, pot_states, player_index):
                 events_infos["useful_o_drop"][player_index] = True
 
+        elif obj_name == "tomato":
+            # TODO: logging/events for tomatoes are not currently supported
+            pass
+
         else:
             raise ValueError()
 
@@ -823,7 +838,7 @@ class OvercookedGridworld(object):
         """
         pot_states = self.get_pot_states(new_state)
         # We divide reward by agent to keep track of who contributed
-        sparse_reward, shaped_reward = [0, 0], [0, 0]
+        sparse_reward, shaped_reward = [0] * self.num_players, [0] * self.num_players 
 
         for player_idx, (player, action) in enumerate(zip(new_state.players, joint_action)):
 
@@ -1175,6 +1190,7 @@ class OvercookedGridworld(object):
 
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
+        assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
         base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
