@@ -133,7 +133,6 @@ def take_indexes_from_dict(d, indices):
         new_d[k] = np.take(d[k], indices)
     return new_d
 
-
 def profile(fnc):
     """A decorator that uses cProfile to profile a function (from https://osf.io/upav8/)"""
     def inner(*args, **kwargs):

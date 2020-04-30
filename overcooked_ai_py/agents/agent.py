@@ -507,11 +507,11 @@ class GreedyHumanModel(Agent):
                     next_order = state.next_order
 
                 if next_order == 'onion':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects)
                 elif next_order == 'tomato':
-                    motion_goals = am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_tomato_actions(counter_objects)
                 elif next_order is None or next_order == 'any':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
 
         else:
             player_obj = player.get_object()

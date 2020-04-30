@@ -812,26 +812,26 @@ class MediumLevelActionManager(object):
         player_actions = list(filter(is_valid_goal_given_start, player_actions))
         return player_actions
 
-    def pickup_onion_actions(self, state, counter_objects, only_use_dispensers=False):
+    def pickup_onion_actions(self, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take onions from the dispensers"""
         onion_pickup_locations = self.mdp.get_onion_dispenser_locations()
         if not only_use_dispensers:
             onion_pickup_locations += counter_objects['onion']
         return self._get_ml_actions_for_positions(onion_pickup_locations)
 
-    def pickup_tomato_actions(self, state, counter_objects):
+    def pickup_tomato_actions(self, counter_objects):
         tomato_dispenser_locations = self.mdp.get_tomato_dispenser_locations()
         tomato_pickup_locations = tomato_dispenser_locations + counter_objects['tomato']
         return self._get_ml_actions_for_positions(tomato_pickup_locations)
 
-    def pickup_dish_actions(self, state, counter_objects, only_use_dispensers=False):
+    def pickup_dish_actions(self, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take dishes from the dispensers"""
         dish_pickup_locations = self.mdp.get_dish_dispenser_locations()
         if not only_use_dispensers:
             dish_pickup_locations += counter_objects['dish']
         return self._get_ml_actions_for_positions(dish_pickup_locations)
 
-    def pickup_counter_soup_actions(self, state, counter_objects):
+    def pickup_counter_soup_actions(self, counter_objects):
         soup_pickup_locations = counter_objects['soup']
         return self._get_ml_actions_for_positions(soup_pickup_locations)
 
@@ -867,6 +867,16 @@ class MediumLevelActionManager(object):
                             self.mdp.get_pot_locations() + self.mdp.get_dish_dispenser_locations()
         closest_feature_pos = self.motion_planner.min_cost_to_feature(player.pos_and_or, feature_locations, with_argmin=True)[1]
         return self._get_ml_actions_for_positions([closest_feature_pos])
+
+    def go_to_closest_feature_or_counter_to_goal(self, goal_pos_and_or, goal_location):
+        """Instead of going to goal_pos_and_or, go to the closest feature or counter to this goal, that ISN'T the goal itself"""
+        valid_locations = self.mdp.get_onion_dispenser_locations() + \
+                                    self.mdp.get_tomato_dispenser_locations() + self.mdp.get_pot_locations() + \
+                                    self.mdp.get_dish_dispenser_locations() + self.counter_drop
+        valid_locations.remove(goal_location)
+        closest_non_goal_feature_pos = self.motion_planner.min_cost_to_feature(
+                                            goal_pos_and_or, valid_locations, with_argmin=True)[1]
+        return self._get_ml_actions_for_positions([closest_non_goal_feature_pos])
 
     def wait_actions(self, player):
         waiting_motion_goal = (player.position, player.orientation)
@@ -1573,4 +1583,3 @@ class Heuristic(object):
             print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
 
         return heuristic_cost
-

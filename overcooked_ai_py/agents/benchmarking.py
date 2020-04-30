@@ -253,8 +253,18 @@ class AgentEvaluator(object):
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
 
+    ############################
+    # TRAJ MANINPULATION UTILS #
+    ############################
+    # TODO: add more documentation!
+
     @staticmethod
     def merge_trajs(trajs_n):
+        """
+        Takes in multiple trajectory objects and appends all the information into one trajectory object
+
+        [trajs0, trajs1] -> trajs
+        """
         metadatas_merged = merge_dictionaries([trajs["metadatas"] for trajs in trajs_n])
         merged_trajs = merge_dictionaries(trajs_n)
         merged_trajs["metadatas"] = metadatas_merged
@@ -329,4 +339,5 @@ class AgentEvaluator(object):
     
     @staticmethod
     def events_visualization(trajs, traj_index):
+        # TODO
         pass
