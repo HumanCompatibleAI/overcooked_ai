@@ -395,7 +395,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
 
@@ -500,7 +500,7 @@ class GreedyHumanModel(Agent):
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
 
             if soup_nearly_ready and not other_has_dish:
-                motion_goals = am.pickup_dish_actions(state, counter_objects)
+                motion_goals = am.pickup_dish_actions(counter_objects)
             else:
                 next_order = None
                 if state.num_orders_remaining > 1:
