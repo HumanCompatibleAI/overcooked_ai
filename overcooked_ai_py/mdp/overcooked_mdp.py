@@ -785,25 +785,19 @@ class OvercookedGridworld(object):
 
     def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index):
         """Player picked an object up from a counter or a dispenser"""
-        if obj_name == "soup":
-            events_infos["soup_pickup"][player_index] = True
-
-        elif obj_name == "dish":
-            events_infos["dish_pickup"][player_index] = True
-            if self.is_dish_pickup_useful(state, pot_states):
-                events_infos["useful_d_pickup"][player_index] = True
+        obj_pickup_key = obj_name + "_pickup"
+        if obj_pickup_key not in events_infos:
+            raise ValueError("Unknown event {}".format(obj_pickup_key))
+        events_infos[obj_pickup_key][player_index] = True
         
-        elif obj_name == "onion":
-            events_infos["onion_pickup"][player_index] = True
-            if self.is_onion_pickup_useful(state, pot_states, player_index):
-                events_infos["useful_o_pickup"][player_index] = True
-
-        elif obj_name == "tomato":
-            # TODO: logging/events for tomatoes are not currently supported
-            pass
-        
-        else:
-            raise ValueError()
+        USEFUL_PICKUP_FNS = {
+            "onion": self.is_onion_pickup_useful,
+            "dish": self.is_dish_pickup_useful
+        }
+        if obj_name in USEFUL_PICKUP_FNS:
+            if USEFUL_PICKUP_FNS[obj_name](state, pot_states, player_index):
+                obj_useful_key = "useful_" + obj_name + "_pickup"
+                events_infos[obj_useful_key][player_index] = True
 
     def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index):
         """Player dropped the object on a counter"""
