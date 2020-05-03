@@ -165,12 +165,18 @@ class TestFeaturizations(unittest.TestCase):
     def test_lossless_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
+        # featurizations by uncommenting the following line:
+        # save_pickle(featurized_observations, "data/testing/lossless_state_featurization")
         expected_featurization = load_pickle("data/testing/lossless_state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
         featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
+        # featurizations by uncommenting the following line:
+        # save_pickle(featurized_observations, "data/testing/state_featurization")
         expected_featurization = load_pickle("data/testing/state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
@@ -265,7 +271,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         start_state = env.state.all_objects_list
         for _ in range(3):
             env.reset()
-            print(env)
+            # print(env)
             curr_terrain = env.state.all_objects_list
             self.assertFalse(np.array_equal(start_state, curr_terrain))
 
@@ -273,23 +279,23 @@ class TestOvercookedEnvironment(unittest.TestCase):
         with self.assertRaises(TypeError):
             mdp_gen_params = {"None": None}
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-            OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+            OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
 
     def test_random_layout(self):
         mdp_gen_params = {"prop_feats": (1, 1)}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-        env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+        env = OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
         start_terrain = env.mdp.terrain_mtx
 
         for _ in range(3):
             env.reset()
-            print(env)
+            # print(env)
             curr_terrain = env.mdp.terrain_mtx
             self.assertFalse(np.array_equal(start_terrain, curr_terrain))
 
         mdp_gen_params = {"mdp_choices": ['cramped_room', 'asymmetric_advantages']}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-        env = OvercookedEnv(mdp=mdp_fn, **DEFAULT_ENV_PARAMS)
+        env = OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
         
         layouts_seen = []
         for _ in range(10):
