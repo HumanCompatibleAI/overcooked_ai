@@ -19,6 +19,20 @@ class Agent(object):
         """
         return NotImplementedError()
 
+    def actions(self, states, agent_indices):
+        """
+        A multi-state version of the action method. This enables for parallized
+        implementations that can potentially give speedups in action prediction. 
+
+        Args:
+            states (list): list of OvercookedStates for which we want actions for
+            agent_indices (list): list to inform which agent we are requesting the action for in each state
+
+        Returns:
+            [(action, action_info), (action, action_info), ...]: the actions and action infos for each state-agent_index pair
+        """
+        return NotImplementedError()
+
     @staticmethod
     def a_probs_from_action(action):
         action_idx = Action.ACTION_TO_INDEX[action]
@@ -125,54 +139,40 @@ class AgentFromPolicy(Agent):
     Defines an agent from a `state_policy` and `direct_policy` functions
     """
     
-    def __init__(self, state_policy, direct_policy, multi_state_policy, stochastic=True, action_probs=False):
+    def __init__(self, multi_state_policy, multi_obs_policy, sim_threads, stochastic=True):
         """
-        state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
-        direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
-        multi_state_policy (fn): a function that takes in multiple OvercookedState instatences and returns actions
+        multi_obs_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
+        multi_state_policy (fn, args: stochastic): a function that takes in multiple OvercookedState instatences and returns actions
         stochastic (Bool): Whether the agent should sample from policy or take argmax
-        action_probs (Bool): Whether agent should return action probabilities or a sampled action
         """
-        self.state_policy = state_policy
-        self.direct_policy = direct_policy
         self.multi_state_policy = multi_state_policy
-        self.history = []
+        self.multi_obs_policy = multi_obs_policy
+        self.sim_threads = sim_threads
         self.stochastic = stochastic
-        self.action_probs = action_probs
-
-    def action(self, state):
-        """
-        The standard action function call, that takes in a Overcooked state
-        and returns the corresponding action.
-
-        Requires having set self.agent_index and self.mdp
-        """
-        self.history.append(state)
-        try:
-            return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
-        except AttributeError as e:
-            raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
+        self.reset()
 
     def actions(self, states, agent_indices):
-        self.history = None # NOTE: This method won't support history based agents
-        action_probs_n = self.multi_state_policy(states, agent_indices)
+        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input states"
+        action_probs_n = self.multi_state_policy(states, agent_indices, stochastic=self.stochastic)
         actions_and_infos_n = []
         for action_probs in action_probs_n:
             action = Action.sample(action_probs)
             actions_and_infos_n.append((action, {"action_probs": action_probs}))
         return actions_and_infos_n
 
-    def direct_action(self, obs):
+    def actions_from_observations(self, obs):
         """
-        A action called optimized for multi-threaded environment simulations
+        An action called optimized for multi-threaded environment simulations
         involving the agent. Takes in SIM_THREADS (as defined when defining the agent)
         number of observations in post-processed form, and returns as many actions.
         """
-        return self.direct_policy(obs)
+        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input obvs"
+        return self.multi_obs_policy(obs, self.stochastic)
 
     def reset(self):
         super().reset()
-        self.history = []
+        self.history = [[] for _ in range(sim_threads)]
+
 
 class RandomAgent(Agent):
     """
@@ -539,4 +539,3 @@ class GreedyHumanModel(Agent):
             assert len(motion_goals) != 0
 
         return motion_goals
-
