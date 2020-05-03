@@ -760,9 +760,7 @@ class OvercookedGridworld(object):
         all_pots_full = self.num_pots == len(self.get_full_pots(pot_states))
         other_player = state.players[1 - player_index]
         other_player_has_dish = other_player.has_object() and other_player.get_object().name == "dish"
-        if all_pots_full and not other_player_has_dish:
-            return False
-        return True
+        return not (all_pots_full and not other_player_has_dish)
         
     def is_onion_drop_useful(self, state, pot_states, player_index):
         """
