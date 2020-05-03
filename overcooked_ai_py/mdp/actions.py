@@ -109,3 +109,8 @@ class Action(object):
     def joint_action_to_char(joint_action):
         assert all([a in Action.ALL_ACTIONS for a in joint_action])
         return tuple(Action.to_char(a) for a in joint_action)
+
+    @staticmethod
+    def uniform_probs_over_actions():
+        num_acts = len(Action.ALL_ACTIONS)
+        return np.ones(num_acts) / num_acts

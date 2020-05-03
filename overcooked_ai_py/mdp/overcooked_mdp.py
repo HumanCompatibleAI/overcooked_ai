@@ -3,7 +3,7 @@ import numpy as np
 from functools import reduce
 from collections import defaultdict
 from overcooked_ai_py.utils import pos_distance, load_from_json
-from overcooked_ai_py.data.layouts import read_layout_dict
+from overcooked_ai_py import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -344,6 +344,26 @@ BASE_REW_SHAPING_PARAMS = {
     "SOUP_DISTANCE_REW": 0
 }
 
+EVENT_TYPES = [
+    # Onion events
+    'onion_pickup',
+    'useful_onion_pickup',
+    'onion_drop',
+    'useful_onion_drop',
+    'potting_onion',
+
+    # Dish events
+    'dish_pickup',
+    'useful_dish_pickup',
+    'dish_drop',
+    'useful_dish_drop',
+
+    # Soup events
+    'soup_pickup',
+    'soup_delivery',
+    'soup_drop'
+]
+
 class OvercookedGridworld(object):
     """An MDP grid world based off of the Overcooked game."""
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
@@ -590,6 +610,10 @@ class OvercookedGridworld(object):
     def get_counter_locations(self):
         return list(self.terrain_pos_dict['X'])
 
+    @property
+    def num_pots(self):
+        return len(self.get_pot_locations())
+
     def get_pot_states(self, state):
         """Returns dict with structure:
         {
@@ -652,6 +676,9 @@ class OvercookedGridworld(object):
         shaped reward is given only for completion of subgoals 
         (not soup deliveries).
         """
+
+        events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
+
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
             if action not in action_set:
@@ -660,7 +687,7 @@ class OvercookedGridworld(object):
         new_state = state.deepcopy()
 
         # Resolve interacts first
-        sparse_reward, shaped_reward = self.resolve_interacts(new_state, joint_action)
+        sparse_reward, shaped_reward = self.resolve_interacts(new_state, joint_action, events_infos)
 
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
@@ -669,14 +696,131 @@ class OvercookedGridworld(object):
         self.resolve_movement(new_state, joint_action)
 
         # Finally, environment effects
-        sparse_reward += self.step_environment_effects(new_state)
+        self.step_environment_effects(new_state)
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
 
-        return new_state, sparse_reward, shaped_reward
+        return new_state, sparse_reward, shaped_reward, events_infos
 
-    def resolve_interacts(self, new_state, joint_action):
+    def get_empty_pots(self, pot_states):
+        return pot_states["empty"]
+
+    def get_ready_pots(self, pot_states):
+        return pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
+
+    def get_cooking_pots(self, pot_states):
+        return pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
+
+    def get_full_pots(self, pot_states):
+        return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states)
+
+    def get_partially_full_pots(self, pot_states):
+        return pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
+
+    def is_dish_pickup_useful(self, state, pot_states, player_index=None):
+        """
+        NOTE: this only works if self.num_players == 2
+        Useful if:
+        - Pot is ready/cooking and there is no player with a dish               \ 
+        - 2 pots are ready/cooking and there is one player with a dish          | -> number of dishes in players hands < number of ready/cooking/partially full soups 
+        - Partially full pot is ok if the other player is on course to fill it  /
+
+        We also want to prevent picking up and dropping dishes, so add the condition
+        that there must be no dishes on counters
+        """
+        if self.num_players != 2: return False
+
+        # This next line is to prevent reward hacking (this logic is also used by reward shaping)
+        dishes_on_counters = self.get_counter_objects_dict(state)["dish"]
+        no_dishes_on_counters = len(dishes_on_counters) == 0
+
+        num_player_dishes = len(state.player_objects_by_type['dish'])
+        non_empty_pots = len(self.get_ready_pots(pot_states) + self.get_cooking_pots(pot_states) + self.get_partially_full_pots(pot_states))
+        return no_dishes_on_counters and num_player_dishes < non_empty_pots
+
+    def is_dish_drop_useful(self, state, pot_states, player_index):
+        """
+        NOTE: this only works if self.num_players == 2
+        Useful if:
+        - Onion is needed (all pots are non-full)
+        - Nobody is holding onions
+        """
+        if self.num_players != 2: return False
+        all_non_full = len(self.get_full_pots(pot_states)) == 0
+        other_player = state.players[1 - player_index]
+        other_player_holding_onion = other_player.has_object() and other_player.get_object().name == "onion"
+        return all_non_full and not other_player_holding_onion
+
+    def is_onion_pickup_useful(self, state, pot_states, player_index):
+        """
+        NOTE: this only works if self.num_players == 2
+        Always useful unless:
+        - All pots are full & other agent is not holding a dish
+        """
+        if self.num_players != 2: return False
+        all_pots_full = self.num_pots == len(self.get_full_pots(pot_states))
+        other_player = state.players[1 - player_index]
+        other_player_has_dish = other_player.has_object() and other_player.get_object().name == "dish"
+        return not (all_pots_full and not other_player_has_dish)
+        
+    def is_onion_drop_useful(self, state, pot_states, player_index):
+        """
+        NOTE: this only works if self.num_players == 2
+        Useful if:
+        - Dish is needed (all pots are full)
+        - Nobody is holding a dish
+        """
+        if self.num_players != 2: return False
+        all_pots_full = len(self.get_full_pots(pot_states)) == self.num_pots
+        other_player = state.players[1 - player_index]
+        other_player_holding_dish = other_player.has_object() and other_player.get_object().name == "dish"
+        return all_pots_full and not other_player_holding_dish
+
+    def soup_ready_at_location(self, state, pos):
+        if not state.has_object(pos):
+            return False
+        obj = state.get_object(pos)
+        assert obj.name == 'soup', 'Object in pot was not soup'
+        _, num_items, cook_time = obj.state
+        return num_items == self.num_items_for_soup and cook_time >= self.soup_cooking_time
+
+    def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index):
+        """Player picked an object up from a counter or a dispenser"""
+        obj_pickup_key = obj_name + "_pickup"
+        if obj_pickup_key not in events_infos:
+            raise ValueError("Unknown event {}".format(obj_pickup_key))
+        events_infos[obj_pickup_key][player_index] = True
+        
+        USEFUL_PICKUP_FNS = {
+            "onion": self.is_onion_pickup_useful,
+            "dish": self.is_dish_pickup_useful
+        }
+        if obj_name in USEFUL_PICKUP_FNS:
+            if USEFUL_PICKUP_FNS[obj_name](state, pot_states, player_index):
+                obj_useful_key = "useful_" + obj_name + "_pickup"
+                events_infos[obj_useful_key][player_index] = True
+
+    def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index):
+        """Player dropped the object on a counter"""
+        obj_drop_key = obj_name + "_drop"
+        if obj_drop_key not in events_infos:
+            # TODO: add support for tomato event logging
+            if obj_name == "tomato":
+                return
+            raise ValueError("Unknown event {}".format(obj_drop_key))
+        events_infos[obj_drop_key][player_index] = True
+        
+        USEFUL_DROP_FNS = {
+            "onion": self.is_onion_drop_useful,
+            "dish": self.is_dish_drop_useful
+        }
+        if obj_name in USEFUL_DROP_FNS:
+            if USEFUL_DROP_FNS[obj_name](state, pot_states, player_index):
+                obj_useful_key = "useful_" + obj_name + "_drop"
+                events_infos[obj_useful_key][player_index] = True
+
+    def resolve_interacts(self, new_state, joint_action, events_infos):
         """
         Resolve any INTERACT actions, if present.
 
@@ -684,12 +828,10 @@ class OvercookedGridworld(object):
         first and then player 2's, without doing anything like collision checking.
         """
         pot_states = self.get_pot_states(new_state)
-        ready_pots = pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
-        cooking_pots = ready_pots + pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
-        nearly_ready_pots = cooking_pots + pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
+        # We divide reward by agent to keep track of who contributed
+        sparse_reward, shaped_reward = [0] * self.num_players, [0] * self.num_players 
 
-        sparse_reward, shaped_reward = 0, 0
-        for player, action in zip(new_state.players, joint_action):
+        for player_idx, (player, action) in enumerate(zip(new_state.players, joint_action)):
 
             if action != Action.INTERACT:
                 continue
@@ -698,59 +840,94 @@ class OvercookedGridworld(object):
             i_pos = Action.move_in_direction(pos, o)
             terrain_type = self.get_terrain_type_at_pos(i_pos)
 
+            # NOTE: we always log pickup/drop before performing it, as that's
+            # what the logic of determining whether the pickup/drop is useful assumes
             if terrain_type == 'X':
+
                 if player.has_object() and not new_state.has_object(i_pos):
-                    new_state.add_object(player.remove_object(), i_pos)
+                    obj_name = player.get_object().name
+                    self.log_object_drop(events_infos, new_state, obj_name, pot_states, player_idx)
+
+                    # Drop object on counter
+                    obj = player.remove_object()
+                    new_state.add_object(obj, i_pos)
+                    
                 elif not player.has_object() and new_state.has_object(i_pos):
-                    player.set_object(new_state.remove_object(i_pos))
+                    obj_name = new_state.get_object(i_pos).name
+                    self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx)
+
+                    # Pick up object from counter
+                    obj = new_state.remove_object(i_pos)
+                    player.set_object(obj)
+                    
 
             elif terrain_type == 'O' and player.held_object is None:
-                player.set_object(ObjectState('onion', pos))
-            elif terrain_type == 'T' and player.held_object is None:
-                player.set_object(ObjectState('tomato', pos))
-            elif terrain_type == 'D' and player.held_object is None:
-                dishes_already = len(new_state.player_objects_by_type['dish'])
-                player.set_object(ObjectState('dish', pos))
+                self.log_object_pickup(events_infos, new_state, "onion", pot_states, player_idx)
 
-                dishes_on_counters = self.get_counter_objects_dict(new_state)["dish"]
-                if len(nearly_ready_pots) > dishes_already and len(dishes_on_counters) == 0:
-                    shaped_reward += self.reward_shaping_params["DISH_PICKUP_REWARD"]
+                # Onion pickup from dispenser
+                obj = ObjectState('onion', pos)
+                player.set_object(obj)
+
+            elif terrain_type == 'T' and player.held_object is None:
+                # Tomato pickup from dispenser
+                player.set_object(ObjectState('tomato', pos))
+
+            elif terrain_type == 'D' and player.held_object is None:
+                self.log_object_pickup(events_infos, new_state, "dish", pot_states, player_idx)
+
+                # Give shaped reward if pickup is useful
+                if self.is_dish_pickup_useful(new_state, pot_states):
+                    shaped_reward[player_idx] += self.reward_shaping_params["DISH_PICKUP_REWARD"]
+
+                # Perform dish pickup from dispenser
+                obj = ObjectState('dish', pos)
+                player.set_object(obj)
 
             elif terrain_type == 'P' and player.has_object():
-                if player.get_object().name == 'dish' and new_state.has_object(i_pos):
-                    obj = new_state.get_object(i_pos)
-                    assert obj.name == 'soup', 'Object in pot was not soup'
-                    _, num_items, cook_time = obj.state
-                    if num_items == self.num_items_for_soup and cook_time >= self.soup_cooking_time:
-                        player.remove_object()  # Turn the dish into the soup
-                        player.set_object(new_state.remove_object(i_pos))
-                        shaped_reward += self.reward_shaping_params["SOUP_PICKUP_REWARD"]
+
+                if player.get_object().name == 'dish' and self.soup_ready_at_location(new_state, i_pos):
+                    self.log_object_pickup(events_infos, new_state, "soup", pot_states, player_idx)
+
+                    # Pick up soup
+                    player.remove_object() # Remove the dish
+                    obj = new_state.remove_object(i_pos) # Get soup
+                    player.set_object(obj)
+                    shaped_reward[player_idx] += self.reward_shaping_params["SOUP_PICKUP_REWARD"]
 
                 elif player.get_object().name in ['onion', 'tomato']:
                     item_type = player.get_object().name
 
                     if not new_state.has_object(i_pos):
-                        # Pot was empty
+                        # Pot was empty, add onion to it
                         player.remove_object()
                         new_state.add_object(ObjectState('soup', i_pos, (item_type, 1, 0)), i_pos)
-                        shaped_reward += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+                        shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+
+                        # Log onion potting
+                        events_infos['potting_onion'][player_idx] = True
 
                     else:
-                        # Pot has already items in it
+                        # Pot has already items in it, add if not full and of same type
                         obj = new_state.get_object(i_pos)
                         assert obj.name == 'soup', 'Object in pot was not soup'
                         soup_type, num_items, cook_time = obj.state
                         if num_items < self.num_items_for_soup and soup_type == item_type:
                             player.remove_object()
                             obj.state = (soup_type, num_items + 1, 0)
-                            shaped_reward += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+                            shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+
+                            # Log onion potting
+                            events_infos['potting_onion'][player_idx] = True
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':
 
                     new_state, delivery_rew = self.deliver_soup(new_state, player, obj)
-                    sparse_reward += delivery_rew                        
+                    sparse_reward[player_idx] += delivery_rew
+
+                    # Log soup delivery
+                    events_infos['soup_delivery'][player_idx] = True                        
 
                     # If last soup necessary was delivered, stop resolving interacts
                     if new_state.order_list is not None and len(new_state.order_list) == 0:
@@ -812,7 +989,6 @@ class OvercookedGridworld(object):
         return any(pos0 == pos1 for pos0, pos1 in itertools.combinations(joint_position, 2))
             
     def step_environment_effects(self, state):
-        reward = 0
         for obj in state.objects.values():
             if obj.name == 'soup':
                 x, y = obj.position
@@ -822,7 +998,6 @@ class OvercookedGridworld(object):
                     num_items == self.num_items_for_soup and \
                     cook_time < self.soup_cooking_time:
                         obj.state = soup_type, num_items, cook_time + 1
-        return reward
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""
@@ -955,13 +1130,15 @@ class OvercookedGridworld(object):
                     orientation = player.orientation
                     assert orientation in Direction.ALL_DIRECTIONS
 
+                    player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                    assert len(player_idx_lst) == 1
+
                     grid_string += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
                     if player_object:
                         grid_string += player_object.name[:1]
+                        grid_string += str(player_idx_lst[0])
                     else:
-                        player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
-                        assert len(player_idx_lst) == 1
                         grid_string += str(player_idx_lst[0])
                 else:
                     if element == "X" and state.has_object((x, y)):
@@ -1004,6 +1181,7 @@ class OvercookedGridworld(object):
 
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
+        assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
         base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
@@ -1153,6 +1331,7 @@ class OvercookedGridworld(object):
                     # Check if counter we are facing is empty
                     facing_counter = (feat == 'X' and adj_pos not in overcooked_state.objects.keys())
                     facing_counter_feature = [1] if facing_counter else [0]
+                    # NOTE: Really, this feature should have been "closest empty counter"
                     all_features["p{}_facing_empty_counter".format(i)] = facing_counter_feature
 
                 all_features["p{}_wall_{}".format(i, direction)] = [0] if feat == ' ' else [1]

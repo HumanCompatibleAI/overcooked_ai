@@ -20,12 +20,13 @@ export class OvercookedGame {
         show_post_cook_time = false,
 
         COOK_TIME = 2,
-        DELIVERY_REWARD = OvercookedMDP.OvercookedGridworld.DELIVERY_REWARD
+        DELIVERY_REWARD = OvercookedMDP.OvercookedGridworld.DELIVERY_REWARD,
+        num_items_for_soup = 3
     }){
         this.gameWidth = gameWidth;
         this.gameHeight = gameHeight;
         this.container_id = container_id;
-        let params = {COOK_TIME, DELIVERY_REWARD};
+        let params = {COOK_TIME, DELIVERY_REWARD, num_items_for_soup};
         this.mdp = OvercookedMDP.OvercookedGridworld.from_grid(start_grid, params);
         this.state = this.mdp.get_start_state();
         this.joint_action = [OvercookedMDP.Direction.STAY, OvercookedMDP.Direction.STAY];

@@ -4,7 +4,7 @@ import pickle, time
 from overcooked_ai_py.utils import pos_distance, manhattan_distance
 from overcooked_ai_py.planning.search import SearchTree, Graph
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
@@ -700,7 +700,8 @@ class JointMotionPlanner(object):
         # Interacts
         last_joint_action = tuple(a if a == Action.INTERACT else Action.STAY for a in action_plans[-1])
 
-        self.mdp.resolve_interacts(end_state, last_joint_action)
+        events_dict = { k : [ [] for _ in range(self.mdp.num_players) ] for k in EVENT_TYPES }
+        self.mdp.resolve_interacts(end_state, last_joint_action, events_dict)
         self.mdp.resolve_movement(end_state, last_joint_action)
         self.mdp.step_environment_effects(end_state)
         return end_state
@@ -770,10 +771,10 @@ class MediumLevelActionManager(object):
         player_actions = []
         counter_pickup_objects = self.mdp.get_counter_objects_dict(state, self.counter_pickup)
         if not player.has_object():
-            onion_pickup = self.pickup_onion_actions(state, counter_pickup_objects)
-            tomato_pickup = self.pickup_tomato_actions(state, counter_pickup_objects)
-            dish_pickup = self.pickup_dish_actions(state, counter_pickup_objects)
-            soup_pickup = self.pickup_counter_soup_actions(state, counter_pickup_objects)
+            onion_pickup = self.pickup_onion_actions(counter_pickup_objects)
+            tomato_pickup = self.pickup_tomato_actions(counter_pickup_objects)
+            dish_pickup = self.pickup_dish_actions(counter_pickup_objects)
+            soup_pickup = self.pickup_counter_soup_actions(counter_pickup_objects)
             player_actions.extend(onion_pickup + tomato_pickup + dish_pickup + soup_pickup)
 
         else:
@@ -811,26 +812,26 @@ class MediumLevelActionManager(object):
         player_actions = list(filter(is_valid_goal_given_start, player_actions))
         return player_actions
 
-    def pickup_onion_actions(self, state, counter_objects, only_use_dispensers=False):
+    def pickup_onion_actions(self, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take onions from the dispensers"""
         onion_pickup_locations = self.mdp.get_onion_dispenser_locations()
         if not only_use_dispensers:
             onion_pickup_locations += counter_objects['onion']
         return self._get_ml_actions_for_positions(onion_pickup_locations)
 
-    def pickup_tomato_actions(self, state, counter_objects):
+    def pickup_tomato_actions(self, counter_objects):
         tomato_dispenser_locations = self.mdp.get_tomato_dispenser_locations()
         tomato_pickup_locations = tomato_dispenser_locations + counter_objects['tomato']
         return self._get_ml_actions_for_positions(tomato_pickup_locations)
 
-    def pickup_dish_actions(self, state, counter_objects, only_use_dispensers=False):
+    def pickup_dish_actions(self, counter_objects, only_use_dispensers=False):
         """If only_use_dispensers is True, then only take dishes from the dispensers"""
         dish_pickup_locations = self.mdp.get_dish_dispenser_locations()
         if not only_use_dispensers:
             dish_pickup_locations += counter_objects['dish']
         return self._get_ml_actions_for_positions(dish_pickup_locations)
 
-    def pickup_counter_soup_actions(self, state, counter_objects):
+    def pickup_counter_soup_actions(self, counter_objects):
         soup_pickup_locations = counter_objects['soup']
         return self._get_ml_actions_for_positions(soup_pickup_locations)
 
@@ -866,6 +867,16 @@ class MediumLevelActionManager(object):
                             self.mdp.get_pot_locations() + self.mdp.get_dish_dispenser_locations()
         closest_feature_pos = self.motion_planner.min_cost_to_feature(player.pos_and_or, feature_locations, with_argmin=True)[1]
         return self._get_ml_actions_for_positions([closest_feature_pos])
+
+    def go_to_closest_feature_or_counter_to_goal(self, goal_pos_and_or, goal_location):
+        """Instead of going to goal_pos_and_or, go to the closest feature or counter to this goal, that ISN'T the goal itself"""
+        valid_locations = self.mdp.get_onion_dispenser_locations() + \
+                                    self.mdp.get_tomato_dispenser_locations() + self.mdp.get_pot_locations() + \
+                                    self.mdp.get_dish_dispenser_locations() + self.counter_drop
+        valid_locations.remove(goal_location)
+        closest_non_goal_feature_pos = self.motion_planner.min_cost_to_feature(
+                                            goal_pos_and_or, valid_locations, with_argmin=True)[1]
+        return self._get_ml_actions_for_positions([closest_non_goal_feature_pos])
 
     def wait_actions(self, player):
         waiting_motion_goal = (player.position, player.orientation)
@@ -1119,7 +1130,7 @@ class MediumLevelPlanner(object):
         else:
             joint_action = (action, other_agent_action)
         if not self.mdp.is_terminal(state):
-            results, _, _ = self.mdp.get_state_transition(state, joint_action)
+            results, _, _, _ = self.mdp.get_state_transition(state, joint_action)
             successor_state = results
         else:
             print("Tried to find successor of terminal")
@@ -1196,7 +1207,7 @@ class HighLevelActionManager(object):
     def get_dish_and_soup_and_serve(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting a dish, 
         going to a pot and picking up a soup, and delivering the soup."""
-        dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(state, counter_objects)
+        dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(counter_objects)
         pickup_soup_actions = self.ml_action_manager.pickup_soup_with_dish_actions(pot_states_dict)
         deliver_soup_actions = self.ml_action_manager.deliver_soup_actions()
         hl_level_actions = list(itertools.product(dish_pickup_actions, pickup_soup_actions, deliver_soup_actions))
@@ -1205,7 +1216,7 @@ class HighLevelActionManager(object):
     def get_onion_and_put_in_pot(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting an onion
         from a dispenser and placing it in a pot."""
-        onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(state, counter_objects)
+        onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(counter_objects)
         put_in_pot_actions = self.ml_action_manager.put_onion_in_pot_actions(pot_states_dict)
         hl_level_actions = list(itertools.product(onion_pickup_actions, put_in_pot_actions))
         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
@@ -1213,7 +1224,7 @@ class HighLevelActionManager(object):
     def get_tomato_and_put_in_pot(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting an tomato
         from a dispenser and placing it in a pot."""
-        tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(state, counter_objects)
+        tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(counter_objects)
         put_in_pot_actions = self.ml_action_manager.put_tomato_in_pot_actions(pot_states_dict)
         hl_level_actions = list(itertools.product(tomato_pickup_actions, put_in_pot_actions))
         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
@@ -1572,4 +1583,3 @@ class Heuristic(object):
             print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
 
         return heuristic_cost
-

@@ -1,7 +1,7 @@
 import json, copy
 import numpy as np
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
@@ -51,6 +51,11 @@ class AgentEvaluator(object):
         self.mlp_params = mlp_params
         self._mlp = None
 
+        # For easier exporting
+        self.env_params = env_params
+        self.mdp_params = mdp_params
+        self.mdp_fn_params = mdp_fn_params
+
     @property
     def mlp(self):
         assert not self.variable_mdp, "Variable mdp is not currently supported for planning"
@@ -59,56 +64,71 @@ class AgentEvaluator(object):
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
         return self._mlp
 
-    def evaluate_random_pair(self, interact=True, display=False):
-        agent_pair = AgentPair(RandomAgent(interact=interact), RandomAgent(interact=interact))
-        return self.evaluate_agent_pair(agent_pair, display=display)
+    def get_params(self):
+        return {
+            "mdp_params": self.mdp_params,
+            "env_params": self.env_params,
+            "mdp_fn_params": self.mdp_fn_params,
+            "force_compute": self.force_compute,
+            "mlp_params": self.mlp_params,
+            "debug": self.debug
+        }
 
-    def evaluate_human_model_pair(self, display=True, num_games=1):
+    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
+        agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+
+    def evaluate_human_model_pair(self, num_games=1, display=False):
         a0 = GreedyHumanModel(self.mlp)
         a1 = GreedyHumanModel(self.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display, num_games=num_games)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_optimal_pair(self, display=True, delivery_horizon=2):
+    def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
         a0 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
         a1 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
         a0.mlp.env = self.env
         a1.mlp.env = self.env
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_one_optimal_one_random(self, display=True):
+    def evaluate_one_optimal_one_random(self, num_games, display=True):
         a0 = CoupledPlanningAgent(self.mlp)
         a1 = RandomAgent()
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_one_optimal_one_greedy_human(self, h_idx=0, display=True):
+    def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
         h = GreedyHumanModel(self.mlp)
         r = CoupledPlanningAgent(self.mlp)
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_agent_pair(self, agent_pair, num_games=1, display=False, info=True):
-        self.env.reset()
-        return self.env.get_rollouts(agent_pair, num_games, display=display, info=info)
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True):
+        horizon_env = self.env.copy()
+        horizon_env.horizon = self.env.horizon if game_length is None else game_length
+        horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
+        horizon_env.reset()
+        return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
-    def get_agent_pair_trajs(self, a0, a1=None, num_games=100, display=False):
+    def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""
         if a1 is None:
             ap = AgentPair(a0, a0, allow_duplicate_agents=True)
-            trajs_0 = trajs_1 = self.evaluate_agent_pair(ap, num_games=num_games, display=display)
+            trajs_0 = trajs_1 = self.evaluate_agent_pair(ap, num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
         else:
-            trajs_0 = self.evaluate_agent_pair(AgentPair(a0, a1), num_games=num_games, display=display)
-            trajs_1 = self.evaluate_agent_pair(AgentPair(a1, a0), num_games=num_games, display=display)
+            trajs_0 = self.evaluate_agent_pair(AgentPair(a0, a1), num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
+            trajs_1 = self.evaluate_agent_pair(AgentPair(a1, a0), num_games=num_games, game_length=game_length, start_state_fn=start_state_fn, display=display, info=info)
         return trajs_0, trajs_1
 
     @staticmethod
-    def check_trajectories(trajectories):
+    def check_trajectories(trajectories, from_json=False):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
+        If the trajectories were saves as json, do not check that they have standard traj keys.
         """
-        AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
+        if not from_json:
+            AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
         AgentEvaluator._check_trajectories_dynamics(trajectories)
         # TODO: Check shapes?
@@ -132,7 +152,7 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):
-        _, envs = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
+        _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)
 
         for idx in range(len(trajectories["ep_observations"])):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
@@ -155,7 +175,7 @@ class AgentEvaluator(object):
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
 
     @staticmethod
-    def mdps_and_envs_from_trajectories(trajectories):
+    def get_mdps_and_envs_from_trajectories(trajectories):
         mdps, envs = [], []
         for idx in range(len(trajectories["ep_lengths"])):
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
@@ -169,15 +189,15 @@ class AgentEvaluator(object):
     ### I/O METHODS ###
 
     @staticmethod
-    def save_trajectory(trajectory, filename):
-        AgentEvaluator.check_trajectories(trajectory)
-        save_pickle(trajectory, filename)
+    def save_trajectories(trajectories, filename):
+        AgentEvaluator.check_trajectories(trajectories)
+        save_pickle(trajectories, filename)
 
     @staticmethod
-    def load_trajectory(filename):
-        traj = load_pickle(filename)
-        AgentEvaluator.check_trajectories(traj)
-        return traj
+    def load_trajectories(filename):
+        trajs = load_pickle(filename)
+        AgentEvaluator.check_trajectories(trajs)
+        return trajs
 
     @staticmethod
     def save_traj_in_stable_baselines_format(rollout_trajs, filename):
@@ -217,9 +237,13 @@ class AgentEvaluator(object):
             dict_traj[k] = list(dict_traj[k])
         dict_traj['ep_actions'] = [list(lst) for lst in dict_traj['ep_actions']]
         dict_traj['ep_rewards'] = [list(lst) for lst in dict_traj['ep_rewards']]
-        dict_traj['ep_dones'] = [int(lst) for lst in dict_traj['ep_dones']]
+        dict_traj['ep_dones'] = [list(lst) for lst in dict_traj['ep_dones']]
         dict_traj['ep_returns'] = [int(val) for val in dict_traj['ep_returns']]
         dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
+
+        # NOTE: Currently saving to JSON does not support ep_infos (due to nested np.arrays) or metadata
+        del dict_traj['ep_infos']
+        del dict_traj['metadatas']
         return dict_traj
 
     @staticmethod
@@ -229,31 +253,91 @@ class AgentEvaluator(object):
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
 
+    ############################
+    # TRAJ MANINPULATION UTILS #
+    ############################
+    # TODO: add more documentation!
+
+    @staticmethod
+    def merge_trajs(trajs_n):
+        """
+        Takes in multiple trajectory objects and appends all the information into one trajectory object
+
+        [trajs0, trajs1] -> trajs
+        """
+        metadatas_merged = merge_dictionaries([trajs["metadatas"] for trajs in trajs_n])
+        merged_trajs = merge_dictionaries(trajs_n)
+        merged_trajs["metadatas"] = metadatas_merged
+        return merged_trajs
+
+    @staticmethod
+    def remove_traj_idx(trajs, idx):
+        # NOTE: MUTATING METHOD for trajs, returns the POPPED IDX
+        metadatas = trajs["metadatas"]
+        del trajs["metadatas"]
+        removed_idx_d = rm_idx_from_dict(trajs, idx)
+        removed_idx_metas = rm_idx_from_dict(metadatas, idx)
+        trajs["metadatas"] = metadatas
+        removed_idx_d["metadatas"] = removed_idx_metas
+        return removed_idx_d
+
+    @staticmethod
+    def take_traj_indices(trajs, indices):
+        # NOTE: non mutating method
+        subset_trajs = take_indexes_from_dict(trajs, indices)
+        # TODO: Make metadatas field into additional keys for trajs, rather than having a metadatas field?
+        subset_trajs["metadatas"] = take_indexes_from_dict(trajs["metadatas"], indices)
+        return subset_trajs
 
     ### VIZUALIZATION METHODS ###
 
     @staticmethod
-    def interactive_from_traj(trajectories, traj_idx=0):
+    def interactive_from_traj(trajectories, traj_idx=0, nested_keys_to_print=[]):
         """
         Displays ith trajectory of trajectories (in standard format) 
         interactively in a Jupyter notebook.
+
+        keys_to_print is a list of keys of info to be printed. By default
+        states and actions (corresponding to the previous timestep will be printed)
+        will be printed.
         """
         from ipywidgets import widgets, interactive_output
 
         states = trajectories["ep_observations"][traj_idx]
         joint_actions = trajectories["ep_actions"][traj_idx]
+        
+        other_info = {}
+        for nested_k in nested_keys_to_print:
+            inner_data = trajectories
+            for k in nested_k:
+                inner_data = inner_data[k]
+            inner_data = inner_data[traj_idx]
+            
+            assert np.array(inner_data).shape == np.array(states).shape, "{} vs {}".format(np.array(inner_data).shape, np.array(states).shape)
+            other_info[k] = inner_data
+
         cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
         mdp_params = trajectories["mdp_params"][traj_idx]
         env_params = trajectories["env_params"][traj_idx]
         env = AgentEvaluator(mdp_params, env_params=env_params).env
 
         def update(t = 1.0):
-            env.state = states[int(t)]
-            joint_action = joint_actions[int(t - 1)] if t > 0 else (Action.STAY, Action.STAY)
+            traj_timestep = int(t)
+            env.state = states[traj_timestep]
+            joint_action = joint_actions[traj_timestep - 1] if traj_timestep > 0 else (Action.STAY, Action.STAY)
             print(env)
             print("Joint Action: {} \t Score: {}".format(Action.joint_action_to_char(joint_action), cumulative_rewards[t]))
-            
-            
+
+            for k, data in other_info.items():
+                print("{}: {}".format(k, data[traj_timestep]))
+
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})
         display(out, t)
+
+    # EVENTS VISUALIZATION METHODS #
+    
+    @staticmethod
+    def events_visualization(trajs, traj_index):
+        # TODO
+        pass

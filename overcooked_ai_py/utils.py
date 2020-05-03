@@ -84,14 +84,54 @@ def std_err(lst):
 
 # Other utils
 
-def merge_dictionaries(dictionaries):
-    """Merge many dictionaries by appending them to one another."""
+def dict_mean_and_std_err(d):
+    result = {}
+    for k, v in d.items():
+        result[k] = mean_and_std_err(v)
+    return result
+
+def append_dictionaries(dictionaries):
+    """
+    Append many dictionaries with numbers as values into one dictionary with lists as values.
+
+    {a: 1, b: 2}, {a: 3, b: 0}  ->  {a: [1, 3], b: [2, 0]}
+    """
     assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
     final_dict = defaultdict(list)
     for d in dictionaries:
         for k, v in d.items():
             final_dict[k].append(v)
     return dict(final_dict)
+
+def merge_dictionaries(dictionaries):
+    """
+    Merge many dictionaries by extending them to one another.
+    {a: [1, 7], b: [2, 5]}, {a: [3], b: [0]}  ->  {a: [1, 7, 3], b: [2, 5, 0]}
+    """
+    assert all(set(d.keys()) == set(dictionaries[0].keys()) for d in dictionaries), "All key sets are the same across all dicts"
+    final_dict = defaultdict(list)
+    for d in dictionaries:
+        for k, v in d.items():
+            final_dict[k].extend(v)
+    return dict(final_dict)
+
+def rm_idx_from_dict(d, idx):
+    """
+    Remove index form all value-lists of a dictionary.
+    NOTE: MUTATING METHOD, returns the POPPED IDX
+    """
+    new_d = {}
+    for k, v in d.items():
+        new_d[k] = [d[k].pop(idx)]
+    return new_d
+
+def take_indexes_from_dict(d, indices):
+    new_d = {}
+    for k, v in d.items():
+        if k == "metadatas":
+            continue
+        new_d[k] = np.take(d[k], indices)
+    return new_d
 
 def profile(fnc):
     """A decorator that uses cProfile to profile a function (from https://osf.io/upav8/)"""

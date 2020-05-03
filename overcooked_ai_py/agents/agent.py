@@ -19,6 +19,20 @@ class Agent(object):
         """
         return NotImplementedError()
 
+    def actions(self, states, agent_indices):
+        """
+        A multi-state version of the action method. This enables for parallized
+        implementations that can potentially give speedups in action prediction. 
+
+        Args:
+            states (list): list of OvercookedStates for which we want actions for
+            agent_indices (list): list to inform which agent we are requesting the action for in each state
+
+        Returns:
+            [(action, action_info), (action, action_info), ...]: the actions and action infos for each state-agent_index pair
+        """
+        return NotImplementedError()
+
     @staticmethod
     def a_probs_from_action(action):
         action_idx = Action.ACTION_TO_INDEX[action]
@@ -49,6 +63,7 @@ class AgentGroup(object):
     def __init__(self, *agents, allow_duplicate_agents=False):
         self.agents = agents
         self.n = len(self.agents)
+        self.reset()
         for i, agent in enumerate(self.agents):
             agent.set_agent_index(i)
 
@@ -119,48 +134,45 @@ class CoupledPlanningPair(AgentPair):
         return joint_action_and_infos
 
 
-
 class AgentFromPolicy(Agent):
     """
     Defines an agent from a `state_policy` and `direct_policy` functions
     """
-
-    def __init__(self, state_policy, direct_policy, stochastic=True, action_probs=False):
+    
+    def __init__(self, multi_state_policy, multi_obs_policy, sim_threads, stochastic=True):
         """
-        state_policy (fn): a function that takes in an OvercookedState instance and returns corresponding actions
-        direct_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
+        multi_obs_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
+        multi_state_policy (fn, args: stochastic): a function that takes in multiple OvercookedState instatences and returns actions
         stochastic (Bool): Whether the agent should sample from policy or take argmax
-        action_probs (Bool): Whether agent should return action probabilities or a sampled action
         """
-        self.state_policy = state_policy
-        self.direct_policy = direct_policy
-        self.history = []
+        self.multi_state_policy = multi_state_policy
+        self.multi_obs_policy = multi_obs_policy
+        self.sim_threads = sim_threads
         self.stochastic = stochastic
-        self.action_probs = action_probs
+        self.reset()
 
-    def action(self, state):
-        """
-        The standard action function call, that takes in a Overcooked state
-        and returns the corresponding action.
+    def actions(self, states, agent_indices):
+        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input states"
+        action_probs_n = self.multi_state_policy(states, agent_indices, stochastic=self.stochastic)
+        actions_and_infos_n = []
+        for action_probs in action_probs_n:
+            action = Action.sample(action_probs)
+            actions_and_infos_n.append((action, {"action_probs": action_probs}))
+        return actions_and_infos_n
 
-        Requires having set self.agent_index and self.mdp
+    def actions_from_observations(self, obs):
         """
-        self.history.append(state)
-        try:
-            return self.state_policy(state, self.mdp, self.agent_index, self.stochastic, self.action_probs)
-        except AttributeError as e:
-            raise AttributeError("{}. Most likely, need to set the agent_index or mdp of the Agent before calling the action method.".format(e))
-
-    def direct_action(self, obs):
-        """
-        A action called optimized for multi-threaded environment simulations
+        An action called optimized for multi-threaded environment simulations
         involving the agent. Takes in SIM_THREADS (as defined when defining the agent)
         number of observations in post-processed form, and returns as many actions.
         """
-        return self.direct_policy(obs)
+        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input obvs"
+        return self.multi_obs_policy(obs, self.stochastic)
 
     def reset(self):
-        self.history = []
+        super().reset()
+        self.history = [[] for _ in range(sim_threads)]
+
 
 class RandomAgent(Agent):
     """
@@ -168,18 +180,30 @@ class RandomAgent(Agent):
     NOTE: Does not perform interact actions, unless specified
     """
 
-    def __init__(self, sim_threads=None, interact=False):
+    def __init__(self, sim_threads=None, all_actions=False, custom_wait_prob=None):
         self.sim_threads = sim_threads
-        self.interact = interact
-
+        self.all_actions = all_actions
+        self.custom_wait_prob = custom_wait_prob
+    
     def action(self, state):
         action_probs = np.zeros(Action.NUM_ACTIONS)
         legal_actions = list(Action.MOTION_ACTIONS)
-        if self.interact:
-            legal_actions.append(Action.INTERACT)
+        if self.all_actions:
+            legal_actions = Action.ALL_ACTIONS
         legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
         action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
+
+        if self.custom_wait_prob is not None:
+            stay = Action.STAY
+            if np.random.random() < self.custom_wait_prob:
+                return stay, {"action_probs": Agent.a_probs_from_action(stay)}
+            else:
+                action_probs = Action.remove_indices_and_renormalize(action_probs, [Action.ACTION_TO_INDEX[stay]])
+
         return Action.sample(action_probs), {"action_probs": action_probs}
+
+    def actions(self, states, agent_indices):
+        return [self.action(state) for state in states]
 
     def direct_action(self, obs):
         return [np.random.randint(4) for _ in range(self.sim_threads)]
@@ -216,6 +240,7 @@ class FixedPlanAgent(Agent):
         return curr_action, {}
 
     def reset(self):
+        super().reset()
         self.i = 0
 
 
@@ -334,6 +359,7 @@ class GreedyHumanModel(Agent):
         self.reset()
 
     def reset(self):
+        super().reset()
         self.prev_state = None
 
     def actions(self, states, agent_indices):
@@ -369,7 +395,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
 
@@ -474,18 +500,18 @@ class GreedyHumanModel(Agent):
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
 
             if soup_nearly_ready and not other_has_dish:
-                motion_goals = am.pickup_dish_actions(state, counter_objects)
+                motion_goals = am.pickup_dish_actions(counter_objects)
             else:
                 next_order = None
                 if state.num_orders_remaining > 1:
                     next_order = state.next_order
 
                 if next_order == 'onion':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects)
                 elif next_order == 'tomato':
-                    motion_goals = am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_tomato_actions(counter_objects)
                 elif next_order is None or next_order == 'any':
-                    motion_goals = am.pickup_onion_actions(state, counter_objects) + am.pickup_tomato_actions(state, counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
 
         else:
             player_obj = player.get_object()
@@ -513,4 +539,3 @@ class GreedyHumanModel(Agent):
             assert len(motion_goals) != 0
 
         return motion_goals
-
