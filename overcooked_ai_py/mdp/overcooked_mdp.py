@@ -801,25 +801,19 @@ class OvercookedGridworld(object):
 
     def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index):
         """Player dropped the object on a counter"""
-        if obj_name == "soup":
-            events_infos["soup_drop"][player_index] = True
-
-        elif obj_name == "dish":
-            events_infos["dish_drop"][player_index] = True
-            if self.is_dish_drop_useful(state, pot_states, player_index):
-                events_infos["useful_d_drop"][player_index] = True
-
-        elif obj_name == "onion":
-            events_infos["onion_drop"][player_index] = True
-            if self.is_onion_drop_useful(state, pot_states, player_index):
-                events_infos["useful_o_drop"][player_index] = True
-
-        elif obj_name == "tomato":
-            # TODO: logging/events for tomatoes are not currently supported
-            pass
-
-        else:
-            raise ValueError()
+        obj_drop_key = obj_name + "_drop"
+        if obj_drop_key not in events_infos:
+            raise ValueError("Unknown event {}".format(obj_drop_key))
+        events_infos[obj_drop_key][player_index] = True
+        
+        USEFUL_DROP_FNS = {
+            "onion": self.is_onion_drop_useful,
+            "dish": self.is_dish_drop_useful
+        }
+        if obj_name in USEFUL_DROP_FNS:
+            if USEFUL_DROP_FNS[obj_name](state, pot_states, player_index):
+                obj_useful_key = "useful_" + obj_name + "_drop"
+                events_infos[obj_useful_key][player_index] = True
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
