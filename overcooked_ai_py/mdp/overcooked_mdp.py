@@ -347,16 +347,16 @@ BASE_REW_SHAPING_PARAMS = {
 EVENT_TYPES = [
     # Onion events
     'onion_pickup',
-    'useful_o_pickup',
+    'useful_onion_pickup',
     'onion_drop',
-    'useful_o_drop',
+    'useful_onion_drop',
     'potting_onion',
 
     # Dish events
     'dish_pickup',
-    'useful_d_pickup',
+    'useful_dish_pickup',
     'dish_drop',
-    'useful_d_drop',
+    'useful_dish_drop',
 
     # Soup events
     'soup_pickup',
@@ -718,7 +718,7 @@ class OvercookedGridworld(object):
     def get_partially_full_pots(self, pot_states):
         return pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
 
-    def is_dish_pickup_useful(self, state, pot_states):
+    def is_dish_pickup_useful(self, state, pot_states, player_index=None):
         """
         NOTE: this only works if self.num_players == 2
         Useful if:
@@ -729,6 +729,8 @@ class OvercookedGridworld(object):
         We also want to prevent picking up and dropping dishes, so add the condition
         that there must be no dishes on counters
         """
+        if self.num_players != 2: return False
+
         # This next line is to prevent reward hacking (this logic is also used by reward shaping)
         dishes_on_counters = self.get_counter_objects_dict(state)["dish"]
         no_dishes_on_counters = len(dishes_on_counters) == 0
@@ -803,6 +805,9 @@ class OvercookedGridworld(object):
         """Player dropped the object on a counter"""
         obj_drop_key = obj_name + "_drop"
         if obj_drop_key not in events_infos:
+            # TODO: add support for tomato event logging
+            if obj_name == "tomato":
+                return
             raise ValueError("Unknown event {}".format(obj_drop_key))
         events_infos[obj_drop_key][player_index] = True
         

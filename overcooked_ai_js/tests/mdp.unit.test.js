@@ -433,6 +433,8 @@ test("Test Transitions and Environment", () => {
         expected_reward: 0
     });
 
+    // NOTE: Discontinued support of tomatoes in javascript
+    //
     // let atraj = [
     //     [stay, stay], [interact, interact],
     //     [e, w], [e, s], [s, interact], [s, w], [interact, n], [e, interact],

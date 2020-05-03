@@ -78,38 +78,38 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_human_model_pair(self, display=True, num_games=1):
+    def evaluate_human_model_pair(self, num_games=1, display=False):
         a0 = GreedyHumanModel(self.mlp)
         a1 = GreedyHumanModel(self.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display, num_games=num_games)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_optimal_pair(self, display=True, delivery_horizon=2):
+    def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
         a0 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
         a1 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
         a0.mlp.env = self.env
         a1.mlp.env = self.env
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_one_optimal_one_random(self, display=True):
+    def evaluate_one_optimal_one_random(self, num_games, display=True):
         a0 = CoupledPlanningAgent(self.mlp)
         a1 = RandomAgent()
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_one_optimal_one_greedy_human(self, h_idx=0, display=True):
+    def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
         h = GreedyHumanModel(self.mlp)
         r = CoupledPlanningAgent(self.mlp)
         agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
-        return self.evaluate_agent_pair(agent_pair, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
     def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True):
         horizon_env = self.env.copy()
         horizon_env.horizon = self.env.horizon if game_length is None else game_length
         horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
         horizon_env.reset()
-        return horizon_env.get_rollouts(agent_pair, num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+        return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""
@@ -152,7 +152,7 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):
-        _, envs = AgentEvaluator.mdps_and_envs_from_trajectories(trajectories)
+        _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)
 
         for idx in range(len(trajectories["ep_observations"])):
             states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
@@ -175,7 +175,7 @@ class AgentEvaluator(object):
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
 
     @staticmethod
-    def mdps_and_envs_from_trajectories(trajectories):
+    def get_mdps_and_envs_from_trajectories(trajectories):
         mdps, envs = [], []
         for idx in range(len(trajectories["ep_lengths"])):
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]

@@ -771,10 +771,10 @@ class MediumLevelActionManager(object):
         player_actions = []
         counter_pickup_objects = self.mdp.get_counter_objects_dict(state, self.counter_pickup)
         if not player.has_object():
-            onion_pickup = self.pickup_onion_actions(state, counter_pickup_objects)
-            tomato_pickup = self.pickup_tomato_actions(state, counter_pickup_objects)
-            dish_pickup = self.pickup_dish_actions(state, counter_pickup_objects)
-            soup_pickup = self.pickup_counter_soup_actions(state, counter_pickup_objects)
+            onion_pickup = self.pickup_onion_actions(counter_pickup_objects)
+            tomato_pickup = self.pickup_tomato_actions(counter_pickup_objects)
+            dish_pickup = self.pickup_dish_actions(counter_pickup_objects)
+            soup_pickup = self.pickup_counter_soup_actions(counter_pickup_objects)
             player_actions.extend(onion_pickup + tomato_pickup + dish_pickup + soup_pickup)
 
         else:
@@ -1130,7 +1130,7 @@ class MediumLevelPlanner(object):
         else:
             joint_action = (action, other_agent_action)
         if not self.mdp.is_terminal(state):
-            results, _, _ = self.mdp.get_state_transition(state, joint_action)
+            results, _, _, _ = self.mdp.get_state_transition(state, joint_action)
             successor_state = results
         else:
             print("Tried to find successor of terminal")
@@ -1207,7 +1207,7 @@ class HighLevelActionManager(object):
     def get_dish_and_soup_and_serve(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting a dish, 
         going to a pot and picking up a soup, and delivering the soup."""
-        dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(state, counter_objects)
+        dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(counter_objects)
         pickup_soup_actions = self.ml_action_manager.pickup_soup_with_dish_actions(pot_states_dict)
         deliver_soup_actions = self.ml_action_manager.deliver_soup_actions()
         hl_level_actions = list(itertools.product(dish_pickup_actions, pickup_soup_actions, deliver_soup_actions))
@@ -1216,7 +1216,7 @@ class HighLevelActionManager(object):
     def get_onion_and_put_in_pot(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting an onion
         from a dispenser and placing it in a pot."""
-        onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(state, counter_objects)
+        onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(counter_objects)
         put_in_pot_actions = self.ml_action_manager.put_onion_in_pot_actions(pot_states_dict)
         hl_level_actions = list(itertools.product(onion_pickup_actions, put_in_pot_actions))
         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
@@ -1224,7 +1224,7 @@ class HighLevelActionManager(object):
     def get_tomato_and_put_in_pot(self, state, counter_objects, pot_states_dict):
         """Get all sequences of medium-level actions (hl actions) that involve a player getting an tomato
         from a dispenser and placing it in a pot."""
-        tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(state, counter_objects)
+        tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(counter_objects)
         put_in_pot_actions = self.ml_action_manager.put_tomato_in_pot_actions(pot_states_dict)
         hl_level_actions = list(itertools.product(tomato_pickup_actions, put_in_pot_actions))
         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
