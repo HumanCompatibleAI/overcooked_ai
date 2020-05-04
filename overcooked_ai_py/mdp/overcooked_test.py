@@ -37,6 +37,7 @@ class TestDirection(unittest.TestCase):
         # Check that the numbers are 0, 1, ... num_directions - 1
         self.assertEqual(set(all_numbers), set(range(num_directions)))
 
+
 class TestGridworld(unittest.TestCase):
 
     # TODO: write more smaller targeted tests to be loaded from jsons

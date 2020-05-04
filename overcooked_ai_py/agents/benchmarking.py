@@ -277,7 +277,7 @@ class AgentEvaluator(object):
     @staticmethod
     def take_traj_indices(trajs, indices):
         # NOTE: non mutating method
-        subset_trajs = take_indexes_from_dict(trajs, indices)
+        subset_trajs = take_indexes_from_dict(trajs, indices, keys_to_ignore=["metadatas"])
         # TODO: Make metadatas field into additional keys for trajs, rather than having a metadatas field?
         subset_trajs["metadatas"] = take_indexes_from_dict(trajs["metadatas"], indices)
         return subset_trajs

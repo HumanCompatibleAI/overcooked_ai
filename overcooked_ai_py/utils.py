@@ -3,6 +3,7 @@ import numpy as np
 from numpy import nan
 from collections import defaultdict
 from pathlib import Path
+from collections.abc import Iterable
 
 # I/O
 
@@ -72,19 +73,25 @@ def rnd_int_uniform(low, high):
 
 # Statistics
 
-def mean_and_std_err(lst):
-    "Mean and standard error"
-    mu = np.mean(lst)
-    return mu, std_err(lst)
-
 def std_err(lst):
+    """Computes the standard error"""
     sd = np.std(lst)
     n = len(lst)
     return sd / np.sqrt(n)
 
+def mean_and_std_err(lst):
+    "Mean and standard error of list"
+    mu = np.mean(lst)
+    return mu, std_err(lst)
+
 # Other utils
 
 def dict_mean_and_std_err(d):
+    """
+    Takes in a dictionary with lists as keys, and returns a dictionary
+    with mean and standard error for each list as values
+    """
+    assert all(isinstance(v, Iterable) for v in d.values())
     result = {}
     for k, v in d.items():
         result[k] = mean_and_std_err(v)
@@ -117,19 +124,28 @@ def merge_dictionaries(dictionaries):
 
 def rm_idx_from_dict(d, idx):
     """
-    Remove index form all value-lists of a dictionary.
-    NOTE: MUTATING METHOD, returns the POPPED IDX
+    Takes in a dictionary with lists as values, and returns
+    a dictionary with lists as values, but containing 
+    only the desired index
+
+    NOTE: this is a MUTATING METHOD, returns the POPPED IDX
     """
+    assert all(isinstance(v, Iterable) for v in d.values())
     new_d = {}
     for k, v in d.items():
         new_d[k] = [d[k].pop(idx)]
     return new_d
 
-def take_indexes_from_dict(d, indices):
+def take_indexes_from_dict(d, indices, keys_to_ignore=[]):
+    """
+    Takes in a dictionary with lists as values, and returns
+    a dictionary with lists as values, but with subsampled indices
+    based on the `indices` input 
+    """
+    assert all(isinstance(v, Iterable) for v in d.values())
     new_d = {}
     for k, v in d.items():
-        if k == "metadatas":
-            continue
+        if k in keys_to_ignore: continue
         new_d[k] = np.take(d[k], indices)
     return new_d
 
