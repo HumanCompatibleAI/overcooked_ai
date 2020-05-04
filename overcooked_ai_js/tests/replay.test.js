@@ -78,7 +78,7 @@ function trajectoryTest(trajectoryFile) {
 	let alignedStartingStates = [];
 	let alignedJointActions = [];
 
-	let observations = trajectoryData.ep_observations[0];
+	let observations = trajectoryData.ep_states[0];
 	let actions = trajectoryData.ep_actions[0];
 	let rewards = trajectoryData.ep_rewards[0];
 

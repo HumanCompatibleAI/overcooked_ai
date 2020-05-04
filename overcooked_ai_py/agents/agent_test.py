@@ -60,7 +60,7 @@ class TestBasicAgents(unittest.TestCase):
         a0 = FixedPlanAgent([s, e, n, w])
         a1 = FixedPlanAgent([s, w, n, e])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp, horizon=10)
+        env = OvercookedEnv.from_mdp(large_mdp, horizon=10)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(time_taken, 10)
@@ -74,7 +74,7 @@ class TestBasicAgents(unittest.TestCase):
             [P((2, 2), n),
              P((2, 1), n)],
             {}, order_list=['any'])
-        env = OvercookedEnv(large_mdp, start_state_fn=lambda: start_state)
+        env = OvercookedEnv.from_mdp(large_mdp, start_state_fn=lambda: start_state)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(end_state.order_list, [])
@@ -89,7 +89,7 @@ class TestBasicAgents(unittest.TestCase):
             [P((8, 1), s),
              P((1, 1), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
+        env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(len(end_state.order_list), 0)
@@ -108,7 +108,7 @@ class TestExtraAgents(unittest.TestCase):
             [P((2, 2), n),
              P((2, 1), n)],
             {}, order_list=['any'])
-        env = OvercookedEnv(simple_mdp, start_state_fn=lambda: start_state)
+        env = OvercookedEnv.from_mdp(simple_mdp, start_state_fn=lambda: start_state)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(end_state.order_list, [])
@@ -117,7 +117,7 @@ class TestExtraAgents(unittest.TestCase):
         a0 = CoupledPlanningAgent(self.mlp_large)
         a1 = FixedPlanAgent([s, e, n, w])
         agent_pair = AgentPair(a0, a1)
-        env = OvercookedEnv(large_mdp, horizon=10)
+        env = OvercookedEnv.from_mdp(large_mdp, horizon=10)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         self.assertEqual(time_taken, 10)
 
@@ -132,7 +132,7 @@ class TestExtraAgents(unittest.TestCase):
             [P((2, 1), s),
              P((1, 1), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(large_mdp, start_state_fn=lambda: start_state)
+        env = OvercookedEnv.from_mdp(large_mdp, start_state_fn=lambda: start_state)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         end_state = trajectory[-1][0]
         self.assertEqual(end_state.order_list, [])
@@ -155,11 +155,11 @@ class TestScenarios(unittest.TestCase):
     """
 
     def compare_times(self, evaluator, h_idx=0):
-        trajectory_hr = evaluator.evaluate_one_optimal_one_greedy_human(h_idx=h_idx, display=DISPLAY)
+        trajectory_hr = evaluator.evaluate_one_optimal_one_greedy_human(num_games=1, h_idx=h_idx, display=DISPLAY)
         time_taken_hr = trajectory_hr["ep_lengths"][0]
 
         print("\n"*5, "\n" , "-"*50)
-        trajectory_rr = evaluator.evaluate_optimal_pair(display=DISPLAY)
+        trajectory_rr = evaluator.evaluate_optimal_pair(num_games=1, display=DISPLAY)
         time_taken_rr = trajectory_rr["ep_lengths"][0]
 
         print("H+R time taken: ", time_taken_hr)
@@ -190,7 +190,7 @@ class TestScenarios(unittest.TestCase):
             [P((2, 1), s, Obj('onion', (2, 1))),
              P((10, 2), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_1_mdp, start_state_fn=lambda: start_state)
+        env = OvercookedEnv.from_mdp(scenario_1_mdp, start_state_fn=lambda: start_state)
         env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
     def test_scenario_1_s(self):
@@ -205,7 +205,7 @@ class TestScenarios(unittest.TestCase):
             [P((2, 1), s, Obj('onion', (2, 1))),
              P((4, 2), s)],
             {}, order_list=['onion'])
-        env = OvercookedEnv(scenario_1_mdp, start_state_fn=lambda: start_state)
+        env = OvercookedEnv.from_mdp(scenario_1_mdp, start_state_fn=lambda: start_state)
         trajectory, time_taken_hr, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
         env.reset()
 

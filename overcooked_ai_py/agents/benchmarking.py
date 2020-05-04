@@ -9,23 +9,14 @@ from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, Ove
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 
-DEFAULT_TRAJ_KEYS = [
-    "ep_observations",
-    "ep_actions",
-    "ep_rewards",
-    "ep_dones",
-    "ep_infos",
-    "ep_returns",
-    "ep_lengths",
-    "mdp_params",
-    "env_params",
-    "metadatas"
-]
-
-
 class AgentEvaluator(object):
     """
     Class used to get rollouts and evaluate performance of various types of agents.
+
+    TODO: This class currently only fully supports fixed mdps, or variable mdps that can be created with the LayoutGenerator class,
+    but might break with other types of variable mdps. Some methods currently assume that the AgentEvaluator can be reconstructed
+    from loaded params (which must be pickleable). However, some custom start_state_fns or mdp_generating_fns will not be easily
+    pickleable. We should think about possible improvements/what makes most sense to do here.
     """
 
     def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
@@ -39,26 +30,21 @@ class AgentEvaluator(object):
         assert type(mdp_params) is dict, "mdp_params must be a dictionary"
 
         if mdp_fn_params is None:
-            self.variable_mdp = False
-            self.mdp_fn = lambda: OvercookedGridworld.from_layout_name(**mdp_params)
+            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+            self.mdp_fn = lambda: mdp
+            self.env = OvercookedEnv.from_mdp(mdp, **env_params)
         else:
-            self.variable_mdp = True
             self.mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
-            
-        self.env = OvercookedEnv(self.mdp_fn, **env_params)
+            self.env = OvercookedEnv(self.mdp_fn, **env_params)
+        
         self.force_compute = force_compute
         self.debug = debug
         self.mlp_params = mlp_params
         self._mlp = None
 
-        # For easier exporting
-        self.env_params = env_params
-        self.mdp_params = mdp_params
-        self.mdp_fn_params = mdp_fn_params
-
     @property
     def mlp(self):
-        assert not self.variable_mdp, "Variable mdp is not currently supported for planning"
+        assert not self.env.variable_mdp, "Variable mdp is not currently supported for planning"
         if self._mlp is None: 
             if self.debug: print("Computing Planner")
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
@@ -66,8 +52,8 @@ class AgentEvaluator(object):
 
     def get_params(self):
         return {
-            "mdp_params": self.mdp_params,
-            "env_params": self.env_params,
+            "mdp_params": self.mdp.mdp_params,
+            "env_params": self.env.env_params,
             "mdp_fn_params": self.mdp_fn_params,
             "force_compute": self.force_compute,
             "mlp_params": self.mlp_params,
@@ -135,14 +121,15 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_standard_traj_keys(traj_keys_set):
-        assert traj_keys_set == set(DEFAULT_TRAJ_KEYS), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
-            [k for k in DEFAULT_TRAJ_KEYS if k not in traj_keys_set], [k for k in traj_keys_set if k not in DEFAULT_TRAJ_KEYS]
+        default_traj_keys = OvercookedEnv.DEFAULT_TRAJ_KEYS
+        assert traj_keys_set == set(default_traj_keys), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
+            [k for k in default_traj_keys if k not in traj_keys_set], [k for k in traj_keys_set if k not in default_traj_keys]
         )
     
     @staticmethod
     def _check_right_types(trajectories):
-        for idx in range(len(trajectories["ep_observations"])):
-            states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+        for idx in range(len(trajectories["ep_states"])):
+            states, actions, rewards = trajectories["ep_states"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
             assert all(type(j_a) is tuple for j_a in actions)
             assert all(type(s) is OvercookedState for s in states)
@@ -152,10 +139,15 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories):
+        if any(env_params["_variable_mdp"] for env_params in trajectories["env_params"]):
+            print("Skipping trajectory consistency checking because MDP was recognized as variable. "
+                  "Trajectory consistency checking is not yet supported for variable MDPs.")
+            return
+
         _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)
 
-        for idx in range(len(trajectories["ep_observations"])):
-            states, actions, rewards = trajectories["ep_observations"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+        for idx in range(len(trajectories["ep_states"])):
+            states, actions, rewards = trajectories["ep_states"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
             simulation_env = envs[idx]
 
             assert len(states) == len(actions) == len(rewards), "# states {}\t# actions {}\t# rewards {}".format(
@@ -178,9 +170,10 @@ class AgentEvaluator(object):
     def get_mdps_and_envs_from_trajectories(trajectories):
         mdps, envs = [], []
         for idx in range(len(trajectories["ep_lengths"])):
-            mdp_params, env_params = trajectories["mdp_params"][idx], trajectories["env_params"][idx]
+            mdp_params = copy.deepcopy(trajectories["mdp_params"][idx])
+            env_params = copy.deepcopy(trajectories["env_params"][idx])
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            env = OvercookedEnv(mdp, **env_params)
+            env = OvercookedEnv.from_mdp(mdp, **env_params)
             mdps.append(mdp)
             envs.append(env)
         return mdps, envs
@@ -209,7 +202,7 @@ class AgentEvaluator(object):
 
         stable_baselines_trajs_dict = {
             'actions': np.concatenate(rollout_trajs["ep_actions"]),
-            'obs': np.concatenate(rollout_trajs["ep_observations"]),
+            'obs': np.concatenate(rollout_trajs["ep_states"]),
             'rewards': np.concatenate(rollout_trajs["ep_rewards"]),
             'episode_starts': np.concatenate(eps_starts),
             'episode_returns': rollout_trajs["ep_returns"]
@@ -220,7 +213,7 @@ class AgentEvaluator(object):
     @staticmethod
     def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
-        assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
+        assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectory.keys())
         AgentEvaluator.check_trajectories(trajectory)
         trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
         save_as_json(trajectory, filename)
@@ -232,7 +225,7 @@ class AgentEvaluator(object):
         This method converts all components of a trajectory to standard types.
         """
         dict_traj = copy.deepcopy(trajectories)
-        dict_traj["ep_observations"] = [[ob.to_dict() for ob in one_ep_obs] for one_ep_obs in trajectories["ep_observations"]]
+        dict_traj["ep_states"] = [[ob.to_dict() for ob in one_ep_obs] for one_ep_obs in trajectories["ep_states"]]
         for k in dict_traj.keys():
             dict_traj[k] = list(dict_traj[k])
         dict_traj['ep_actions'] = [list(lst) for lst in dict_traj['ep_actions']]
@@ -249,7 +242,7 @@ class AgentEvaluator(object):
     @staticmethod
     def load_traj_from_json(filename):
         traj_dict = load_from_json(filename)
-        traj_dict["ep_observations"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_observations"]]
+        traj_dict["ep_states"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_states"]]
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
 
@@ -303,7 +296,7 @@ class AgentEvaluator(object):
         """
         from ipywidgets import widgets, interactive_output
 
-        states = trajectories["ep_observations"][traj_idx]
+        states = trajectories["ep_states"][traj_idx]
         joint_actions = trajectories["ep_actions"][traj_idx]
         
         other_info = {}

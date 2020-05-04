@@ -42,7 +42,7 @@ function losslessEncodingTest(original_trajectory_file, python_encoding_file, pl
 	});
 
 
-	let traj_states = trajectoryData.ep_observations[0];
+	let traj_states = trajectoryData.ep_states[0];
 
 	for (let i = 0; i < traj_states.length; i++) {
 		let curr_state = dictToState(traj_states[i]);
@@ -85,7 +85,7 @@ test('Encodings should be the same', () => {
 // 	});
 
 
-// 	let traj_states = trajectoryData.ep_observations[0];
+// 	let traj_states = trajectoryData.ep_states[0];
 
 // 	for (let i = 0; i < traj_states.length; i++) {
 // 		let curr_state = dictToState(traj_states[i]);

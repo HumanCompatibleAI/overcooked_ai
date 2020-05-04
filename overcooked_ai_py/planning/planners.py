@@ -622,7 +622,7 @@ class JointMotionPlanner(object):
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
         dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, order_list=['any', 'any'])
-        env = OvercookedEnv(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
+        env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
         return successor_state.players_pos_and_or
@@ -1439,7 +1439,7 @@ class Heuristic(object):
         heuristic_cost = forward_cost / 2
         
         if debug:
-            env = OvercookedEnv(self.mdp)
+            env = OvercookedEnv.from_mdp(self.mdp)
             env.state = state
             print("\n" + "#"*35)
             print("Current state: (ml timestep {})\n".format(time))
@@ -1567,7 +1567,7 @@ class Heuristic(object):
         heuristic_cost = (pot_to_delivery_costs + dish_to_pot_costs + items_to_pot_cost) / 2
 
         if debug:
-            env = OvercookedEnv(self.mdp)
+            env = OvercookedEnv.from_mdp(self.mdp)
             env.state = state
             print("\n" + "#" * 35)
             print("Current state: (ml timestep {})\n".format(time))

@@ -11,14 +11,39 @@ DEFAULT_ENV_PARAMS = {
 
 MAX_HORIZON = 1e10
 
+
 class OvercookedEnv(object):
     """An environment wrapper for the OvercookedGridworld Markov Decision Process.
 
     The environment keeps track of the current state of the agent, updates
     it as the agent takes actions, and provides rewards to the agent.
+
+    Overcooked trajectories have the following structure:
+
+    trajs = {
+        # With shape (n_episodes, game_len), where game_len might vary across games:
+        "ep_states":    [ [traj_1_states], [traj_2_states], ... ],                          # Individual trajectory states
+        "ep_actions":   [ [traj_1_joint_actions], [traj_2_joint_actions], ... ],            # Trajectory joint actions, by agent
+        "ep_rewards":   [ [traj_1_timestep_rewards], [traj_2_timestep_rewards], ... ],      # (Sparse) reward values by timestep
+        "ep_dones":     [ [traj_1_timestep_dones], [traj_2_timestep_dones], ... ],          # Done values (should be all 0s except last one for each traj, TODO check this)
+        "ep_infos":     [ [traj_1_timestep_infos], [traj_2_traj_1_timestep_infos], ... ],   # Info dictionaries
+
+        # With shape (n_episodes, ):
+        "ep_returns":   [ cumulative_traj1_reward, cumulative_traj2_reward, ... ],          # Sum of sparse rewards across each episode
+        "ep_lengths":   [ traj1_length, traj2_length, ... ],                                # Lengths (in env timesteps) of each episode
+        "mdp_params":   [ traj1_mdp_params, traj2_mdp_params, ... ],                        # Custom Mdp params to for each episode
+        "env_params":   [ traj1_env_params, traj2_env_params, ... ],                        # Custom Env params for each episode
+
+        # Custom metadata key value pairs
+        "metadatas":    [{custom metadata key:value pairs for traj 1}, {...}, ...]          # Each metadata dictionary is of similar format to the trajectories dictionary
+    }
     """
 
-    def __init__(self, mdp_or_mdp_fn, start_state_fn=None, horizon=MAX_HORIZON, info_level=0):
+    TIMESTEP_TRAJ_KEYS = ["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"]
+    EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "metadatas"]
+    DEFAULT_TRAJ_KEYS = TIMESTEP_TRAJ_KEYS + EPISODE_TRAJ_KEYS + ["metadatas"]
+
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, info_level=1, _variable_mdp=True):
         """
         mdp (OvercookedGridworld or function): either an instance of the MDP or a function that returns MDP instances 
         start_state_fn (OvercookedState): function that returns start state for the MDP, called at each environment reset
@@ -27,22 +52,38 @@ class OvercookedEnv(object):
         TODO: make the start state completely decided in the MDP. MDPs with different start states should be considered
         different MDPs, and the env should not have any say in the start state.
         """
-        self.mdp_or_mdp_fn = mdp_or_mdp_fn
-        if isinstance(mdp_or_mdp_fn, OvercookedGridworld):
-            self.mdp_generator_fn = lambda: mdp_or_mdp_fn
-            self.variable_mdp = True
-        elif callable(mdp_or_mdp_fn) and isinstance(mdp_or_mdp_fn(), OvercookedGridworld):
-            self.mdp_generator_fn = mdp_or_mdp_fn
-            self.variable_mdp = False
-        else:
-            raise ValueError("Mdp should be either OvercookedGridworld instance or a generating function")
-
+        assert callable(mdp_generator_fn),  "OvercookedEnv takes in a OvercookedGridworld generator function. " \
+                                            "If trying to instantiate directly from a OvercookedGridworld " \
+                                            "instance, use the OvercookedEnv.from_mdp method"
+        self.variable_mdp = _variable_mdp
+        self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
         self.start_state_fn = start_state_fn
         self.info_level = info_level
         self.reset()
         if self.horizon >= MAX_HORIZON and self.state.order_list is None and self.info_level > 0:
-            print("Environment has (near-)infinite horizon and no terminal states")
+            print("Environment has (near-)infinite horizon and no terminal states. \
+                Reduce info level of OvercookedEnv to not see this message.")
+
+    @staticmethod
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, info_level=1, _variable_mdp=False):
+        """
+        Create an OvercookedEnv directly from a OvercookedGridworld mdp
+        rather than a mdp generating function.
+        """
+        assert isinstance(mdp, OvercookedGridworld)
+        assert _variable_mdp is False, \
+            "from_mdp should not be called with _variable_mdp=True. If you performed this call, " \
+            "most likely there is an inconsistency in the an env_params dictionary that you were " \
+            "trying to use to create the Environment."
+        mdp_generator_fn = lambda: mdp
+        return OvercookedEnv(
+            mdp_generator_fn=mdp_generator_fn,
+            start_state_fn=start_state_fn,
+            horizon=horizon,
+            info_level=info_level,
+            _variable_mdp=_variable_mdp
+        )
 
     def __repr__(self):
         """Standard way to view the state of an environment programatically
@@ -66,7 +107,8 @@ class OvercookedEnv(object):
         return {
             "start_state_fn": self.start_state_fn,
             "horizon": self.horizon,
-            "info_level": self.info_level
+            "info_level": self.info_level,
+            "_variable_mdp": self.variable_mdp
         }
 
     def display_states(self, *states):
@@ -76,18 +118,14 @@ class OvercookedEnv(object):
             print(self)
         self.state = old_state
 
-    @staticmethod
-    def print_state(mdp, s):
-        e = OvercookedEnv(mdp, s)
-        print(e)
-
     def copy(self):
         # TODO: Add testing for checking that these util methods are up to date?
         return OvercookedEnv(
-            mdp_or_mdp_fn=self.mdp_or_mdp_fn,
+            mdp_generator_fn=self.mdp_generator_fn,
             start_state_fn=self.start_state_fn,
             horizon=self.horizon,
-            info_level=self.info_level
+            info_level=self.info_level,
+            _variable_mdp=self.variable_mdp
         )
 
     def step(self, joint_action, joint_agent_action_info=None):
@@ -237,25 +275,7 @@ class OvercookedEnv(object):
 
         NOTE: this is the standard trajectories format used throughout the codebase
         """
-        trajectories = {
-            # With shape (n_episodes, game_len), where game_len might vary across games:
-            "ep_observations": [],
-            "ep_actions": [],
-            "ep_rewards": [], # Individual (sparse) reward values
-            "ep_dones": [], # Individual done values
-            "ep_infos": [],
-
-            # With shape (n_episodes, ):
-            "ep_returns": [], # Sum of sparse rewards across each episode
-            "ep_lengths": [], # Lengths of each episode
-            "mdp_params": [], # Custom MDP params to for each episode
-            "env_params": [], # Custom Env params for each episode
-
-            # Custom metadata key value pairs
-            "metadatas": [] # Final data type is a dictionary of similar format to trajectories
-                            # (key value pairs of the same form as ep_observations, ep_returns, or others...)
-        }
-
+        trajectories = { k:[] for k in self.DEFAULT_TRAJ_KEYS }
         metadata_fn = (lambda x: {}) if metadata_fn is None else metadata_fn
         metadata_info_fn = (lambda x: "") if metadata_info_fn is None else metadata_info_fn
         range_iterator = tqdm.trange(num_games, desc='', leave=True) if info else range(num_games)
@@ -265,7 +285,7 @@ class OvercookedEnv(object):
             rollout_info = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
             trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = rollout_info
             obs, actions, rews, dones, infos = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
-            trajectories["ep_observations"].append(obs)
+            trajectories["ep_states"].append(obs)
             trajectories["ep_actions"].append(actions)
             trajectories["ep_rewards"].append(rews)
             trajectories["ep_dones"].append(dones)
@@ -339,10 +359,14 @@ class OvercookedEnv(object):
 
     @staticmethod
     def proportion_stuck_time(trajectories, agent_idx, stuck_time=3):
+        """
+        Simple util for calculating a guess for the proportion of time in the trajectories
+        during which the agent with the desired agent index was stuck.
+        """
         stuck_matrix = []
         for traj_idx in range(len(trajectories["ep_lengths"])):
             stuck_matrix.append([])
-            obs = trajectories["ep_observations"][traj_idx]
+            obs = trajectories["ep_states"][traj_idx]
             for traj_timestep in range(stuck_time, trajectories["ep_lengths"][traj_idx]):
                 if traj_timestep >= stuck_time:
                     recent_states = obs[traj_timestep - stuck_time : traj_timestep + 1]

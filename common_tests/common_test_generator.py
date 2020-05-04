@@ -13,7 +13,6 @@ from overcooked_ai_py.utils import save_as_json
 # Saving trajectory for dynamics consistency test
 np.random.seed(0)
 ae = AgentEvaluator(mdp_params={"layout_name": "cramped_room"}, env_params={"horizon": 1500})
-base_mdp = ae.mdp_fn()
 test_trajs = ae.evaluate_random_pair(all_actions=True, num_games=1)
 assert test_trajs["ep_returns"][0] > 0, "Choose a different seed, we should have a test trajectory that gets some reward"
 
@@ -27,9 +26,9 @@ env_params = load_traj["env_params"][0]
 mdp = AgentEvaluator(mdp_params, env_params).mdp_fn()
 for i in range(2):
     lossless_path = COMMON_TESTS_DIR + "encoding_tests/lossless_py{}.json".format(i)
-    encoded_states = [mdp.lossless_state_encoding(s)[i].tolist() for s in np.concatenate(load_traj["ep_observations"])]
+    encoded_states = [mdp.lossless_state_encoding(s)[i].tolist() for s in np.concatenate(load_traj["ep_states"])]
     save_as_json(encoded_states, lossless_path)
 
     featurization_path = COMMON_TESTS_DIR + "encoding_tests/featurized_py{}.json".format(i)
-    encoded_states = [mdp.featurize_state(s, ae.mlp)[i].tolist() for s in np.concatenate(load_traj["ep_observations"])]
+    encoded_states = [mdp.featurize_state(s, ae.mlp)[i].tolist() for s in np.concatenate(load_traj["ep_states"])]
     save_as_json(encoded_states, featurization_path)
