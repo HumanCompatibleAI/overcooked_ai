@@ -136,7 +136,7 @@ class CoupledPlanningPair(AgentPair):
 
 class AgentFromPolicy(Agent):
     """
-    This is a useful Agent class backbone from which to subclass from NN-based agents
+    This is a useful Agent class backbone from which to subclass from NN-based agents.
     """
     
     def __init__(self, multi_state_policy, multi_obs_policy, sim_threads, stochastic=True):

@@ -184,6 +184,9 @@ class AgentEvaluator(object):
     @staticmethod
     def save_trajectories(trajectories, filename):
         AgentEvaluator.check_trajectories(trajectories)
+        if any(t["env_params"]["start_state_fn"] is not None for t in trajectories):
+            print("Saving trajectories with a custom start state. This can currently "
+                  "cause things to break when loading in the trajectories.")
         save_pickle(trajectories, filename)
 
     @staticmethod

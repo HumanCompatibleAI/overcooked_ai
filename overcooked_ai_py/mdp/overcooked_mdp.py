@@ -371,6 +371,11 @@ class OvercookedGridworld(object):
     """
     ORDER_TYPES = ObjectState.SOUP_TYPES + ['any']
 
+
+    #########################
+    # INSTANTIATION METHODS #
+    #########################
+
     def __init__(self, terrain, start_player_positions, start_order_list=None, cook_time=20, num_items_for_soup=3, delivery_reward=20, rew_shaping_params=None, layout_name="unnamed_layout"):
         """
         terrain: a matrix of strings that encode the MDP layout
@@ -394,51 +399,6 @@ class OvercookedGridworld(object):
         self.delivery_reward = delivery_reward
         self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
-
-
-    #########
-    # UTILS #
-    #########
-
-    def __eq__(self, other):
-        return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
-                self.start_player_positions == other.start_player_positions and \
-                self.start_order_list == other.start_order_list and \
-                self.soup_cooking_time == other.soup_cooking_time and \
-                self.num_items_for_soup == other.num_items_for_soup and \
-                self.delivery_reward == other.delivery_reward and \
-                self.reward_shaping_params == other.reward_shaping_params and \
-                self.layout_name == other.layout_name
-    
-    def copy(self):
-        return OvercookedGridworld(
-            terrain=self.terrain_mtx.copy(),
-            start_player_positions=self.start_player_positions,
-            start_order_list=None if self.start_order_list is None else list(self.start_order_list),
-            cook_time=self.soup_cooking_time,
-            num_items_for_soup=self.num_items_for_soup,
-            delivery_reward=self.delivery_reward,
-            rew_shaping_params=copy.deepcopy(self.reward_shaping_params),
-            layout_name=self.layout_name
-        )
-
-    @property
-    def mdp_params(self):
-        return {
-            "layout_name": self.layout_name,
-            "terrain": self.terrain_mtx,
-            "start_player_positions": self.start_player_positions,
-            "start_order_list": self.start_order_list,
-            "cook_time": self.soup_cooking_time,
-            "num_items_for_soup": self.num_items_for_soup,
-            "delivery_reward": self.delivery_reward,
-            "rew_shaping_params": copy.deepcopy(self.reward_shaping_params)
-        }
-
-
-    #########################
-    # INSTANTIATION METHODS #
-    #########################
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -495,6 +455,46 @@ class OvercookedGridworld(object):
             mdp_config[k] = v
 
         return OvercookedGridworld(**mdp_config)
+
+
+    #####################
+    # BASIC CLASS UTILS #
+    #####################
+
+    def __eq__(self, other):
+        return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
+                self.start_player_positions == other.start_player_positions and \
+                self.start_order_list == other.start_order_list and \
+                self.soup_cooking_time == other.soup_cooking_time and \
+                self.num_items_for_soup == other.num_items_for_soup and \
+                self.delivery_reward == other.delivery_reward and \
+                self.reward_shaping_params == other.reward_shaping_params and \
+                self.layout_name == other.layout_name
+    
+    def copy(self):
+        return OvercookedGridworld(
+            terrain=self.terrain_mtx.copy(),
+            start_player_positions=self.start_player_positions,
+            start_order_list=None if self.start_order_list is None else list(self.start_order_list),
+            cook_time=self.soup_cooking_time,
+            num_items_for_soup=self.num_items_for_soup,
+            delivery_reward=self.delivery_reward,
+            rew_shaping_params=copy.deepcopy(self.reward_shaping_params),
+            layout_name=self.layout_name
+        )
+
+    @property
+    def mdp_params(self):
+        return {
+            "layout_name": self.layout_name,
+            "terrain": self.terrain_mtx,
+            "start_player_positions": self.start_player_positions,
+            "start_order_list": self.start_order_list,
+            "cook_time": self.soup_cooking_time,
+            "num_items_for_soup": self.num_items_for_soup,
+            "delivery_reward": self.delivery_reward,
+            "rew_shaping_params": copy.deepcopy(self.reward_shaping_params)
+        }
 
 
     ##############

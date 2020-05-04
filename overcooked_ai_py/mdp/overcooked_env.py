@@ -13,19 +13,23 @@ MAX_HORIZON = 1e10
 
 
 class OvercookedEnv(object):
-    """An environment wrapper for the OvercookedGridworld Markov Decision Process.
+    """
+    An environment wrapper for the OvercookedGridworld Markov Decision Process.
 
     The environment keeps track of the current state of the agent, updates
     it as the agent takes actions, and provides rewards to the agent.
 
-    Overcooked trajectories have the following structure:
+    E.g. of how to instantiate OvercookedEnv:
+    > mdp = OvercookedGridworld(...)
+    > env = OvercookedEnv.from_mdp(mdp, horizon=400)
 
+    The standard format for Overcooked trajectories is:
     trajs = {
         # With shape (n_episodes, game_len), where game_len might vary across games:
         "ep_states":    [ [traj_1_states], [traj_2_states], ... ],                          # Individual trajectory states
         "ep_actions":   [ [traj_1_joint_actions], [traj_2_joint_actions], ... ],            # Trajectory joint actions, by agent
         "ep_rewards":   [ [traj_1_timestep_rewards], [traj_2_timestep_rewards], ... ],      # (Sparse) reward values by timestep
-        "ep_dones":     [ [traj_1_timestep_dones], [traj_2_timestep_dones], ... ],          # Done values (should be all 0s except last one for each traj, TODO check this)
+        "ep_dones":     [ [traj_1_timestep_dones], [traj_2_timestep_dones], ... ],          # Done values (should be all 0s except last one for each traj) TODO: add this to traj checks
         "ep_infos":     [ [traj_1_timestep_infos], [traj_2_traj_1_timestep_infos], ... ],   # Info dictionaries
 
         # With shape (n_episodes, ):
@@ -43,14 +47,22 @@ class OvercookedEnv(object):
     EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "metadatas"]
     DEFAULT_TRAJ_KEYS = TIMESTEP_TRAJ_KEYS + EPISODE_TRAJ_KEYS + ["metadatas"]
 
+
+    #########################
+    # INSTANTIATION METHODS #
+    #########################
+
     def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, info_level=1, _variable_mdp=True):
         """
-        mdp (OvercookedGridworld or function): either an instance of the MDP or a function that returns MDP instances 
-        start_state_fn (OvercookedState): function that returns start state for the MDP, called at each environment reset
-        horizon (float): number of steps before the environment returns done=True
+        mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
+        start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
+        horizon (int):                  Number of steps before the environment returns done=True
+        info_level (int):               Change amount of logging
+        _variable_mdp (bool):           This input should be ignored in nearly all cases. Should automatically keep 
+                                        track of whether the mdp changes or is constant across episodes.
 
-        TODO: make the start state completely decided in the MDP. MDPs with different start states should be considered
-        different MDPs, and the env should not have any say in the start state.
+        TODO: Potentially make changes based on this discussion
+        https://github.com/HumanCompatibleAI/overcooked_ai/pull/22#discussion_r416786847
         """
         assert callable(mdp_generator_fn),  "OvercookedEnv takes in a OvercookedGridworld generator function. " \
                                             "If trying to instantiate directly from a OvercookedGridworld " \
@@ -85,15 +97,10 @@ class OvercookedEnv(object):
             _variable_mdp=_variable_mdp
         )
 
-    def __repr__(self):
-        """Standard way to view the state of an environment programatically
-        is just to print the Env object"""
-        return self.mdp.state_string(self.state)
 
-    def print_state_transition(self, a_t, r_t, info):
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}\n".format(
-            self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["agent_infos"], self)
-        )
+    #####################
+    # BASIC CLASS UTILS #
+    #####################
 
     @property
     def env_params(self):
@@ -101,8 +108,6 @@ class OvercookedEnv(object):
         Env params should be though of as all of the params of an env WITHOUT the mdp.
         Alone, env_params is not sufficent to recreate a copy of the Env instance, but it is
         together with mdp_params (which is sufficient to build a copy of the Mdp instance).
-
-        NOTE: unclear what happens with start_state_fn if it is not pickleable
         """
         return {
             "start_state_fn": self.start_state_fn,
@@ -110,13 +115,6 @@ class OvercookedEnv(object):
             "info_level": self.info_level,
             "_variable_mdp": self.variable_mdp
         }
-
-    def display_states(self, *states):
-        old_state = self.state
-        for s in states:
-            self.state = s
-            print(self)
-        self.state = old_state
 
     def copy(self):
         # TODO: Add testing for checking that these util methods are up to date?
@@ -127,6 +125,37 @@ class OvercookedEnv(object):
             info_level=self.info_level,
             _variable_mdp=self.variable_mdp
         )
+
+
+    #############################
+    # ENV VISUALIZATION METHODS #
+    #############################
+
+    def __repr__(self):
+        """
+        Standard way to view the state of an environment programatically
+        is just to print the Env object
+        """
+        return self.mdp.state_string(self.state)
+
+    def display_states(self, *states):
+        old_state = self.state
+        for s in states:
+            self.state = s
+            print(self)
+        self.state = old_state
+
+    def print_state_transition(self, a_t, r_t, info):
+        """
+        Terminal graphics visualization of a state transition.
+        """
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}\n".format(
+            self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["agent_infos"], self)
+        )
+
+    ###################
+    # BASIC ENV LOGIC #
+    ###################
 
     def step(self, joint_action, joint_agent_action_info=None):
         """Performs a joint action, updating the environment state
@@ -143,55 +172,17 @@ class OvercookedEnv(object):
         timestep_sparse_reward, timestep_reward_shaping = sum(sparse_reward_by_agent), sum(reward_shaping_by_agent)
 
         # Update game_stats 
-        self.update_game_stats(sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos)
+        self._update_game_stats(sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos)
 
         # Update state, time, and done
         self.t += 1
         self.state = next_state
         done = self.is_done()
-        info = self.prepare_info_dict(joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent)
+        info = self._prepare_info_dict(joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent)
         
-        if done: self.add_episode_info(info)
+        if done: self._add_episode_info(info)
 
         return (next_state, timestep_sparse_reward, done, info)
-
-    def prepare_info_dict(self, joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent):
-        """
-        The normal timestep info dict will contain infos specifc to each agent's action taken,
-        and reward shaping information.
-        """
-        # Get the agent action info, that could contain info about action probs, or other
-        # custom user defined information
-        info = {"agent_infos": [joint_agent_action_info[agent_idx] for agent_idx in range(self.mdp.num_players)]}
-        info['shaped_r_by_agent'] = reward_shaping_by_agent
-        info['sparse_r_by_agent'] = sparse_reward_by_agent
-        return info
-
-    def add_episode_info(self, info):
-        info['episode'] = {
-            'ep_game_stats': self.game_stats,
-            'ep_sparse_r': sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
-            'ep_shaped_r': sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
-            'ep_sparse_r_by_agent': self.game_stats["cumulative_sparse_rewards_by_agent"],
-            'ep_shaped_r_by_agent': self.game_stats["cumulative_shaped_rewards_by_agent"],
-            'ep_length': self.t
-        }
-        return info
-
-    def update_game_stats(self, sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos):
-        """
-        Update the game stats dict based on the events of the current step
-        NOTE: the timer ticks after events are logged, so there can be events from time 0 to time self.horizon - 1
-        """
-        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(sparse_reward_by_agent)
-        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(reward_shaping_by_agent)
-
-        for event_type, bool_list_by_agent in game_stat_infos.items():
-            # For each event type, store the timestep if it occurred
-            event_occurred_by_idx = [int(x) for x in bool_list_by_agent]
-            for idx, event_by_agent in enumerate(event_occurred_by_idx):
-                if event_by_agent:
-                    self.game_stats[event_type][idx].append(self.t)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -212,6 +203,49 @@ class OvercookedEnv(object):
     def is_done(self):
         """Whether the episode is over."""
         return self.t >= self.horizon or self.mdp.is_terminal(self.state)
+
+    def _prepare_info_dict(self, joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent):
+        """
+        The normal timestep info dict will contain infos specifc to each agent's action taken,
+        and reward shaping information.
+        """
+        # Get the agent action info, that could contain info about action probs, or other
+        # custom user defined information
+        info = {"agent_infos": [joint_agent_action_info[agent_idx] for agent_idx in range(self.mdp.num_players)]}
+        info['shaped_r_by_agent'] = reward_shaping_by_agent
+        info['sparse_r_by_agent'] = sparse_reward_by_agent
+        return info
+
+    def _add_episode_info(self, info):
+        info['episode'] = {
+            'ep_game_stats': self.game_stats,
+            'ep_sparse_r': sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
+            'ep_shaped_r': sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
+            'ep_sparse_r_by_agent': self.game_stats["cumulative_sparse_rewards_by_agent"],
+            'ep_shaped_r_by_agent': self.game_stats["cumulative_shaped_rewards_by_agent"],
+            'ep_length': self.t
+        }
+        return info
+
+    def _update_game_stats(self, sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos):
+        """
+        Update the game stats dict based on the events of the current step
+        NOTE: the timer ticks after events are logged, so there can be events from time 0 to time self.horizon - 1
+        """
+        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(sparse_reward_by_agent)
+        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(reward_shaping_by_agent)
+
+        for event_type, bool_list_by_agent in game_stat_infos.items():
+            # For each event type, store the timestep if it occurred
+            event_occurred_by_idx = [int(x) for x in bool_list_by_agent]
+            for idx, event_by_agent in enumerate(event_occurred_by_idx):
+                if event_by_agent:
+                    self.game_stats[event_type][idx].append(self.t)
+
+
+    ####################
+    # TRAJECTORY LOGIC #
+    ####################
 
     def execute_plan(self, start_state, joint_action_plan, display=False):
         """Executes action_plan (a list of joint actions) from a start 
@@ -318,6 +352,11 @@ class OvercookedEnv(object):
         AgentEvaluator.check_trajectories(trajectories)
         return trajectories
 
+
+    ####################
+    # TRAJECTORY UTILS #
+    ####################
+
     @staticmethod
     def get_discounted_rewards(trajectories, gamma):
         rews = trajectories['ep_rewards']
@@ -342,6 +381,8 @@ class OvercookedEnv(object):
             ...
         }
         with as keys the keys returned by the agent in it's agent_info dictionary
+
+        NOTE: deprecated
         """
         agent_infos = []
         for traj_idx in range(len(trajectories["ep_lengths"])):
@@ -362,6 +403,8 @@ class OvercookedEnv(object):
         """
         Simple util for calculating a guess for the proportion of time in the trajectories
         during which the agent with the desired agent index was stuck.
+
+        NOTE: deprecated
         """
         stuck_matrix = []
         for traj_idx in range(len(trajectories["ep_lengths"])):
