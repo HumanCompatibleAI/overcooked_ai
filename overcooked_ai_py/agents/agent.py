@@ -167,6 +167,9 @@ class AgentFromPolicy(Agent):
         """
         self.policy = policy
         self.reset()
+        
+    def action(self, state):
+        return self.actions([state], [self.agent_index])[0]
 
     def actions(self, states, agent_indices):
         action_probs_n = self.policy.multi_state_policy(states, agent_indices)
