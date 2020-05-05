@@ -196,22 +196,42 @@ class AgentEvaluator(object):
         return trajs
 
     @staticmethod
-    def save_traj_in_stable_baselines_format(rollout_trajs, filename):
-        # Converting episode dones to episode starts
-        eps_starts = [np.zeros(len(traj)) for traj in rollout_trajs["ep_dones"]]
-        for ep_starts in eps_starts:
-            ep_starts[0] = 1
-        eps_starts = [ep_starts.astype(np.bool) for ep_starts in eps_starts]
+    def get_joint_traj_in_single_agent_stable_baselines_format(trajs, encoding_fn, save=False, filename=None):
+        """
+        This requires splitting each trajectory into two, one for each action in the
+        joint action.
+        """
+        sb_traj_dict_keys = ["actions", "obs", "rewards", "episode_starts", "episode_returns"]
+        sb_trajs_dict = { k:[] for k in sb_traj_dict_keys }
 
-        stable_baselines_trajs_dict = {
-            'actions': np.concatenate(rollout_trajs["ep_actions"]),
-            'obs': np.concatenate(rollout_trajs["ep_states"]),
-            'rewards': np.concatenate(rollout_trajs["ep_rewards"]),
-            'episode_starts': np.concatenate(eps_starts),
-            'episode_returns': rollout_trajs["ep_returns"]
-        }
-        stable_baselines_trajs_dict = { k:np.array(v) for k, v in stable_baselines_trajs_dict.items() }
-        np.savez(filename, **stable_baselines_trajs_dict)
+        AgentEvaluator.add_observations_to_trajs_in_metadata(trajs, encoding_fn)
+
+        for traj_idx in range(len(trajs["ep_lengths"])):
+            # Extract single-agent trajectory for each agent
+            for agent_idx in range(2):
+                
+                # Getting only actions for current agent index, and processing them to an array 
+                # with shape (1, )
+                processed_agent_actions = [[Action.ACTION_TO_INDEX[j_a[agent_idx]]] for j_a in trajs["ep_actions"][traj_idx]]
+                sb_trajs_dict["actions"].extend(processed_agent_actions)
+
+                agent_obs = [both_agent_obs[agent_idx] for both_agent_obs in trajs["metadatas"]["ep_obs_for_both_agents"][traj_idx]]
+                sb_trajs_dict["obs"].extend(agent_obs)
+
+                sb_trajs_dict["rewards"].extend(trajs["ep_rewards"][traj_idx])
+
+                # Converting episode dones to episode starts
+                traj_starts = [1 if i == 0 else 0 for i in range(trajs["ep_lengths"][traj_idx])]
+                sb_trajs_dict["episode_starts"].extend(traj_starts)
+                sb_trajs_dict["episode_returns"].append(trajs["ep_returns"][traj_idx])
+
+        sb_trajs_dict = { k:np.array(v) for k, v in sb_trajs_dict.items() }
+
+        if save:
+            assert filename is not None
+            np.savez(filename, **sb_trajs_dict)
+
+        return sb_trajs_dict
 
     @staticmethod
     def save_traj_as_json(trajectory, filename):
@@ -284,6 +304,30 @@ class AgentEvaluator(object):
         # TODO: Make metadatas field into additional keys for trajs, rather than having a metadatas field?
         subset_trajs["metadatas"] = take_indexes_from_dict(trajs["metadatas"], indices)
         return subset_trajs
+
+    @staticmethod
+    def add_metadata_to_traj(trajs, metadata_fn, input_keys):
+        """
+        Add an additional metadata entry to the trajectory, based on manipulating 
+        the trajectory `input_keys` values
+        """
+        metadata_fn_input = [trajs[k] for k in input_keys]
+        metadata_key, metadata_data = metadata_fn(metadata_fn_input)
+        assert metadata_key not in trajs["metadatas"].keys()
+        trajs["metadatas"][metadata_key] = metadata_data
+        return trajs
+
+    @staticmethod
+    def add_observations_to_trajs_in_metadata(trajs, encoding_fn):
+        """Adds processed observations (for both agent indices) in the metadatas"""
+        def metadata_fn(data):
+            traj_ep_states = data[0]
+            obs_metadata = []
+            for one_traj_states in traj_ep_states:
+                obs_metadata.append([encoding_fn(s) for s in one_traj_states])
+            return "ep_obs_for_both_agents", obs_metadata
+        return AgentEvaluator.add_metadata_to_traj(trajs, metadata_fn, ["ep_states"])
+
 
     ### VIZUALIZATION METHODS ###
 

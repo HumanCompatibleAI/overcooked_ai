@@ -134,26 +134,43 @@ class CoupledPlanningPair(AgentPair):
         return joint_action_and_infos
 
 
+class NNPolicy(object):
+    """
+    This is a common format for NN-based policies. Once one has wrangled the intended trained neural net
+    to this format, one can then easily create an Agent with the AgentFromPolicy class.
+    """
+
+    def __init__(self):
+        pass
+
+    def multi_state_policy(states, agent_indices):
+        """
+        A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
+        """
+        raise NotImplementedError()
+
+    def multi_obs_policy(states):
+        """
+        A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
+        """
+        raise NotImplementedError()
+
+
 class AgentFromPolicy(Agent):
     """
     This is a useful Agent class backbone from which to subclass from NN-based agents.
     """
     
-    def __init__(self, multi_state_policy, multi_obs_policy, sim_threads, stochastic=True):
+    def __init__(self, policy):
         """
-        multi_obs_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns actions
-        multi_state_policy (fn, args: stochastic): a function that takes in multiple OvercookedState instatences and returns actions
-        stochastic (Bool): Whether the agent should sample from policy or take argmax
+        multi_obs_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns action probabilities.
+        multi_state_policy (fn): a function that takes in multiple OvercookedState instatences and returns action probabilities.
         """
-        self.multi_state_policy = multi_state_policy
-        self.multi_obs_policy = multi_obs_policy
-        self.sim_threads = sim_threads
-        self.stochastic = stochastic
+        self.policy = policy
         self.reset()
 
     def actions(self, states, agent_indices):
-        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input states"
-        action_probs_n = self.multi_state_policy(states, agent_indices, stochastic=self.stochastic)
+        action_probs_n = self.policy.multi_state_policy(states, agent_indices)
         actions_and_infos_n = []
         for action_probs in action_probs_n:
             action = Action.sample(action_probs)
@@ -162,16 +179,9 @@ class AgentFromPolicy(Agent):
 
     def actions_from_observations(self, obs):
         """
-        An action called optimized for multi-threaded environment simulations
-        involving the agent. Takes in SIM_THREADS (as defined when defining the agent)
-        number of observations in post-processed form, and returns as many actions.
+        An action method that takes in states in post-processed form, and returns respective actions.
         """
-        assert len(states) <= sim_threads, "Policy doesn't support more than sim_threads parallel input obvs"
-        return self.multi_obs_policy(obs, self.stochastic)
-
-    def reset(self):
-        super().reset()
-        self.history = [[] for _ in range(sim_threads)]
+        return self.policy.multi_obs_policy(obs)
 
 
 class RandomAgent(Agent):
