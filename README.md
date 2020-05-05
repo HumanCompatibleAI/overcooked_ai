@@ -44,10 +44,10 @@ For development, you will also need to install browserify: `npm install -g brows
 To verify your python installation, you can try running the following command from the inner `overcooked_ai_py` folder:
 
 ```
-python run_tests_fast.py
+python run_tests.py
 ```
 
-or alternatively (this can take 5-10 mins): `python run_tests_full.py`
+If you're thinking of using the planning code extensively, you should run (this can take 5-10 mins): `python run_tests_full_planning_suite.py`
 
 #### Javascript Code
 

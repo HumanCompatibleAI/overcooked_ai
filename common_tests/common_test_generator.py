@@ -1,70 +1,34 @@
-from overcooked_ai_py.mdp.actions import Direction, Action
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, ObjectState, PlayerState
+import numpy as np
+from overcooked_ai_py import COMMON_TESTS_DIR
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+from overcooked_ai_py.utils import save_as_json
 
-n, s = Direction.NORTH, Direction.SOUTH
-e, w = Direction.EAST, Direction.WEST
-stay, interact = Action.STAY, Action.INTERACT
-S, P, Obj = OvercookedState, PlayerState, ObjectState
+# NOTE: This code was used to create the common test trajectories. The purpose of these
+# tests is to sanity check the consistency of dynamics and encodings across the 
+# overcooked python and javascript implementations.
+# If changing the overcooked environment in ways that affect trajectories, one 
+# should also run this file again, and make sure `npm run test` will pass in
+# overcooked_ai_js
 
-delivery_reward = 20
+# Saving trajectory for dynamics consistency test
+np.random.seed(0)
+ae = AgentEvaluator(mdp_params={"layout_name": "cramped_room"}, env_params={"horizon": 1500})
+test_trajs = ae.evaluate_random_pair(all_actions=True, num_games=1)
+assert test_trajs["ep_returns"][0] > 0, "Choose a different seed, we should have a test trajectory that gets some reward"
 
-s_a_r_pairs = [
-    (S([P((1, 2), n), P((3, 1), n)], {}, order_list=None), [n, e], 0),
-    (S([P((1, 1), n), P((3, 1), e)], {}, order_list=None), [w, interact], 0),
-    (S([P((1, 1), w), P((3, 1), e, Obj('onion', (3, 1)))], {}, order_list=None), [interact, w], 0),
-    (S([P((1, 1), w, Obj('onion', (1, 1))),P((2, 1), w, Obj('onion', (2, 1)))],{}, order_list=None), [e, n], 0),
-    (S([P((1, 1), e, Obj('onion', (1, 1))),P((2, 1), n, Obj('onion', (2, 1)))],{}, order_list=None), [stay, interact], 0),
-    (S([P((1, 1), e, Obj('onion', (1, 1))),P((2, 1), n)],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [e, e], 0),
-    (S([P((2, 1), e, Obj('onion', (2, 1))),P((3, 1), e)],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [n, interact], 0),
-    (S([P((2, 1), n, Obj('onion', (2, 1))),P((3, 1), e, Obj('onion', (3, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [interact, w], 0),
-    (S([P((2, 1), n),P((3, 1), w, Obj('onion', (3, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))}, order_list=None), [w, w], 0),
-    (S([P((1, 1), w),P((2, 1), w, Obj('onion', (2, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))}, order_list=None), [s, n], 0),
-    (S([P((1, 2), s),P((2, 1), n, Obj('onion', (2, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 2, 0))}, order_list=None), [interact, interact], 0),
-    (S([P((1, 2), s, Obj('dish', (1, 2))),P((2, 1), n)],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 1))}, order_list=None), [e, s], 0),
-    (S([P((1, 2), e, Obj('dish', (1, 2))),P((2, 1), s)],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 2))}, order_list=None), [e, interact], 0),
-    (S([P((2, 2), e, Obj('dish', (2, 2))),P((2, 1), s)],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 3))}, order_list=None), [n, e], 0),
-    (S([P((2, 1), n, Obj('dish', (2, 1))),P((3, 1), e)],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 4))}, order_list=None), [interact, interact], 0),
-    (S([P((2, 1), n, Obj('dish', (2, 1))),P((3, 1), e, Obj('onion', (3, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 5))}, order_list=None), [stay, stay], 0),
-    (S([P((2, 1), n, Obj('dish', (2, 1))),P((3, 1), e, Obj('onion', (3, 1)))],{(2, 0): Obj('soup', (2, 0), ('onion', 3, 5))}, order_list=None), [interact, interact], 0),
-    (S([P((2, 1), n, Obj('soup', (2, 1), ('onion', 3, 5))),P((3, 1), e, Obj('onion', (3, 1)))],{}, order_list=None), [e, w], 0),
-    (S([P((2, 1), e, Obj('soup', (2, 1), ('onion', 3, 5))),P((3, 1), w, Obj('onion', (3, 1)))],{}, order_list=None), [e, s], 0),
-    (S([P((3, 1), e, Obj('soup', (3, 1), ('onion', 3, 5))),P((3, 2), s, Obj('onion', (3, 2)))],{}, order_list=None), [s, interact], 0),
-    (S([P((3, 1), s, Obj('soup', (3, 1), ('onion', 3, 5))),P((3, 2), s, Obj('onion', (3, 2)))],{}, order_list=None), [s, w], 0),
-    (S([P((3, 2), s, Obj('soup', (3, 2), ('onion', 3, 5))),P((2, 2), w, Obj('onion', (2, 2)))],{}, order_list=None), [interact, n], delivery_reward),
-    (S([P((3, 2), s),P((2, 1), n, Obj('onion', (2, 1)))],{}, order_list=None), [e, interact], 0),
-    (S([P((3, 2), e),P((2, 1), n)],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [interact, s], 0),
-    (S([P((3, 2), e, Obj('tomato', (3, 2))),P((2, 2), s)],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [w, w], 0),
-    (S([P((2, 2), w, Obj('tomato', (2, 2))),P((1, 2), w)],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [n, interact], 0),
-    (S([P((2, 1), n, Obj('tomato', (2, 1))),P((1, 2), w, Obj('tomato', (1, 2)))],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [interact, interact], 0),
-    (S([P((2, 1), n, Obj('tomato', (2, 1))),P((1, 2), w, Obj('tomato', (1, 2)))],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [s, interact], 0),
-    (S([P((2, 2), s, Obj('tomato', (2, 2))),P((1, 2), w, Obj('tomato', (1, 2)))],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0))}, order_list=None), [interact, interact], 0),
-    (S([P((2, 2), s),P((1, 2), w, Obj('tomato', (1, 2)))],{(2, 0): Obj('soup', (2, 0), ('onion', 1, 0)),(2, 3): Obj('soup', (2, 3), ('tomato', 1, 0))}, order_list=None), [interact, interact], 0)
-]
+test_trajs_path = COMMON_TESTS_DIR + "trajectory_tests/trajs.json"
+AgentEvaluator.save_traj_as_json(test_trajs, test_trajs_path)
 
-curr_ep_rewards = [s_a_r[2] for s_a_r in s_a_r_pairs]
+# Saving encondings for encoding tests
+load_traj = AgentEvaluator.load_traj_from_json(test_trajs_path)
+mdp_params = load_traj["mdp_params"][0]
+env_params = load_traj["env_params"][0]
+mdp = AgentEvaluator(mdp_params, env_params).mdp_fn()
+for i in range(2):
+    lossless_path = COMMON_TESTS_DIR + "encoding_tests/lossless_py{}.json".format(i)
+    encoded_states = [mdp.lossless_state_encoding(s)[i].tolist() for s in np.concatenate(load_traj["ep_states"])]
+    save_as_json(encoded_states, lossless_path)
 
-traj = {
-    "ep_observations": [[s_a_r[0] for s_a_r in s_a_r_pairs]],
-    "ep_actions": [[tuple(s_a_r[1]) for s_a_r in s_a_r_pairs]],
-    "ep_rewards": [curr_ep_rewards],
-    "ep_dones": [False] * len(s_a_r_pairs),
-    "ep_infos": [{}] * len(s_a_r_pairs),
-
-    "ep_returns": [sum(curr_ep_rewards)],
-    "ep_lengths": [len(curr_ep_rewards)],
-    "mdp_params": [{
-        "layout_name": "mdp_test",
-        "cook_time": 5,
-        "start_order_list": None,
-        "num_items_for_soup": 3,
-        "rew_shaping_params": None
-    }],
-    "env_params": [{
-        "horizon": 100,
-        "start_state_fn": None
-    }],
-    "metadatas": {}
-}
-
-AgentEvaluator.save_traj_as_json(traj, "trajectory_tests/test_full_traj")
+    featurization_path = COMMON_TESTS_DIR + "encoding_tests/featurized_py{}.json".format(i)
+    encoded_states = [mdp.featurize_state(s, ae.mlp)[i].tolist() for s in np.concatenate(load_traj["ep_states"])]
+    save_as_json(encoded_states, featurization_path)

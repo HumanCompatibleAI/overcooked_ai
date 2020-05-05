@@ -43,7 +43,7 @@ Direction.DIRECTION_TO_NAME = {
     '-1,0': 'WEST'
 }
 
-export class Action {}
+export class Action { }
 Action.INTERACT = "INTERACT";
 Action.INDEX_TO_ACTION = _.clone(Direction.INDEX_TO_DIRECTION);
 Action.INDEX_TO_ACTION.push(Action.INTERACT);
@@ -59,7 +59,7 @@ export class PlayerState {
     }) {
         assert(Array.isArray(position));
         // assert(orientation in Direction.ALL_DIRECTIONS)
-        if (typeof(held_object) !== "undefined") {
+        if (typeof (held_object) !== "undefined") {
             // assert(ObjectState.is_object(held_object));
             assert(_.isEqual(held_object.position, position));
         }
@@ -69,25 +69,25 @@ export class PlayerState {
     }
 
     // pos_and_or () {}
-    has_object () {
-        return typeof(this.held_object) !== 'undefined'
+    has_object() {
+        return typeof (this.held_object) !== 'undefined'
     }
-    get_object () {
+    get_object() {
         assert(this.has_object());
         return this.held_object
     }
-    set_object (obj) {
+    set_object(obj) {
         assert(!this.has_object());
         obj.position = this.position;
         this.held_object = obj;
     }
-    remove_object () {
+    remove_object() {
         assert(this.has_object());
         let obj = this.held_object;
         this.held_object = undefined;
         return obj
     }
-    update_pos_and_or (new_position, new_orientation) {
+    update_pos_and_or(new_position, new_orientation) {
         assert(Array.isArray(new_position));
         this.position = new_position;
         this.orientation = new_orientation;
@@ -95,7 +95,7 @@ export class PlayerState {
             this.get_object().position = new_position;
         }
     }
-    deepcopy () {
+    deepcopy() {
         let new_obj;
         if (this.has_object()) {
             new_obj = this.held_object.deepcopy();
@@ -109,7 +109,7 @@ export class PlayerState {
 }
 
 export class ObjectState {
-    constructor ({
+    constructor({
         name,
         position,
         state
@@ -123,15 +123,15 @@ export class ObjectState {
         }
         this.state = state;
     }
-    is_valid () {
+    is_valid() {
         if (this.name === 'onion') {
-            return typeof(this.state) === 'undefined'
+            return typeof (this.state) === 'undefined'
         }
         if (this.name === 'tomato') {
-            return typeof(this.state) === 'undefined'
+            return typeof (this.state) === 'undefined'
         }
         if (this.name === 'dish') {
-            return typeof(this.state) === 'undefined'
+            return typeof (this.state) === 'undefined'
         }
         if (this.name === 'soup') {
             let [soup_type, num_items, cook_time] = this.state;
@@ -142,7 +142,7 @@ export class ObjectState {
         }
         return false
     }
-    deepcopy () {
+    deepcopy() {
         return new ObjectState({
             name: this.name,
             position: this.position,
@@ -153,10 +153,10 @@ export class ObjectState {
 ObjectState.SOUP_TYPES = ['onion', 'tomato'];
 
 export class OvercookedState {
-    constructor ({
+    constructor({
         players,
         objects,
-        order_list = []
+        order_list = null
     }) {
         // Represents a state in Overcooked.
         // players: List of PlayerStates.
@@ -164,45 +164,45 @@ export class OvercookedState {
         //     include objects held by players.
         // Order is important for players but not for objects
         for (let pos in objects) {
-            if (!objects.hasOwnProperty(pos)) {continue}
+            if (!objects.hasOwnProperty(pos)) { continue }
             let obj = objects[pos];
             assert(
                 _.isEqual(String(obj.position), String(pos)),
                 `${String(obj.position)} !== ${String(pos)}`
-                );
+            );
         }
-        this.players = players.map((p) => {return p.deepcopy()});
+        this.players = players.map((p) => { return p.deepcopy() });
         this.objects = objects;
         this.order_list = order_list;
     }
 
     static from_object(obj) {
         obj['players'] = obj['players'].map((p) => {
-            if (typeof(p.held_object) !== 'undefined') {
+            if (typeof (p.held_object) !== 'undefined') {
                 p.held_object = new ObjectState(p.held_object);
             }
             return p
         });
-        obj['players'] = obj['players'].map((p) => {return new PlayerState(p)});
-        obj['objects'] = _.mapValues(obj['objects'], (o) => {return new ObjectState(o)});
+        obj['players'] = obj['players'].map((p) => { return new PlayerState(p) });
+        obj['objects'] = _.mapValues(obj['objects'], (o) => { return new ObjectState(o) });
         return new OvercookedState(obj);
     }
 
-    player_positions () {
-        return this.players.map((p) => {return p.position})
+    player_positions() {
+        return this.players.map((p) => { return p.position })
     }
-    player_orientations () {
-        return this.players.map((p) => {return p.orientation})
+    player_orientations() {
+        return this.players.map((p) => { return p.orientation })
     }
-    has_object (pos) {
+    has_object(pos) {
         return _.includes(_.keys(this.objects).map(String), String(pos));
     }
-    get_object (pos) {
+    get_object(pos) {
         assert(this.has_object(pos));
         return this.objects[pos]
     }
-    add_object (obj, pos) {
-        if (typeof(pos) === 'undefined') {
+    add_object(obj, pos) {
+        if (typeof (pos) === 'undefined') {
             pos = obj.position
         }
         assert(!this.has_object(pos));
@@ -229,7 +229,7 @@ export class OvercookedState {
     static from_players_pos_and_or(players_pos_and_or, order_list) {
         return new OvercookedState({
             players: players_pos_and_or.map((params) => {
-                params = {position: params[0], orientation: params[1]};
+                params = { position: params[0], orientation: params[1] };
                 return new PlayerState(params)
             }),
             objects: {},
@@ -247,13 +247,11 @@ export function dictToState(state_dict) {
     if (state_dict['objects'].length > 0) {
         state_dict['objects'].forEach(function (item, index) {
             object_dict[item['position']] = dictToObjectState(item)
-            })
-        }
-    state_dict['objects'] = object_dict
-
+        })
+    }
     return new OvercookedState({
-        players: [dictToPlayerState(state_dict['players'][0]), dictToPlayerState(state_dict['players'][1])], 
-        objects: state_dict['objects'], 
+        players: [dictToPlayerState(state_dict['players'][0]), dictToPlayerState(state_dict['players'][1])],
+        objects: object_dict,
         order_list: state_dict['order_list']
     })
 }
@@ -264,51 +262,52 @@ export function dictToPlayerState(player_dict) {
     }
     else {
         player_dict['held_object'] = dictToObjectState(player_dict['held_object'])
-     }
-     return new PlayerState({
-        position: player_dict['position'], 
-        orientation: player_dict['orientation'], 
-        held_object: player_dict['held_object']
-     })
     }
+    return new PlayerState({
+        position: player_dict['position'],
+        orientation: player_dict['orientation'],
+        held_object: player_dict['held_object']
+    })
+}
 
 export function dictToObjectState(object_dict) {
     if (object_dict['state'] == null) {
         object_dict['state'] = undefined;
     }
     return new ObjectState(
-        {name: object_dict['name'],
-        position: object_dict['position'], 
-        state: object_dict['state']
+        {
+            name: object_dict['name'],
+            position: object_dict['position'],
+            state: object_dict['state']
         })
 }
 
 
 export function lookupActions(actions_arr) {
-    let actions = []; 
+    let actions = [];
     actions_arr.forEach(function (item, index) {
         if (item == "interact") {
-            item = Action.INTERACT; 
+            item = Action.INTERACT;
         }
         if (arraysEqual(Direction.STAY, item) || item == "stay") {
             item = Direction.STAY;
         }
         actions.push(item);
     }
-        )
+    )
     return actions;
-    
+
 }
 
 function arraysEqual(a, b) {
     // Stolen from https://stackoverflow.com/questions/3115982/how-to-check-if-two-arrays-are-equal-with-javascript
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; ++i) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
 
 }
 /*
@@ -318,7 +317,7 @@ function arraysEqual(a, b) {
  */
 
 export class OvercookedGridworld {
-    constructor ({
+    constructor({
         terrain,
         player_positions,
         COOK_TIME = OvercookedGridworld.COOK_TIME,
@@ -333,14 +332,14 @@ export class OvercookedGridworld {
         this.num_items_for_soup = num_items_for_soup;
     }
 
-    get_start_state (order_list) {
+    get_start_state(order_list) {
         return OvercookedState.from_player_positions(
             this.start_player_positions,
             order_list
         );
     }
 
-    get_actions (state) {
+    get_actions(state) {
         /* Returns the list of lists of valid actions for 'state'.
         The ith element of the list is the list of valid actions that player i
         can take.
@@ -349,18 +348,18 @@ export class OvercookedGridworld {
         deterministic, in order to allow agents to implement deterministic
         behavior. */
         this._check_valid_state(state);
-        return state.players.map((p, i) => {return this._get_player_actions(state, i)})
+        return state.players.map((p, i) => { return this._get_player_actions(state, i) })
     }
 
-    _get_player_actions (state, player_num) {
+    _get_player_actions(state, player_num) {
         return Action.ALL_ACTIONS
     }
 
-    is_terminal ({state}) {
+    is_terminal({ state }) {
         return (state.order_list.length === 0)
     }
 
-    get_transition_states_and_probs ({state, joint_action}) {
+    get_transition_states_and_probs({ state, joint_action }) {
         /*Gets information about possible transitions for the action.
         Returns list of (next_state, prob) pairs representing the states
         reachable from 'state' by taking 'action' along with their transition
@@ -391,7 +390,7 @@ export class OvercookedGridworld {
         return [[new_state, 1.0], reward]
     }
 
-    resolve_interacts (new_state, joint_action) {
+    resolve_interacts(new_state, joint_action) {
         /*TODO: Currently if two players both interact with a terrain, we
         resolve player 1's interact first and then player 2's, without doing
         anything like collision checking. Is this okay?*/
@@ -416,13 +415,13 @@ export class OvercookedGridworld {
             }
             else if (!player.has_object()) {
                 if (terrain_type === 'O') {
-                    player.set_object(new ObjectState({name: 'onion', position: pos}));
+                    player.set_object(new ObjectState({ name: 'onion', position: pos }));
                 }
                 else if (terrain_type === 'T') {
-                    player.set_object(new ObjectState({name: 'tomato', position: pos}));
+                    player.set_object(new ObjectState({ name: 'tomato', position: pos }));
                 }
                 else if (terrain_type === 'D') {
-                    player.set_object(new ObjectState({name: 'dish', position: pos}));
+                    player.set_object(new ObjectState({ name: 'dish', position: pos }));
                 }
             }
             else if (player.has_object()) {
@@ -465,12 +464,12 @@ export class OvercookedGridworld {
                         let [soup_type, num_items, cook_time] = obj.state;
                         assert(_.includes(ObjectState.SOUP_TYPES, soup_type));
                         assert(num_items === this.num_items_for_soup &&
-                               cook_time >= this.COOK_TIME);
+                            cook_time >= this.COOK_TIME);
                         player.remove_object();
 
                         if (new_state.order_list === null) {
                             reward += this.DELIVERY_REWARD;
-                        } else if ((new_state.order_list[0] === 'any') || (soup_type === new_state.order_list[0])) {    
+                        } else if ((new_state.order_list[0] === 'any') || (soup_type === new_state.order_list[0])) {
                             // If the delivered soup is the one currently required
                             new_state.order_list = new_state.order_list.slice(1);
                             reward += this.DELIVERY_REWARD;
@@ -482,7 +481,7 @@ export class OvercookedGridworld {
         return reward
     }
 
-    resolve_movement (state, joint_action){
+    resolve_movement(state, joint_action) {
         // Resolve player movement and deal with possible collisions
         let [new_positions, new_orientations] =
             this.compute_new_positions_and_orientations({
@@ -496,7 +495,7 @@ export class OvercookedGridworld {
         }
     }
 
-    compute_new_positions_and_orientations ({old_player_states, joint_action}) {
+    compute_new_positions_and_orientations({ old_player_states, joint_action }) {
         //Compute new positions and orientations ignoring collisions
         let new_positions = [];
         let old_positions = [];
@@ -554,11 +553,11 @@ export class OvercookedGridworld {
         return [new_pos, new_orientation]
     }
 
-    get_valid_player_positions () {
+    get_valid_player_positions() {
         return this.terrain_pos_dict[' '];
     }
 
-    _get_terrain_type_pos_dict () {
+    _get_terrain_type_pos_dict() {
         let pos_dict = {};
         for (let y = 0; y < this.terrain_mtx.length; y++) {
             for (let x = 0; x < this.terrain_mtx[y].length; x++) {
@@ -572,7 +571,7 @@ export class OvercookedGridworld {
         return pos_dict
     }
 
-    _check_valid_state (state) {
+    _check_valid_state(state) {
         /*Checks that the state is valid.
         Conditions checked:
         - Players are on free spaces, not terrain
@@ -586,7 +585,7 @@ export class OvercookedGridworld {
             //Check that players are not on terrain
             let pos = pstate.position;
             assert(_.includes(this.get_valid_player_positions().map(String), String(pos)),
-                    JSON.stringify(this.get_valid_player_positions())+" "+pos);
+                JSON.stringify(this.get_valid_player_positions()) + " " + pos);
 
             //check that held obj have the same position
             if (pstate.has_object()) {
@@ -596,7 +595,7 @@ export class OvercookedGridworld {
         }
 
         for (let obj_pos in state.objects) {
-            if (!state.objects.hasOwnProperty(obj_pos)) {continue}
+            if (!state.objects.hasOwnProperty(obj_pos)) { continue }
             obj_pos = str_to_array(obj_pos);
             let obj_state = state.objects[obj_pos];
             //check that the hash key position agrees with the position stored in the object state
@@ -615,10 +614,10 @@ export class OvercookedGridworld {
         assert(all_pos.length === _.uniq(all_pos).length, "Overlapping players or objects");
 
         //check that objects have a valid state
-        all_objects.map((o) => assert(o.is_valid(), "Invalid Obj: "+JSON.stringify(o)))
+        all_objects.map((o) => assert(o.is_valid(), "Invalid Obj: " + JSON.stringify(o)))
     }
 
-    get_terrain_type_at (pos) {
+    get_terrain_type_at(pos) {
         let [x, y] = pos;
         return this.terrain_mtx[y][x];
     }
@@ -633,15 +632,15 @@ export class OvercookedGridworld {
                 let [x, y] = obj.position;
                 let [soup_type, num_items, cook_time] = obj.state;
                 if (
-                        (this.terrain_mtx[y][x] === 'P') &&
-                        (num_items === this.num_items_for_soup)) {
+                    (this.terrain_mtx[y][x] === 'P') &&
+                    (num_items === this.num_items_for_soup)) {
                     obj.state = [soup_type, num_items, Math.min(cook_time + 1, this.COOK_TIME)];
                 }
             }
         }
     }
 
-    static from_grid (grid, params) {
+    static from_grid(grid, params) {
         grid = grid.map((r) => _.map(r, (c) => c));
         let player_pos = [null, null];
         for (let y = 0; y < grid.length; y++) {
@@ -649,24 +648,108 @@ export class OvercookedGridworld {
                 let c = grid[y][x];
                 if (_.includes(['1', '2'], c)) {
                     grid[y][x] = ' ';
-                    assert(player_pos[parseInt(c)-1] === null, "Duplicate player in grid");
-                    player_pos[parseInt(c)-1] = [x, y];
+                    assert(player_pos[parseInt(c) - 1] === null, "Duplicate player in grid");
+                    player_pos[parseInt(c) - 1] = [x, y];
                 }
             }
         }
         assert(_.every(player_pos), 'A player was missing');
-        params = typeof(params) === 'undefined' ? {} : params;
+        params = typeof (params) === 'undefined' ? {} : params;
         params = Object.assign({}, params, {
             terrain: grid,
             player_positions: player_pos
         });
         return new OvercookedGridworld(params)
     }
+
+    lossless_state_encoding(state, playerIndex, padding) {
+        const BASE_FEATURE_INDICES = {
+            "P": 10,
+            "X": 11,
+            "O": 12,
+            "D": 13,
+            "S": 14
+        };
+
+        // The soup numbers are duplicated in preprocessState
+        const VARIABLE_FEATURE_INDICES = {
+            "onions_in_pot": 15,
+            "onions_cook_time": 16,
+            "onion_soup_loc": 17,
+            "dish": 18,
+            "onion": 19
+        };
+
+        function constant(element, shape) {
+            function helper(i) {
+                let size = shape[i];
+                if (i === shape.length - 1) {
+                    return Array(size).fill(element);
+                }
+                return Array(size).fill().map(() => helper(i + 1));
+            }
+            return helper(0);
+        }
+
+        // All of our models have a batch size of 30, but we only want to predict on
+        // a single state, so we put zeros everywhere else.
+        let terrain = this.terrain_mtx;
+        let shape = [padding, terrain[0].length, terrain.length, 20];
+        let result = constant(0, shape);
+
+        function handle_object(obj) {
+            let [x, y] = obj.position;
+            if (obj.name === 'soup') {
+                let [soup_type, num_onions, cook_time] = obj.state;
+                if (terrain[y][x] === 'P') {
+                    result[0][x][y][15] = num_onions;
+                    result[0][x][y][16] = Math.min(cook_time, 20);
+                } else {
+                    result[0][x][y][17] = 1;
+                }
+            } else {
+                let feature_index = VARIABLE_FEATURE_INDICES[obj.name];
+                result[0][x][y][feature_index] = 1;
+            }
+        }
+
+        for (let i = 0; i < state.players.length; i++) {
+            let player = state.players[i];
+            let [x, y] = player.position;
+            let orientation = Direction.DIRECTION_TO_INDEX[player.orientation];
+            if (playerIndex === i) {
+                result[0][x][y][0] = 1;
+                result[0][x][y][2 + orientation] = 1;
+            } else {
+                result[0][x][y][1] = 1;
+                result[0][x][y][6 + orientation] = 1;
+            }
+
+            if (player.has_object()) {
+                handle_object(player.held_object);
+            }
+        }
+
+        let pos_dict = this._get_terrain_type_pos_dict();
+        for (let ttype in BASE_FEATURE_INDICES) {
+            let t_index = BASE_FEATURE_INDICES[ttype];
+            for (let i in pos_dict[ttype]) {
+                let [x, y] = pos_dict[ttype][i];
+                result[0][x][y][t_index] = 1;
+            }
+        }
+
+        for (let i in state.objects) {
+            let obj = state.objects[i];
+            handle_object(obj);
+        }
+        return [result, shape];
+    }
 }
-OvercookedGridworld.COOK_TIME = 5;
+OvercookedGridworld.COOK_TIME = 20;
 OvercookedGridworld.DELIVERY_REWARD = 20;
 OvercookedGridworld.ORDER_TYPES = ObjectState.SOUP_TYPES + ['any'];
-OvercookedGridworld.num_items_for_soup = 3; 
+OvercookedGridworld.num_items_for_soup = 3;
 
 let str_to_array = (val) => {
     if (Array.isArray(val)) {
