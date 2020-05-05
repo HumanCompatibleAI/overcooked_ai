@@ -28,7 +28,7 @@ base_params = {
 action_manger_filename = "simple_1_am.pkl"
 ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
     simple_mdp, mlp_params=base_params, custom_filename=action_manger_filename, force_compute=force_compute)
-ml_planner_simple.env = OvercookedEnv(simple_mdp)
+ml_planner_simple.env = OvercookedEnv.from_mdp(simple_mdp)
 
 base_params_start_or = {
     'start_orientations': True,
@@ -152,7 +152,7 @@ class TestMotionPlanner(unittest.TestCase):
         self.assertEqual(plan_cost, graph_plan_cost)
 
         joint_action_plan = [(a, stay) for a in action_plan]
-        env = OvercookedEnv(motion_planner.mdp, horizon=1000)
+        env = OvercookedEnv.from_mdp(motion_planner.mdp, horizon=1000)
         resulting_state, _ = env.execute_plan(start_state, joint_action_plan)
         self.assertEqual(resulting_state.players_pos_and_or[0], goal_pos_and_or)
 
@@ -310,7 +310,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         if debug: print("Start state: {}, Goal state: {}, Action plan: {}".format(start, goal, action_plan))
 
         start_state = OvercookedState([P(*start[0]), P(*start[1])], {}, order_list=['any', 'any'])
-        env = OvercookedEnv(joint_motion_planner.mdp, horizon=1000)
+        env = OvercookedEnv.from_mdp(joint_motion_planner.mdp, horizon=1000)
         resulting_state, _ = env.execute_plan(start_state, action_plan, display=display)
 
         self.assertTrue(any([agent_goal in resulting_state.players_pos_and_or for agent_goal in goal]))
@@ -429,7 +429,7 @@ class TestMediumLevelPlanner(unittest.TestCase):
     def check_full_plan(self, start_state, planner, debug=False):
         heuristic = Heuristic(planner.mp)
         joint_action_plan = planner.get_low_level_action_plan(start_state, heuristic.simple_heuristic, debug=debug, goal_info=debug)
-        env = OvercookedEnv(planner.mdp, horizon=1000)
+        env = OvercookedEnv.from_mdp(planner.mdp, horizon=1000)
         resulting_state, _ = env.execute_plan(start_state, joint_action_plan, display=False)
         self.assertEqual(len(resulting_state.order_list), 0)
         

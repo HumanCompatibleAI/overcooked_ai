@@ -37,6 +37,7 @@ class TestDirection(unittest.TestCase):
         # Check that the numbers are 0, 1, ... num_directions - 1
         self.assertEqual(set(all_numbers), set(range(num_directions)))
 
+
 class TestGridworld(unittest.TestCase):
 
     # TODO: write more smaller targeted tests to be loaded from jsons
@@ -116,7 +117,7 @@ class TestGridworld(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.base_mdp.get_state_transition(bad_state, stay)
 
-        env = OvercookedEnv(self.base_mdp)
+        env = OvercookedEnv.from_mdp(self.base_mdp)
         env.state.order_list = ['onion', 'any']
 
         def check_transition(action, expected_state, expected_reward=0):
@@ -158,13 +159,13 @@ class TestFeaturizations(unittest.TestCase):
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlp = MediumLevelPlanner.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
-        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlp), GreedyHumanModel(self.mlp))
         np.random.seed(0)
 
     def test_lossless_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
-        featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_states"]]
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/lossless_state_featurization")
@@ -173,7 +174,7 @@ class TestFeaturizations(unittest.TestCase):
 
     def test_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
-        featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_observations"]]
+        featurized_observations = [[self.base_mdp.featurize_state(state, self.mlp) for state in ep_states] for ep_states in trajs["ep_states"]]
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/state_featurization")
@@ -185,18 +186,18 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([stay, w, w]), FixedPlanAgent([stay, e, e]))
         np.random.seed(0)
 
     def test_constructor(self):
         try:
-            OvercookedEnv(self.base_mdp, horizon=10)
+            OvercookedEnv.from_mdp(self.base_mdp, horizon=10)
         except Exception as e:
             self.fail("Failed to instantiate OvercookedEnv:\n{}".format(e))
 
         with self.assertRaises(TypeError):
-            OvercookedEnv(self.base_mdp, **{"invalid_env_param": None})
+            OvercookedEnv.from_mdp(self.base_mdp, **{"invalid_env_param": None})
 
     def test_step_fn(self):
         for _ in range(10):
@@ -220,7 +221,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_one_player_env(self):
         mdp = OvercookedGridworld.from_layout_name("cramped_room_single")
-        env = OvercookedEnv(mdp, horizon=12)
+        env = OvercookedEnv.from_mdp(mdp, horizon=12)
         a0 = FixedPlanAgent([stay, w, w, e, e, n, e, interact, w, n, interact])
         ag = AgentGroup(a0)
         env.run_agents(ag, display=False)
@@ -232,7 +233,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_four_player_env_fixed(self):
         mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
         assert mdp.num_players == 4
-        env = OvercookedEnv(mdp, horizon=16)
+        env = OvercookedEnv.from_mdp(mdp, horizon=16)
         a0 = FixedPlanAgent([stay, w, w])
         a1 = FixedPlanAgent([stay, stay, e, e, n, n, n, e, interact, n, n, w, w, w, n, interact, e])
         a2 = FixedPlanAgent([stay, w, interact, n, n, e, e, e, n, e, n, interact, w])
@@ -256,7 +257,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_starting_position_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=True, rnd_obj_prob_thresh=0.0)
-        env = OvercookedEnv(self.base_mdp, start_state_fn)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         start_state = env.state.players_pos_and_or
         for _ in range(3):
             env.reset()
@@ -267,7 +268,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_starting_obj_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=False, rnd_obj_prob_thresh=0.8)
-        env = OvercookedEnv(self.base_mdp, start_state_fn)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         start_state = env.state.all_objects_list
         for _ in range(3):
             env.reset()
@@ -279,12 +280,12 @@ class TestOvercookedEnvironment(unittest.TestCase):
         with self.assertRaises(TypeError):
             mdp_gen_params = {"None": None}
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-            OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
+            OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
 
     def test_random_layout(self):
         mdp_gen_params = {"prop_feats": (1, 1)}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-        env = OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
+        env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         start_terrain = env.mdp.terrain_mtx
 
         for _ in range(3):
@@ -295,7 +296,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
         mdp_gen_params = {"mdp_choices": ['cramped_room', 'asymmetric_advantages']}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
-        env = OvercookedEnv(mdp_or_mdp_fn=mdp_fn, **DEFAULT_ENV_PARAMS)
+        env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         
         layouts_seen = []
         for _ in range(10):
@@ -309,7 +310,7 @@ class TestGymEnvironment(unittest.TestCase):
 
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        self.env = OvercookedEnv(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)
 
