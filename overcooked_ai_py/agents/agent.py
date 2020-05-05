@@ -169,6 +169,9 @@ class AgentFromPolicy(Agent):
         self.policy = policy
         self.reset()
 
+    def action(self, state):
+        return self.actions([state], [self.agent_index])[0]
+
     def actions(self, states, agent_indices):
         action_probs_n = self.policy.multi_state_policy(states, agent_indices)
         actions_and_infos_n = []
@@ -183,6 +186,12 @@ class AgentFromPolicy(Agent):
         """
         return self.policy.multi_obs_policy(obs)
 
+    def set_mdp(self, mdp):
+        super().set_mdp(mdp)
+        self.policy.mdp = mdp
+    
+    def reset(self):
+        self.policy.mdp = None
 
 class RandomAgent(Agent):
     """
