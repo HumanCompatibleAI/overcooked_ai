@@ -163,11 +163,13 @@ class AgentFromPolicy(Agent):
     
     def __init__(self, policy):
         """
-        multi_obs_policy (fn): a function that takes in a preprocessed OvercookedState instances and returns action probabilities.
-        multi_state_policy (fn): a function that takes in multiple OvercookedState instatences and returns action probabilities.
+        Takes as input an NN Policy instance
         """
         self.policy = policy
         self.reset()
+        
+    def action(self, state):
+        return self.actions([state], [self.agent_index])[0]
 
     def action(self, state):
         return self.actions([state], [self.agent_index])[0]
