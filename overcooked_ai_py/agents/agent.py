@@ -51,6 +51,10 @@ class Agent(object):
         self.mdp = mdp
 
     def reset(self):
+        """
+        One should always reset agents in between trajectory rollouts, as resetting
+        usually clears history or other trajectory-specific attributes.
+        """
         pass
 
 
@@ -171,9 +175,6 @@ class AgentFromPolicy(Agent):
     def action(self, state):
         return self.actions([state], [self.agent_index])[0]
 
-    def action(self, state):
-        return self.actions([state], [self.agent_index])[0]
-
     def actions(self, states, agent_indices):
         action_probs_n = self.policy.multi_state_policy(states, agent_indices)
         actions_and_infos_n = []
@@ -181,12 +182,6 @@ class AgentFromPolicy(Agent):
             action = Action.sample(action_probs)
             actions_and_infos_n.append((action, {"action_probs": action_probs}))
         return actions_and_infos_n
-
-    def actions_from_observations(self, obs):
-        """
-        An action method that takes in states in post-processed form, and returns respective actions.
-        """
-        return self.policy.multi_obs_policy(obs)
 
     def set_mdp(self, mdp):
         super().set_mdp(mdp)

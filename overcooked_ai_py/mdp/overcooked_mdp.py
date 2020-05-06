@@ -326,15 +326,6 @@ class OvercookedState(object):
         return load_from_json(filename)
 
 
-NO_REW_SHAPING_PARAMS = {
-    "PLACEMENT_IN_POT_REW": 0,
-    "DISH_PICKUP_REWARD": 0,
-    "SOUP_PICKUP_REWARD": 0,
-    "DISH_DISP_DISTANCE_REW": 0,
-    "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0,
-}
-
 BASE_REW_SHAPING_PARAMS = {
     "PLACEMENT_IN_POT_REW": 3,
     "DISH_PICKUP_REWARD": 3,
@@ -397,7 +388,7 @@ class OvercookedGridworld(object):
         self.soup_cooking_time = cook_time
         self.num_items_for_soup = num_items_for_soup
         self.delivery_reward = delivery_reward
-        self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
+        self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
 
     @staticmethod
@@ -1207,6 +1198,10 @@ class OvercookedGridworld(object):
     # STATE ENCODINGS #
     ###################
 
+    @property
+    def lossless_state_encoding_shape(self):
+        return np.array(list(self.shape) + [20])
+
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
@@ -1294,6 +1289,10 @@ class OvercookedGridworld(object):
         num_players = len(overcooked_state.players)
         final_obs_for_players = tuple(process_for_player(i) for i in range(num_players))
         return final_obs_for_players
+
+    @property
+    def featurize_state_shape(self):
+        return np.array([62])
 
     def featurize_state(self, overcooked_state, mlp):
         """
