@@ -145,12 +145,23 @@ class OvercookedEnv(object):
             print(self)
         self.state = old_state
 
-    def print_state_transition(self, a_t, r_t, info):
+    def print_state_transition(self, a_t, r_t, env_info):
         """
         Terminal graphics visualization of a state transition.
         """
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}\n".format(
-            self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["agent_infos"], self)
+        # TODO: turn this into a "formatting action probs" function and add action symbols too
+        action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
+        action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+                self.t,
+                tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
+                r_t,
+                env_info["shaped_r_by_agent"],
+                action_probs,
+                self.mdp.potential_function(self.state),
+                0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
+                self
+            )
         )
 
     ###################
@@ -168,21 +179,21 @@ class OvercookedEnv(object):
         """
         assert not self.is_done()
         if joint_agent_action_info is None: joint_agent_action_info = [{}, {}]
-        next_state, sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos = self.mdp.get_state_transition(self.state, joint_action)
-        timestep_sparse_reward, timestep_reward_shaping = sum(sparse_reward_by_agent), sum(reward_shaping_by_agent)
+        next_state, mdp_infos = self.mdp.get_state_transition(self.state, joint_action)
 
         # Update game_stats 
-        self._update_game_stats(sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos)
+        self._update_game_stats(mdp_infos)
 
         # Update state, time, and done
         self.t += 1
         self.state = next_state
         done = self.is_done()
-        info = self._prepare_info_dict(joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent)
+        env_info = self._prepare_info_dict(joint_agent_action_info, mdp_infos)
         
-        if done: self._add_episode_info(info)
+        if done: self._add_episode_info(env_info)
 
-        return (next_state, timestep_sparse_reward, done, info)
+        timestep_sparse_reward = sum(mdp_infos["sparse_reward_by_agent"])
+        return (next_state, timestep_sparse_reward, done, env_info)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -204,38 +215,41 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.t >= self.horizon or self.mdp.is_terminal(self.state)
 
-    def _prepare_info_dict(self, joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent):
+    def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
         The normal timestep info dict will contain infos specifc to each agent's action taken,
         and reward shaping information.
         """
         # Get the agent action info, that could contain info about action probs, or other
         # custom user defined information
-        info = {"agent_infos": [joint_agent_action_info[agent_idx] for agent_idx in range(self.mdp.num_players)]}
-        info['shaped_r_by_agent'] = reward_shaping_by_agent
-        info['sparse_r_by_agent'] = sparse_reward_by_agent
-        return info
+        env_info = {"agent_infos": [joint_agent_action_info[agent_idx] for agent_idx in range(self.mdp.num_players)]}
+        # TODO: This can be further simplified by having all the mdp_infos copied over to the env_infos automatically 
+        env_info["sparse_r_by_agent"] = mdp_infos["sparse_reward_by_agent"]
+        env_info["shaped_r_by_agent"] = mdp_infos["shaped_reward_by_agent"]
+        env_info["phi_s"] = mdp_infos["phi_s"] # previous state
+        env_info["phi_s_prime"] = mdp_infos["phi_s_prime"] # new state
+        return env_info
 
-    def _add_episode_info(self, info):
-        info['episode'] = {
-            'ep_game_stats': self.game_stats,
-            'ep_sparse_r': sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
-            'ep_shaped_r': sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
-            'ep_sparse_r_by_agent': self.game_stats["cumulative_sparse_rewards_by_agent"],
-            'ep_shaped_r_by_agent': self.game_stats["cumulative_shaped_rewards_by_agent"],
-            'ep_length': self.t
+    def _add_episode_info(self, env_info):
+        env_info["episode"] = {
+            "ep_game_stats": self.game_stats,
+            "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
+            "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
+            "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
+            "ep_shaped_r_by_agent": self.game_stats["cumulative_shaped_rewards_by_agent"],
+            "ep_length": self.t
         }
-        return info
+        return env_info
 
-    def _update_game_stats(self, sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos):
+    def _update_game_stats(self, infos):
         """
         Update the game stats dict based on the events of the current step
         NOTE: the timer ticks after events are logged, so there can be events from time 0 to time self.horizon - 1
         """
-        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(sparse_reward_by_agent)
-        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(reward_shaping_by_agent)
+        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(infos["sparse_reward_by_agent"])
+        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(infos["shaped_reward_by_agent"])
 
-        for event_type, bool_list_by_agent in game_stat_infos.items():
+        for event_type, bool_list_by_agent in infos["event_infos"].items():
             # For each event type, store the timestep if it occurred
             event_occurred_by_idx = [int(x) for x in bool_list_by_agent]
             for idx, event_by_agent in enumerate(event_occurred_by_idx):
@@ -312,12 +326,12 @@ class OvercookedEnv(object):
         trajectories = { k:[] for k in self.DEFAULT_TRAJ_KEYS }
         metadata_fn = (lambda x: {}) if metadata_fn is None else metadata_fn
         metadata_info_fn = (lambda x: "") if metadata_info_fn is None else metadata_info_fn
-        range_iterator = tqdm.trange(num_games, desc='', leave=True) if info else range(num_games)
+        range_iterator = tqdm.trange(num_games, desc="", leave=True) if info else range(num_games)
         for i in range_iterator:
             agent_pair.set_mdp(self.mdp)
 
             rollout_info = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
-            trajectory, time_taken, tot_rews_sparse, tot_rews_shaped = rollout_info
+            trajectory, time_taken, tot_rews_sparse, _tot_rews_shaped = rollout_info
             obs, actions, rews, dones, infos = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
             trajectories["ep_states"].append(obs)
             trajectories["ep_actions"].append(actions)
@@ -359,7 +373,7 @@ class OvercookedEnv(object):
 
     @staticmethod
     def get_discounted_rewards(trajectories, gamma):
-        rews = trajectories['ep_rewards']
+        rews = trajectories["ep_rewards"]
         horizon = rews.shape[1]
         return OvercookedEnv._get_discounted_rewards_with_horizon(rews, gamma, horizon)
 
@@ -491,22 +505,22 @@ class Overcooked(gym.Env):
         else:
             joint_action = (other_agent_action, agent_action)
 
-        next_state, reward, done, info = self.base_env.step(joint_action)
+        next_state, reward, done, env_info = self.base_env.step(joint_action)
         ob_p0, ob_p1 = self.featurize_fn(self.mdp, next_state)
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
         else:
             both_agents_ob = (ob_p1, ob_p0)
         
-        info['policy_agent_idx'] = self.agent_idx
+        env_info["policy_agent_idx"] = self.agent_idx
 
-        if 'episode' in info.keys():
-            info['episode']['policy_agent_idx'] = self.agent_idx
+        if "episode" in env_info.keys():
+            env_info["episode"]["policy_agent_idx"] = self.agent_idx
 
         obs = {"both_agent_obs": both_agents_ob,
                 "overcooked_state": next_state,
                 "other_agent_env_idx": 1 - self.agent_idx}
-        return obs, reward, done, info
+        return obs, reward, done, env_info
 
     def reset(self):
         """
@@ -530,5 +544,5 @@ class Overcooked(gym.Env):
                 "overcooked_state": self.base_env.state, 
                 "other_agent_env_idx": 1 - self.agent_idx}
 
-    def render(self, mode='human', close=False):
+    def render(self, mode="human", close=False):
         pass

@@ -194,7 +194,7 @@ class OvercookedState(object):
         ones held by players.
         """
         objects_by_type = defaultdict(list)
-        for pos, obj in self.objects.items():
+        for _pos, obj in self.objects.items():
             objects_by_type[obj.name].append(obj)
         return objects_by_type
 
@@ -571,6 +571,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
+        phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -580,7 +581,7 @@ class OvercookedGridworld(object):
         new_state = state.deepcopy()
 
         # Resolve interacts first
-        sparse_reward, shaped_reward = self.resolve_interacts(new_state, joint_action, events_infos)
+        sparse_reward_by_agent, shaped_reward_by_agent = self.resolve_interacts(new_state, joint_action, events_infos)
 
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
@@ -594,7 +595,15 @@ class OvercookedGridworld(object):
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
 
-        return new_state, sparse_reward, shaped_reward, events_infos
+        phi_s_prime = self.potential_function(new_state)
+        infos = {
+            "event_infos": events_infos,
+            "sparse_reward_by_agent": sparse_reward_by_agent,
+            "shaped_reward_by_agent": shaped_reward_by_agent,
+            "phi_s": phi_s,
+            "phi_s_prime": phi_s_prime
+        }
+        return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
@@ -686,7 +695,7 @@ class OvercookedGridworld(object):
                         # Pot has already items in it, add if not full and of same type
                         obj = new_state.get_object(i_pos)
                         assert obj.name == 'soup', 'Object in pot was not soup'
-                        soup_type, num_items, cook_time = obj.state
+                        soup_type, num_items, _cook_time = obj.state
                         if num_items < self.num_items_for_soup and soup_type == item_type:
                             player.remove_object()
                             obj.state = (soup_type, num_items + 1, 0)
@@ -879,6 +888,7 @@ class OvercookedGridworld(object):
             }
          tomato: same dict structure as above
         }
+        NOTE: all returned pots are just pot positions
         """
         pots_states_dict = {}
         pots_states_dict['empty'] = []
@@ -920,18 +930,23 @@ class OvercookedGridworld(object):
         return [pos for pos in counter_locations if not state.has_object(pos)]
 
     def get_empty_pots(self, pot_states):
+        """Returns pots that have 0 items in them"""
         return pot_states["empty"]
 
     def get_ready_pots(self, pot_states):
+        """Returns pots that are full, fully cooked, and ready for pickup"""
         return pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
 
     def get_cooking_pots(self, pot_states):
+        """Returns pots that are full and are not ready yet"""
         return pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
 
     def get_full_pots(self, pot_states):
+        """Returns all pots with self.num_items_for_soup in them"""
         return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states)
 
     def get_partially_full_pots(self, pot_states):
+        """Returns all pots that have between `1` and `self.num_items_for_soup - 1` items in them"""
         return pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
 
     def soup_ready_at_location(self, state, pos):
@@ -1192,6 +1207,7 @@ class OvercookedGridworld(object):
             grid_string += "Current orders: {}/{} are any's\n".format(
                 len(state.order_list), len([order == "any" for order in state.order_list])
             )
+        grid_string += "State potential value: {}\n".format(self.potential_function(state))
         return grid_string
 
     ###################
@@ -1390,6 +1406,43 @@ class OvercookedGridworld(object):
             return (0, 0)
         dy_loc, dx_loc = pos_distance(closest_loc, player.position)
         return dy_loc, dx_loc
+
+
+    ###############################
+    # POTENTIAL REWARD SHAPING FN #
+    ###############################
+
+    def potential_function(self, state):
+        """
+        A potential function used for more principled reward shaping
+        For details see "Policy invariance under reward transformations:
+        Theory and application to reward shaping"
+
+        Essentially, this is the ɸ(s) function.
+        """
+        pot_states = self.get_pot_states(state)
+        potential_values = {
+            'holding_onion': 1,
+            'onion_in_pot': 3,
+            'holding_dish': 1, # For each dish when there is a full pot, corresponding to it
+            'holding_soup': 14
+        }
+
+        potential = 0
+        potential += len(state.player_objects_by_type['onion']) * potential_values['holding_onion']
+
+        all_pots_with_items = self.get_partially_full_pots(pot_states) + self.get_full_pots(pot_states)
+        soup_objects_in_pots_with_items = [state.get_object(pot_loc) for pot_loc in all_pots_with_items]
+        total_num_onions_in_pots = sum([pot.state[1] for pot in soup_objects_in_pots_with_items])
+        potential += total_num_onions_in_pots * potential_values['onion_in_pot']
+
+        num_ready_pots = len(self.get_full_pots(pot_states))
+        num_useful_dishes = min(len(state.player_objects_by_type['dish']), num_ready_pots)
+        potential += num_useful_dishes * potential_values['holding_dish']
+
+        potential += len(state.player_objects_by_type['soup']) * potential_values['holding_soup']
+        return potential
+
 
     ##############
     # DEPRECATED #
