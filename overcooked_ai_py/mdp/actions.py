@@ -1,13 +1,15 @@
 import itertools, copy
 import numpy as np
 
+def error_function(x):
+    a = undefined_variable
 
 class Direction(object):
     """
     The four possible directions a player can be facing.
     """
     
-    NORTH = (0, -1)
+    NORTH = (0, 1)
     SOUTH = (0, 1)
     EAST  = (1, 0)
     WEST  = (-1, 0)
