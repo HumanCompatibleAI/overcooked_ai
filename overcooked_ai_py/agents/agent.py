@@ -415,7 +415,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
 

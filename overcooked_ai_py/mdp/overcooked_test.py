@@ -122,7 +122,7 @@ class TestGridworld(unittest.TestCase):
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
-            pred_state, sparse_reward, dense_reward, _ = self.base_mdp.get_state_transition(state, action)
+            pred_state, _ = self.base_mdp.get_state_transition(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
