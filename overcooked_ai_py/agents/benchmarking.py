@@ -374,8 +374,7 @@ class AgentEvaluator(object):
 
         t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
         out = interactive_output(update, {'t': t})
-        # TODO: add function display; flake8 sees here undefined name "display"
-        # display(out, t)
+        display(out, t)
 
     # EVENTS VISUALIZATION METHODS #
     
