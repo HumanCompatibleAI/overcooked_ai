@@ -1,5 +1,6 @@
 import json, copy
 import numpy as np
+from IPython.display import display
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
