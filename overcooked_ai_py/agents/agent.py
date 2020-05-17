@@ -8,6 +8,9 @@ from overcooked_ai_py.planning.search import SearchTree
 
 class Agent(object):
 
+    def __init__(self):
+        self.reset()
+
     def action(self, state):
         """
         Should return an action, and an action info dictionary.
@@ -55,7 +58,8 @@ class Agent(object):
         One should always reset agents in between trajectory rollouts, as resetting
         usually clears history or other trajectory-specific attributes.
         """
-        pass
+        self.agent_index = None
+        self.mdp = None
 
 
 class AgentGroup(object):
