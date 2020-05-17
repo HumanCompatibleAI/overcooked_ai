@@ -72,8 +72,6 @@ class AgentGroup(object):
         self.agents = agents
         self.n = len(self.agents)
         self.reset()
-        for i, agent in enumerate(self.agents):
-            agent.set_agent_index(i)
 
         if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
             assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
@@ -87,8 +85,13 @@ class AgentGroup(object):
             a.set_mdp(mdp)
 
     def reset(self):
-        for a in self.agents:
-            a.reset()
+        """
+        When resetting an agent group, we know that the agent indices will remain the same,
+        but we have no guarantee about the mdp, that must be set again separately.
+        """
+        for i, agent in enumerate(self.agents):
+            agent.reset()
+            agent.set_agent_index(i)
 
 
 class AgentPair(AgentGroup):
@@ -151,13 +154,13 @@ class NNPolicy(object):
     def __init__(self):
         pass
 
-    def multi_state_policy(states, agent_indices):
+    def multi_state_policy(self, states, agent_indices):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
         raise NotImplementedError()
 
-    def multi_obs_policy(states):
+    def multi_obs_policy(self, states):
         """
         A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
         """
