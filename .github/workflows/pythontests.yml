@@ -1,4 +1,4 @@
-on: ['push', 'pull-request']
+on: ['push', 'pull_request']
 jobs:
   osx_basic_tests:
     runs-on: macos-latest
