@@ -1,8 +1,8 @@
 on:
   push:
-    branches: [ master, overcooked_ai_improvements ]
+    branches: "*"
   pull_request:
-    branches: [ master, overcooked_ai_improvements ]
+    branches: "*"
 jobs:
   build:
     runs-on: ubuntu-latest
