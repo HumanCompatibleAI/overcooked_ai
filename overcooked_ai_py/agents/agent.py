@@ -8,6 +8,9 @@ from overcooked_ai_py.planning.search import SearchTree
 
 class Agent(object):
 
+    def __init__(self):
+        self.reset()
+
     def action(self, state):
         """
         Should return an action, and an action info dictionary.
@@ -51,7 +54,12 @@ class Agent(object):
         self.mdp = mdp
 
     def reset(self):
-        pass
+        """
+        One should always reset agents in between trajectory rollouts, as resetting
+        usually clears history or other trajectory-specific attributes.
+        """
+        self.agent_index = None
+        self.mdp = None
 
 
 class AgentGroup(object):
@@ -64,8 +72,6 @@ class AgentGroup(object):
         self.agents = agents
         self.n = len(self.agents)
         self.reset()
-        for i, agent in enumerate(self.agents):
-            agent.set_agent_index(i)
 
         if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
             assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
@@ -79,8 +85,13 @@ class AgentGroup(object):
             a.set_mdp(mdp)
 
     def reset(self):
-        for a in self.agents:
-            a.reset()
+        """
+        When resetting an agent group, we know that the agent indices will remain the same,
+        but we have no guarantee about the mdp, that must be set again separately.
+        """
+        for i, agent in enumerate(self.agents):
+            agent.reset()
+            agent.set_agent_index(i)
 
 
 class AgentPair(AgentGroup):
@@ -143,13 +154,13 @@ class NNPolicy(object):
     def __init__(self):
         pass
 
-    def multi_state_policy(states, agent_indices):
+    def multi_state_policy(self, states, agent_indices):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
         raise NotImplementedError()
 
-    def multi_obs_policy(states):
+    def multi_obs_policy(self, states):
         """
         A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
         """
@@ -179,12 +190,12 @@ class AgentFromPolicy(Agent):
             actions_and_infos_n.append((action, {"action_probs": action_probs}))
         return actions_and_infos_n
 
-    def actions_from_observations(self, obs):
-        """
-        An action method that takes in states in post-processed form, and returns respective actions.
-        """
-        return self.policy.multi_obs_policy(obs)
-
+    def set_mdp(self, mdp):
+        super().set_mdp(mdp)
+        self.policy.mdp = mdp
+    
+    def reset(self):
+        self.policy.mdp = None
 
 class RandomAgent(Agent):
     """
@@ -407,7 +418,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
 
