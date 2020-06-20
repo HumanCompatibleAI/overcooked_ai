@@ -174,8 +174,7 @@ class OvercookedEnv(object):
         # Update game_stats 
         self._update_game_stats(sparse_reward_by_agent, reward_shaping_by_agent, game_stat_infos)
 
-        # Update state, time, and done
-        self.t += 1
+        # Update state and done
         self.state = next_state
         done = self.is_done()
         info = self._prepare_info_dict(joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent)
@@ -198,11 +197,10 @@ class OvercookedEnv(object):
             "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
         }
         self.game_stats = {**events_dict, **rewards_dict}
-        self.t = 0
 
     def is_done(self):
         """Whether the episode is over."""
-        return self.t >= self.horizon or self.mdp.is_terminal(self.state)
+        return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
     def _prepare_info_dict(self, joint_agent_action_info, reward_shaping_by_agent, sparse_reward_by_agent):
         """
