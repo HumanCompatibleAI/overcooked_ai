@@ -74,7 +74,7 @@ class Recipe:
         if not cls._computed:
             cls._compute_all_recipes()
             cls._computed = True
-        return cls.ALL_RECIPES_CACHE.values()
+        return set(cls.ALL_RECIPES_CACHE.values())
 
     @classmethod
     def configure(cls, conf):
@@ -356,14 +356,14 @@ class PlayerState(object):
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
-    def __init__(self, players, objects, bonus_orders=[], all_orders=[], timestep=0):
+    def __init__(self, players, objects, bonus_orders=set(), all_orders=set(), timestep=0):
         """
         players (list(PlayerState)): Currently active PlayerStates (index corresponds to number)
         objects (dict({tuple:list(ObjectState)})):  Dictionary mapping positions (x, y) to ObjectStates. 
             NOTE: Does NOT include objects held by players (they are in 
             the PlayerState objects).
-        bonus_orders (iter(str)):   Current orders worth a bonus
-        all_orders (iter(str)):     Current orders allowed at all
+        bonus_orders (set(Recipe)):   Current orders worth a bonus
+        all_orders (set(Recipe)):     Current orders allowed at all
         timestep (int):  The current timestep of the state
 
         """
@@ -374,7 +374,7 @@ class OvercookedState(object):
         self.players = tuple(players)
         self.objects = objects
         self.bonus_orders = bonus_orders
-        self.all_orders = all_orders
+        self._all_orders = all_orders
         self.timestep = timestep
 
     @property
@@ -434,7 +434,7 @@ class OvercookedState(object):
 
     @property
     def all_orders(self):
-        return self.all_orders if self.all_orders else Recipe.ALL_RECIPES
+        return self._all_orders if self._all_orders else Recipe.ALL_RECIPES
 
     def has_object(self, pos):
         return pos in self.objects
@@ -458,7 +458,7 @@ class OvercookedState(object):
         return obj
 
     @classmethod
-    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
+    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=set(), all_orders=set()):
         """
         Make a dummy OvercookedState with no objects based on the passed in player
         positions and orientations and order list
@@ -468,7 +468,7 @@ class OvercookedState(object):
             objects={}, bonus_orders=bonus_orders, all_orders=all_orders)
 
     @classmethod
-    def from_player_positions(cls, player_positions, bonus_orders=[], all_orders=[]):
+    def from_player_positions(cls, player_positions, bonus_orders=set(), all_orders=set()):
         """
         Make a dummy OvercookedState with no objects and with players facing
         North based on the passed in player positions and order list
@@ -478,35 +478,36 @@ class OvercookedState(object):
 
     def deepcopy(self):
         return OvercookedState(
-            [player.deepcopy() for player in self.players],
-            {pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
-            None if self.order_list is None else list(self.order_list))
+            players=[player.deepcopy() for player in self.players],
+            objects={pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
+            bonus_orders=set(self.bonus_orders),
+            all_orders=set(self.all_orders))
 
     def __eq__(self, other):
-        order_list_equal = type(self.order_list) == type(other.order_list) and \
-            ((self.order_list is None and other.order_list is None) or \
-            (type(self.order_list) is list and np.array_equal(self.order_list, other.order_list)))
+        order_lists_equal = self.all_orders == other.all_orders and self.bonus_orders == other.bonus_orders
 
         return isinstance(other, OvercookedState) and \
             self.players == other.players and \
             set(self.objects.items()) == set(other.objects.items()) and \
-            order_list_equal
+            self.timestep == other.timestep and \
+            order_lists_equal
 
     def __hash__(self):
-        order_list_hash = tuple(self.order_list) if self.order_list is not None else None
+        order_list_hash = hash(tuple(sorted(self.bonus_orders))) + hash(tuple(sorted(self.all_orders)))
         return hash(
             (self.players, tuple(self.objects.values()), order_list_hash)
         )
 
     def __str__(self):
-        return 'Players: {}, Objects: {}, Order list: {}'.format( 
-            str(self.players), str(list(self.objects.values())), str(self.order_list))
+        return 'Players: {}, Objects: {}, Bonus orders: {} All orders: {} Timestep: {}'.format( 
+            str(self.players), str(list(self.objects.values())), str(self.bonus_orders), str(self.all_orders), str(self.timestep))
 
     def to_dict(self):
         return {
             "players": [p.to_dict() for p in self.players],
             "objects": [obj.to_dict() for obj in self.objects.values()],
-            "order_list": self.order_list
+            "bonus_orders": self.bonus_orders,
+            "all_orders" : self.all_orders
         }
 
     @staticmethod
@@ -571,12 +572,12 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_order_list=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=set(), rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, order_bonus=2, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
         start_player_positions: tuple of positions for both players' starting positions
-        start_order_list: either a tuple of orders or None if there is not specific list. Note that these are the soups worth a bonus
+        start_bonus_orders: List of recipes that are worth a bonus 
         rew_shaping_params: reward given for completion of specific subgoals
         all_orders: List of all available orders the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
@@ -589,7 +590,7 @@ class OvercookedGridworld(object):
         self.terrain_pos_dict = self._get_terrain_type_pos_dict()
         self.start_player_positions = start_player_positions
         self.num_players = len(start_player_positions)
-        self.start_bonus_orders = start_order_list
+        self.start_bonus_orders = start_bonus_orders
         self.start_all_orders = start_all_orders
         self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name

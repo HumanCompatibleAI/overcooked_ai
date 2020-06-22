@@ -242,20 +242,20 @@ class TestGridworld(unittest.TestCase):
 
     def test_start_positions(self):
         expected_start_state = OvercookedState(
-            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['onion', 'any'])
+            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {})
         actual_start_state = self.base_mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
         mdp = OvercookedGridworld.from_layout_name('corridor')
         expected_start_state = OvercookedState(
-            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {}, order_list=None)
+            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {})
         actual_start_state = mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_actions(self):
         bad_state = OvercookedState(
-            [PlayerState((0, 0), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['any'])
+            [PlayerState((0, 0), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {})
         with self.assertRaises(AssertionError):
             self.base_mdp.get_actions(bad_state)
 
@@ -264,13 +264,12 @@ class TestGridworld(unittest.TestCase):
 
     def test_transitions_and_environment(self):
         bad_state = OvercookedState(
-            [P((0, 0), s), P((3, 1), s)], {}, order_list=[])
+            [P((0, 0), s), P((3, 1), s)], {})
 
         with self.assertRaises(AssertionError):
             self.base_mdp.get_state_transition(bad_state, stay)
 
         env = OvercookedEnv.from_mdp(self.base_mdp)
-        env.state.order_list = ['onion', 'any']
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
@@ -283,7 +282,7 @@ class TestGridworld(unittest.TestCase):
         check_transition([n, e], OvercookedState(
             [P((1, 1), n),
              P((3, 1), e)],
-            {}, order_list=['onion', 'any']))
+            {}, timestep=1))
 
     def test_common_mdp_jsons(self):
         traj_test_json_paths = iterate_over_json_files_in_dir("../common_tests/trajectory_tests/")
