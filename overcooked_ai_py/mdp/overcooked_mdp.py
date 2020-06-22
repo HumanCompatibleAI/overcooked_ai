@@ -182,23 +182,35 @@ class SoupState(ObjectState):
 
     @property
     def is_full(self):
-        return self.is_idle and len(self.ingredients) == Recipe.MAX_NUM_INGREDIENTS
+        return not self.is_idle or len(self.ingredients) == Recipe.MAX_NUM_INGREDIENTS
 
     def auto_finish(self):
         self.begin_cooking()
         self._cooking_tick = self.cook_time
 
     def add_ingredient(self, ingredient):
-        assert ingredient.position == self.position, "Cannot add this object to soup as it is not in correct position"
-        assert ingredient.name in Recipe.ALL_INGREDIENTS, "Invalid ingredient"
-        assert not self.is_full, "Reached maximum number of ingredients in recipe"
-        self._ingredients.apend(ingredient)
+        if ingredient.position != self.position:
+            raise ValueError("Cannot add this object to soup as it is not in correct position")
+        if not ingredient.name in Recipe.ALL_INGREDIENTS:
+            raise ValueError("Invalid ingredient")
+        if self.is_full:
+            raise ValueError("Reached maximum number of ingredients in recipe")
+        self._ingredients.append(ingredient)
+
+    def add_ingredient_from_str(self, ingredient_str):
+        ingredient_obj = ObjectState(ingredient_str, self.position)
+        self.add_ingredient(ingredient_obj)
 
     def pop_ingredient(self):
-        assert len(self._ingredients) > 0, "No ingredient to remove"
+        if not self.is_idle:
+            raise ValueError("Cannot remove an ingredient from this soup at this time")
+        if len(self._ingredients) == 0:
+            raise ValueError("No ingredient to remove")
         return self._ingredients.pop()
 
     def begin_cooking(self):
+        if not self.is_idle:
+            raise ValueError("Cannot begin cooking this soup at this time")
         if len(self.ingredients) == 0:
             raise ValueError("Must add at least one ingredient to soup before you can begin cooking")
         self._cooking_tick = 0
@@ -559,7 +571,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_order_list=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_order_list=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, order_bonus=2, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -568,6 +580,7 @@ class OvercookedGridworld(object):
         rew_shaping_params: reward given for completion of specific subgoals
         all_orders: List of all available orders the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
+        order_bonus: Multiplicative factor for serving a bonus recipe
         """
         self.height = len(terrain)
         self.width = len(terrain[0])
@@ -580,6 +593,7 @@ class OvercookedGridworld(object):
         self.start_all_orders = start_all_orders
         self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
+        self.order_bonus = order_bonus
         self._configure_recipes(num_items_for_soup)
 
     @staticmethod
@@ -868,28 +882,22 @@ class OvercookedGridworld(object):
                     player.set_object(obj)
                     shaped_reward[player_idx] += self.reward_shaping_params["SOUP_PICKUP_REWARD"]
 
-                elif player.get_object().name in ['onion', 'tomato']:
-                    item_type = player.get_object().name
+                elif player.get_object().name in Recipe.ALL_INGREDIENTS:
+                    # Adding ingredient to soup
 
                     if not new_state.has_object(i_pos):
-                        # Pot was empty, add onion to it
-                        player.remove_object()
-                        new_state.add_object(SoupState.get_soup(i_pos, num_onions=1))
+                        # Pot was empty, add ingredient to it
+                        new_state.add_object(SoupState(i_pos))
+
+                    # Add ingredient if possible
+                    soup = new_state.get_object(i_pos)
+                    if not soup.is_full:
+                        obj = player.remove_object()
+                        soup.add_ingredient(obj)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
 
                         # Log onion potting
-                        events_infos['potting_onion'][player_idx] = True
-
-                    else:
-                        # Pot has already items in it, add if not full and of same type
-                        soup = new_state.get_object(i_pos)
-                        assert soup.name == 'soup', 'Object in pot was not soup'
-                        if not soup.is_full:
-                            obj = player.remove_object()
-                            soup.add_ingredient(obj)
-                            shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
-
-                            # Log onion potting
+                        if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
             elif terrain_type == 'S' and player.has_object():
@@ -1119,7 +1127,7 @@ class OvercookedGridworld(object):
         if not state.has_object(pos):
             return False
         obj = state.get_object(pos)
-        return obj.name == 'soup' and not obj.is_cooking and not obj.ready
+        return obj.name == 'soup' and not obj.is_cooking and not obj.is_ready and len(obj.ingredients) > 0
 
     def _check_valid_state(self, state):
         """Checks that the state is valid.

@@ -87,7 +87,7 @@ class TestSoupState(unittest.TestCase):
     def setUp(self):
         self.s1 = SoupState.get_soup((0, 0), num_onions=0, num_tomatoes=0)
         self.s2 = SoupState.get_soup((0, 1), num_onions=2, num_tomatoes=1)
-        self.s3 = SoupState.get_soup((1, 1), num_onions=1, num_tomatoes=0, cooking_tick=0)
+        self.s3 = SoupState.get_soup((1, 1), num_onions=1, num_tomatoes=0, cooking_tick=1)
         self.s4 = SoupState.get_soup((1, 0), num_onions=0, num_tomatoes=2, finished=True)
 
     def test_is_cooking(self):
@@ -115,9 +115,58 @@ class TestSoupState(unittest.TestCase):
         self.assertTrue(self.s4.is_full)
 
     def test_cooking(self):
-        self.s1.add_ingredient(Recipe.Onion)
-        self.s1.add_ingredient(Recipe.TOMATO)
-        self.begin_co
+        self.s1.add_ingredient_from_str(Recipe.ONION)
+        self.s1.add_ingredient_from_str(Recipe.TOMATO)
+        
+        self.assertTrue(self.s1.is_idle)
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s1.is_full)
+        
+        self.s1.begin_cooking()
+
+        self.assertFalse(self.s1.is_idle)
+        self.assertTrue(self.s1.is_full)
+        self.assertTrue(self.s1.is_cooking)
+
+        for _ in range(self.s1.cook_time):
+            self.s1.cook()
+
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s1.is_idle)
+        self.assertTrue(self.s1.is_full)
+        self.assertTrue(self.s1.is_ready)
+
+    def test_invalid_ops(self):
+        
+        # Cannot cook an empty soup
+        self.assertRaises(ValueError, self.s1.begin_cooking)
+
+        # Must call 'begin_cooking' before cooking a soup
+        self.assertRaises(ValueError, self.s2.cook)
+
+        # Cannot cook a done soup
+        self.assertRaises(ValueError, self.s4.cook)
+
+        # Cannot begin cooking a soup that is already cooking
+        self.assertRaises(ValueError, self.s3.begin_cooking)
+
+        # Cannot begin cooking a soup that is already done
+        self.assertRaises(ValueError, self.s4.begin_cooking)
+
+        # Cannot add ingredients to a soup that is cooking
+        self.assertRaises(ValueError, self.s3.add_ingredient_from_str, Recipe.ONION)
+
+        # Cannot add ingredients to a soup that is ready
+        self.assertRaises(ValueError, self.s4.add_ingredient_from_str, Recipe.ONION)
+
+        # Cannot remove an ingredient from a soup that is ready
+        self.assertRaises(ValueError, self.s4.pop_ingredient)
+
+        # Cannot remove an ingredient from a soup that is cooking
+        self.assertRaises(ValueError, self.s3.pop_ingredient)
+
+        # Cannot remove an ingredient from a soup that is empty
+        self.assertRaises(ValueError, self.s1.pop_ingredient)
 
 
 
