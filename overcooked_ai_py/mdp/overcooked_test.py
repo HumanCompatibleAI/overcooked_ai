@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-
+from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
+from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent
@@ -16,6 +16,109 @@ n, s = Direction.NORTH, Direction.SOUTH
 e, w = Direction.EAST, Direction.WEST
 stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
+
+def comb(n, k):
+    return factorial(n) / (factorial(n - k) * factorial(k))
+
+
+class TestRecipe(unittest.TestCase):
+
+    def setUp(self):
+        self.r1 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
+        self.r2 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
+        self.r3 = Recipe([Recipe.ONION, Recipe.TOMATO])
+        self.r4 = Recipe([Recipe.ONION, Recipe.TOMATO])
+        self.r5 = Recipe([Recipe.TOMATO, Recipe.ONION])
+        self.r6 = Recipe([Recipe.ONION, Recipe.ONION])
+
+        self.recipes = [self.r1, self.r2, self.r3, self.r4, self.r5, self.r6]
+
+    def tearDown(self):
+        Recipe.configure({})
+
+    def test_eq(self):
+
+        self.assertEqual(self.r1, self.r2, "Failed basic equality check")
+        self.assertNotEqual(self.r1, self.r3, "Failed Basic inequality check")
+        self.assertNotEqual(self.r1, self.r6, "Failed inequality check with all one ingredient")
+        self.assertEqual(self.r3, self.r4, "Failed basic equality check")
+        self.assertEqual(self.r4, self.r5, "Failed ordered equality check")
+
+    def test_caching(self):
+
+        self.assertIs(self.r1, self.r2)
+        self.assertIs(self.r3, self.r4)
+        self.assertIs(self.r4, self.r5)
+        self.assertFalse(self.r6 is self.r1, "different recipes cached to same value")
+
+    def test_value(self):
+        # TODO
+        for recipe in self.recipes:
+            self.assertEqual(recipe.value, 20)
+
+    def test_time(self):
+        # TODO
+        for recipe in self.recipes:
+            self.assertEqual(recipe.time, 20)
+
+    def test_all_recipes(self):
+        for recipe in self.recipes:
+            self.assertTrue(recipe in Recipe.ALL_RECIPES)
+
+        self.assertEqual(len(Recipe.ALL_RECIPES), self._expected_num_recipes(len(Recipe.ALL_INGREDIENTS), Recipe.MAX_NUM_INGREDIENTS))
+
+        Recipe.configure({ "max_num_ingredients" : 4 })
+
+        self.assertEqual(len(Recipe.ALL_RECIPES), self._expected_num_recipes(len(Recipe.ALL_INGREDIENTS), 4))
+
+    def test_invalid_input(self):
+
+        self.assertRaises(ValueError, Recipe, [Recipe.ONION, Recipe.TOMATO, "carrot"])
+        self.assertRaises(ValueError, Recipe, [Recipe.ONION]*4)
+        self.assertRaises(ValueError, Recipe, [])
+        self.assertRaises(ValueError, Recipe, "invalid argument")
+
+
+    def _expected_num_recipes(self, num_ingredients, max_len):
+        return comb(num_ingredients + max_len, num_ingredients) - 1
+
+class TestSoupState(unittest.TestCase):
+    
+    def setUp(self):
+        self.s1 = SoupState.get_soup((0, 0), num_onions=0, num_tomatoes=0)
+        self.s2 = SoupState.get_soup((0, 1), num_onions=2, num_tomatoes=1)
+        self.s3 = SoupState.get_soup((1, 1), num_onions=1, num_tomatoes=0, cooking_tick=0)
+        self.s4 = SoupState.get_soup((1, 0), num_onions=0, num_tomatoes=2, finished=True)
+
+    def test_is_cooking(self):
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s2.is_cooking)
+        self.assertTrue(self.s3.is_cooking)
+        self.assertFalse(self.s4.is_cooking)
+
+    def test_is_ready(self):
+        self.assertFalse(self.s1.is_ready)
+        self.assertFalse(self.s2.is_ready)
+        self.assertFalse(self.s3.is_ready)
+        self.assertTrue(self.s4.is_ready)
+
+    def test_is_idle(self):
+        self.assertTrue(self.s1.is_idle)
+        self.assertTrue(self.s2.is_idle)
+        self.assertFalse(self.s3.is_idle)
+        self.assertFalse(self.s4.is_idle)
+
+    def test_is_full(self):
+        self.assertFalse(self.s1.is_full)
+        self.assertTrue(self.s2.is_full)
+        self.assertTrue(self.s3.is_full)
+        self.assertTrue(self.s4.is_full)
+
+    def test_cooking(self):
+        self.s1.add_ingredient(Recipe.Onion)
+        self.s1.add_ingredient(Recipe.TOMATO)
+        self.begin_co
+
 
 
 class TestDirection(unittest.TestCase):

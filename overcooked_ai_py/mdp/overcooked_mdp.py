@@ -24,9 +24,14 @@ class Recipe:
     
     def __new__(cls, ingredients):
         # Some basic argument verification
-        assert all([elem in cls.ALL_INGREDIENTS for elem in ingredients]), "Recipe can only contain ingredients {0}".format(cls.ALL_INGREDIENTS)
-        assert len(ingredients) <= cls.MAX_NUM_INGREDIENTS
-        key = id(tuple(sorted(ingredients)))
+        if not ingredients or not hasattr(ingredients, '__iter__') or len(ingredients) == 0:
+            raise ValueError("Invalid input recipe. Must be ingredients iterable with non-zero length")
+        for elem in ingredients:
+            if not elem in cls.ALL_INGREDIENTS:
+                raise ValueError("Invalid ingredient: {0}. Recipe can only contain ingredients {1}".format(elem, cls.ALL_INGREDIENTS))
+        if not len(ingredients) <= cls.MAX_NUM_INGREDIENTS:
+            raise ValueError("Recipe of length {0} is invalid. Recipe can contain at most {1} ingredients".format(len(ingredients), cls.MAX_NUM_INGREDIENTS))
+        key = hash(tuple(sorted(ingredients)))
         if key in cls.ALL_RECIPES_CACHE:
             return cls.ALL_RECIPES_CACHE[key]
         cls.ALL_RECIPES_CACHE[key] = super(Recipe, cls).__new__(cls)
@@ -36,15 +41,19 @@ class Recipe:
         self._ingredients = ingredients
 
     def __hash__(self):
-        return hash(self._ingredients())
+        return hash(self.ingredients)
 
     def __eq__(self, other):
-        return self._ingredients() == other.ingredients()
+        return self.ingredients == other.ingredients
+
+    def __repr__(self):
+        return self.ingredients.__repr__()
 
     @classmethod
     def _compute_all_recipes(cls):
-        for ingredient_list in itertools.combinations_with_replacement(cls.ALL_INGREDIENTS, cls.MAX_NUM_INGREDIENTS):
-            cls(ingredient_list)
+        for i in range(cls.MAX_NUM_INGREDIENTS):
+            for ingredient_list in itertools.combinations_with_replacement(cls.ALL_INGREDIENTS, i + 1):
+                cls(ingredient_list)
 
     @property
     def ingredients(self):
@@ -65,7 +74,12 @@ class Recipe:
         if not cls._computed:
             cls._compute_all_recipes()
             cls._computed = True
-        return cls.ALL_RECIPES_CACHE
+        return cls.ALL_RECIPES_CACHE.values()
+
+    @classmethod
+    def configure(cls, conf):
+        cls._computed = False
+        cls.MAX_NUM_INGREDIENTS = conf.get('max_num_ingredients', 3)
         
 
 
@@ -168,7 +182,7 @@ class SoupState(ObjectState):
 
     @property
     def is_full(self):
-        return len(self.ingredients) == Recipe.MAX_NUM_INGREDIENTS
+        return self.is_idle and len(self.ingredients) == Recipe.MAX_NUM_INGREDIENTS
 
     def auto_finish(self):
         self.begin_cooking()
@@ -230,8 +244,14 @@ class SoupState(ObjectState):
 
     @classmethod
     def get_soup(cls, position, num_onions=1, num_tomatoes=0, cooking_tick=-1, finished=False, **kwargs):
+        if num_onions < 0 or num_tomatoes < 0:
+            raise ValueError("Number of active ingredients must be positive")
         if num_onions + num_tomatoes > Recipe.MAX_NUM_INGREDIENTS:
             raise ValueError("Too many ingredients specified for this soup")
+        if cooking_tick >= 0 and num_tomatoes + num_onions == 0:
+            raise ValueError("_cooking_tick must be -1 for empty soup")
+        if finished and num_tomatoes + num_onions == 0:
+            raise ValueError("Empty soup cannot be finished")
         onions = [ObjectState(Recipe.ONION, position) for _ in range(num_onions)]
         tomatoes = [ObjectState(Recipe.TOMATO, position) for _ in range(num_tomatoes)]
         ingredients = onions + tomatoes
@@ -539,7 +559,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_order_list=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES):
+    def __init__(self, terrain, start_player_positions, start_order_list=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -547,6 +567,7 @@ class OvercookedGridworld(object):
         start_order_list: either a tuple of orders or None if there is not specific list. Note that these are the soups worth a bonus
         rew_shaping_params: reward given for completion of specific subgoals
         all_orders: List of all available orders the players can make
+        num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         """
         self.height = len(terrain)
         self.width = len(terrain[0])
@@ -559,6 +580,7 @@ class OvercookedGridworld(object):
         self.start_all_orders = start_all_orders
         self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
+        self._configure_recipes(num_items_for_soup)
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -616,6 +638,9 @@ class OvercookedGridworld(object):
 
         return OvercookedGridworld(**mdp_config)
 
+
+    def _configure_recipes(self, num_items_for_soup):
+        Recipe.configure({'num_items_for_soup' : num_items_for_soup })
 
     #####################
     # BASIC CLASS UTILS #
