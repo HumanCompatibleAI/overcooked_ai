@@ -150,7 +150,7 @@ class OvercookedEnv(object):
         Terminal graphics visualization of a state transition.
         """
         print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shape * {} \n{}\n".format(
-            self.t, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["agent_infos"], self)
+            self.state.timestep, tuple(Action.ACTION_TO_CHAR[a] for a in a_t), r_t, info["agent_infos"], self)
         )
 
     ###################
@@ -221,7 +221,7 @@ class OvercookedEnv(object):
             'ep_shaped_r': sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
             'ep_sparse_r_by_agent': self.game_stats["cumulative_sparse_rewards_by_agent"],
             'ep_shaped_r_by_agent': self.game_stats["cumulative_shaped_rewards_by_agent"],
-            'ep_length': self.t
+            'ep_length': self.state.timestep
         }
         return info
 
@@ -238,7 +238,7 @@ class OvercookedEnv(object):
             event_occurred_by_idx = [int(x) for x in bool_list_by_agent]
             for idx, event_by_agent in enumerate(event_occurred_by_idx):
                 if event_by_agent:
-                    self.game_stats[event_type][idx].append(self.t)
+                    self.game_stats[event_type][idx].append(self.state.timestep)
 
 
     ####################
@@ -264,7 +264,7 @@ class OvercookedEnv(object):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
         """
-        assert self.t == 0, "Did not reset environment before running agents"
+        assert self.state.timestep == 0, "Did not reset environment before running agents"
         trajectory = []
         done = False
 
@@ -281,10 +281,10 @@ class OvercookedEnv(object):
             s_tp1, r_t, done, info = self.step(a_t, a_info_t)
             trajectory.append((s_t, a_t, r_t, done, info))
 
-            if display and self.t < display_until:
+            if display and self.state.timestep < display_until:
                 self.print_state_transition(a_t, r_t, info)
 
-        assert len(trajectory) == self.t, "{} vs {}".format(len(trajectory), self.t)
+        assert len(trajectory) == self.state.timestep, "{} vs {}".format(len(trajectory), self.state.timestep)
 
         # Add final state
         if include_final_state:
@@ -292,7 +292,7 @@ class OvercookedEnv(object):
 
         total_sparse = sum(self.game_stats["cumulative_sparse_rewards_by_agent"])
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
-        return np.array(trajectory), self.t, total_sparse, total_shaped
+        return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
 
     def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
         """

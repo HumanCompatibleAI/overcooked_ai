@@ -161,7 +161,7 @@ class AgentEvaluator(object):
 
                 next_state, reward, done, info = simulation_env.step(actions[i])
 
-                assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
+                assert states[i + 1].time_independent_equal(next_state), "States differed (expected vs actual): {}".format(
                     simulation_env.display_states(states[i + 1], next_state)
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)

@@ -136,6 +136,30 @@ class TestSoupState(unittest.TestCase):
         self.assertTrue(self.s1.is_full)
         self.assertTrue(self.s1.is_ready)
 
+    def test_attributes(self):
+        self.assertListEqual(self.s1.ingredients, [])
+        self.assertListEqual(self.s2.ingredients, [Recipe.ONION, Recipe.ONION, Recipe.TOMATO])
+        self.assertListEqual(self.s3.ingredients, [Recipe.ONION])
+        self.assertListEqual(self.s4.ingredients, [Recipe.TOMATO, Recipe.TOMATO])
+
+        try:
+            self.s1.recipe
+            self.fail("Expected ValueError to be raised")
+        except ValueError as e: 
+            pass
+        except Exception as e:
+            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
+
+        try:
+            self.s2.recipe
+            self.fail("Expected ValueError to be raised")
+        except ValueError as e: 
+            pass
+        except Exception as e:
+            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
+        self.assertEqual(self.s3.recipe, Recipe([Recipe.ONION]))
+        self.assertEqual(self.s4.recipe, Recipe([Recipe.TOMATO, Recipe.TOMATO]))
+
     def test_invalid_ops(self):
         
         # Cannot cook an empty soup
@@ -262,6 +286,12 @@ class TestGridworld(unittest.TestCase):
         self.assertEqual(self.base_mdp.get_actions(self.base_mdp.get_standard_start_state()),
                          [Action.ALL_ACTIONS, Action.ALL_ACTIONS])
 
+    def test_from_dict(self):
+        state_dict = {"players": [{"position": [2, 1], "orientation": [0, -1], "held_object": None }, {"position": [1, 1], "orientation": [0, -1], "held_object": None }], "objects": [{"name": "onion", "position": [1, 0], "state": None }], "order_list": None }
+        state = OvercookedState.from_dict(state_dict)
+        print(state)
+
+
     def test_transitions_and_environment(self):
         bad_state = OvercookedState(
             [P((0, 0), s), P((3, 1), s)], {})
@@ -288,10 +318,11 @@ class TestGridworld(unittest.TestCase):
         traj_test_json_paths = iterate_over_json_files_in_dir("../common_tests/trajectory_tests/")
         for test_json_path in traj_test_json_paths:
             test_trajectory = AgentEvaluator.load_traj_from_json(test_json_path)
-            try:
-                AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
-            except AssertionError as e:
-                self.fail("File {} failed with error:\n{}".format(test_json_path, e))
+            # try:
+            #     AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
+            # except AssertionError as e:
+            #     self.fail("File {} failed with error:\n{}".format(test_json_path, e))
+            AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
 
     def test_four_player_mdp(self):
         try:
@@ -320,7 +351,7 @@ class TestFeaturizations(unittest.TestCase):
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/lossless_state_featurization")
-        expected_featurization = load_pickle("data/testing/lossless_state_featurization")
+        expected_featurization = load_pickle("./data/testing/lossless_state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
@@ -329,7 +360,7 @@ class TestFeaturizations(unittest.TestCase):
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/state_featurization")
-        expected_featurization = load_pickle("data/testing/state_featurization")
+        expected_featurization = load_pickle("./data/testing/state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 
@@ -368,6 +399,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         try:
             self.env.get_rollouts(self.rnd_agent_pair, 3)
         except Exception as e:
+            print(e.with_traceback())
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
     def test_one_player_env(self):

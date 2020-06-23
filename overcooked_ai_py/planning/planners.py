@@ -621,7 +621,7 @@ class JointMotionPlanner(object):
         # (not on objects and other aspects of state).
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
-        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, order_list=['any', 'any'])
+        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state)
         env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
@@ -845,20 +845,20 @@ class MediumLevelActionManager(object):
         return self._get_ml_actions_for_positions(serving_locations)
 
     def put_onion_in_pot_actions(self, pot_states_dict):
-        partially_full_onion_pots = pot_states_dict['onion']['partially_full']
+        partially_full_onion_pots = self.mdp.get_partially_full_pots(pot_states_dict)
         fillable_pots = partially_full_onion_pots + pot_states_dict['empty']
         return self._get_ml_actions_for_positions(fillable_pots)
 
     def put_tomato_in_pot_actions(self, pot_states_dict):
-        partially_full_tomato_pots = pot_states_dict['tomato']['partially_full']
+        partially_full_tomato_pots = []
         fillable_pots = partially_full_tomato_pots + pot_states_dict['empty']
         return self._get_ml_actions_for_positions(fillable_pots)
     
     def pickup_soup_with_dish_actions(self, pot_states_dict, only_nearly_ready=False):
-        ready_pot_locations = pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
-        nearly_ready_pot_locations = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking']
+        ready_pot_locations = pot_states_dict['ready']
+        nearly_ready_pot_locations = pot_states_dict['cooking']
         if not only_nearly_ready:
-            partially_full_pots = pot_states_dict['tomato']['partially_full'] + pot_states_dict['onion']['partially_full']
+            partially_full_pots = self.mdp.get_partially_full_pots(pot_states_dict)
             nearly_ready_pot_locations = nearly_ready_pot_locations + pot_states_dict['empty'] + partially_full_pots
         return self._get_ml_actions_for_positions(ready_pot_locations + nearly_ready_pot_locations)
 
@@ -962,9 +962,6 @@ class MediumLevelPlanner(object):
         """
         start_state = start_state.deepcopy()
         ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
-
-        if start_state.order_list is None:
-            start_state.order_list = ['any'] * delivery_horizon
             
         full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
             start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
@@ -1024,10 +1021,6 @@ class MediumLevelPlanner(object):
             cost (int): A* Search cost
         """
         start_state = start_state.deepcopy()
-        if start_state.order_list is None:
-            start_state.order_list = ["any"] * delivery_horizon
-        else:
-            start_state.order_list = start_state.order_list[:delivery_horizon]
         
         expand_fn = lambda state: self.get_successor_states(state)
         goal_fn = lambda state: state.num_orders_remaining == 0
@@ -1375,9 +1368,8 @@ class Heuristic(object):
         min_onion_to_pot_cost = self.heuristic_cost_dict['onion-pot']
 
         pot_locations = self.mdp.get_pot_locations()
-        full_soups_in_pots = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking'] \
-                             + pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
-        partially_full_soups = pot_states_dict['onion']['partially_full'] + pot_states_dict['tomato']['partially_full']
+        full_soups_in_pots = pot_states_dict['cooking'] + pot_states_dict['ready']
+        partially_full_soups = self.mdp.get_partially_full_pots(pot_states_dict)
         num_onions_in_partially_full_pots = sum([state.get_object(loc).state[1] for loc in partially_full_soups])
 
         # Calculating costs
@@ -1521,19 +1513,17 @@ class Heuristic(object):
         """Simpler heuristic that tends to run faster than current one"""
         # NOTE: State should be modified to have an order list w.r.t. which
         # one can calculate the heuristic
-        assert state.order_list is not None
         
         objects_dict = state.unowned_objects_by_type
         player_objects = state.player_objects_by_type
         pot_states_dict = self.mdp.get_pot_states(state)
         num_deliveries_to_go = state.num_orders_remaining
         
-        full_soups_in_pots = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking'] \
-                             + pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
-        partially_full_onion_soups = pot_states_dict['onion']['partially_full']
-        partially_full_tomato_soups = pot_states_dict['tomato']['partially_full']
-        num_onions_in_partially_full_pots = sum([state.get_object(loc).state[1] for loc in partially_full_onion_soups])
-        num_tomatoes_in_partially_full_pots = sum([state.get_object(loc).state[1] for loc in partially_full_tomato_soups])
+        full_soups_in_pots = pot_states_dict['cooking'] + pot_states_dict['ready']
+        partially_full_onion_soups = self.mdp.get_partially_full_pots(pot_states_dict)
+        partially_full_tomato_soups = []
+        num_onions_in_partially_full_pots = sum([len(state.get_object(loc).ingredients) for loc in partially_full_onion_soups])
+        num_tomatoes_in_partially_full_pots = sum([len(state.get_object(loc).ingredients) for loc in partially_full_tomato_soups])
 
         soups_in_transit = player_objects['soup']
         dishes_in_transit = objects_dict['dish'] + player_objects['dish']
