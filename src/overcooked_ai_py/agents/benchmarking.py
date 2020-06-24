@@ -8,6 +8,7 @@ from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
 
 
 class AgentEvaluator(object):
@@ -20,25 +21,71 @@ class AgentEvaluator(object):
     pickleable. We should think about possible improvements/what makes most sense to do here.
     """
 
-    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+
+    def __init__(self, mdp_params_lst, env_params={}, mdp_fn_params_lst=None, force_compute=False, mlp_params_lst=None, debug=False):
         """
-        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        mdp_params_lst (list): a list of params for creation of an OvercookedGridworld instance
+            through the `from_layout_name` method
         env_params (dict): params for creation of an OvercookedEnv
-        mdp_fn (callable function): a function that can be used to create mdp
+        mdp_fn_params (list): a list of params to setup random MDP generation
         force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
         """
-        assert type(mdp_params) is dict, "mdp_params must be a dictionary"
-        assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
-        env_params["mlp_params"] = mlp_params
-        if mdp_fn is None:
-            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            self.mdp_fn = lambda: mdp
-            self.env = OvercookedEnv.from_mdp(mdp, **env_params)
-        else:
-            self.mdp_fn = mdp_fn
-            self.env = OvercookedEnv(self.mdp_fn, **env_params)
+        assert type(mdp_params_lst) is list and len(mdp_params_lst) > 0, \
+            "please make sure mdp_params_lst is a list. " \
+            "If not, please see where the function is called and make a fake list"
+        assert all([type(mdp_params_i) is dict for mdp_params_i in mdp_params_lst]), \
+            "all mdp_params must be a dictionary"
 
+        # The main changes here is that we are putting a list of environment in the AgentEvaluator.
+        self.mdp_fn_lst = []
+        self.env_lst = []
+        if mdp_fn_params_lst is None:
+            for mdp_params_i in mdp_params_lst:
+                mdp = OvercookedGridworld.from_layout_name(**mdp_params_i)
+                self.mdp_fn_lst.append(lambda: mdp)
+                self.env_lst.append(OvercookedEnv.from_mdp(mdp, **env_params))
+        else:
+            assert type(mdp_fn_params_lst) is list and len(mdp_fn_params_lst) > 0
+            assert all([type(mdp_fn_params_i) is dict for mdp_fn_params_i in mdp_fn_params_lst]), \
+                "all mdp_fn_params must be a dictionary"
+            for mdp_params_i, mdp_fn_params_i in zip(mdp_params_lst, mdp_fn_params_lst):
+                mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params_i, **mdp_fn_params_i)
+                self.mdp_fn_lst.append(mdp_fn)
+                self.env_lst.append(OvercookedEnv(mdp_fn, **env_params))
+        
         self.force_compute = force_compute
+        self.debug = debug
+        self.mlp_params_lst = mlp_params_lst if mlp_params_lst is not None else [NO_COUNTERS_PARAMS] * len(mdp_params_lst)
+        self._mlp_lst = [None] * len(mdp_params_lst)
+
+    @property
+    def mlp_lst(self):
+        # each layout will get its own mlp
+        for i in range(len(self._mlp_lst)):
+            assert not self.env_lst[i].variable_mdp, "Variable mdp is not currently supported for planning"
+            if self._mlp_lst[i] is None:
+                if self.debug: print("Computing Planner")
+                self._mlp_lst[i] = MediumLevelPlanner.from_pickle_or_compute(self.env_lst[i].mdp, self.mlp_params_lst[i], force_compute=self.force_compute)
+        return self._mlp_lst
+
+    """
+    @property
+    def env(self, idx = 0):
+        # this function could be used to ensure backwards compatibility with previous APIs that assumes single env
+        # but its use in production is strongly discouraged. Could be used for debugging
+        return self.env_lst[idx]
+        
+    @property
+    def mlp(self, idx = 0):
+        # this function could be used to ensure backwards compatibility with previous APIs that assumes single env
+        # but its use in production is strongly discouraged. Could be used for debugging
+        assert not self.env_lst[0].variable_mdp
+        
+        if self._mlp_lst[0] is None:
+            if self.debug: print("Computing Planner")
+            self._mlp_lst[0] = MediumLevelPlanner.from_pickle_or_compute(self.env_lst[0].mdp, self.mlp_params_lst[0], force_compute=self.force_compute)
+        return self._mlp_lst[0]
+    """
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
@@ -75,9 +122,10 @@ class AgentEvaluator(object):
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
         idx = 0
-        horizon_env = self.env.copy()
-        horizon_env.horizon = self.env.horizon if game_length is None else game_length
-        horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
+
+        horizon_env = self.env_lst[idx].copy()
+        horizon_env.horizon = self.env_lst[idx].horizon if game_length is None else game_length
+        horizon_env.start_state_fn = self.env_lst[idx].start_state_fn if start_state_fn is None else start_state_fn
         horizon_env.reset()
         return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
