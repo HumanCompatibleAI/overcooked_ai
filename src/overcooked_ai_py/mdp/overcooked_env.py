@@ -237,11 +237,11 @@ class OvercookedEnv(object):
         """
         return self.mdp.lossless_state_encoding(state)
 
-    def featurize_state_mdp(self, state):
+    def featurize_state_mdp(self, state, mlp):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.mlp)
+        return self.mdp.featurize_state(state, mlp)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
