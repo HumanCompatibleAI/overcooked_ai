@@ -192,6 +192,18 @@ class OvercookedEnv(object):
         timestep_sparse_reward = sum(mdp_infos["sparse_reward_by_agent"])
         return (next_state, timestep_sparse_reward, done, env_info)
 
+    def lossless_state_encoding_mdp(self, state):
+        """
+        Wrapper of the mdp's lossless_encoding
+        """
+        return self.mdp.lossless_state_encoding(state)
+
+    def featurize_state_mdp(self, state, mlp):
+        """
+        Wrapper of the mdp's featurize_state
+        """
+        return self.mdp.featurize_state(state, mlp)
+
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
         self.mdp = self.mdp_generator_fn()
