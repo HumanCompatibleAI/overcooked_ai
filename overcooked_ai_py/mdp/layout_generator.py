@@ -1,4 +1,5 @@
 import numpy as np
+import random
 from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
@@ -16,10 +17,28 @@ CODE_TO_TYPE = { 0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 
 TYPE_TO_CODE = { v:k for k, v in CODE_TO_TYPE.items() }
 
 
+def mdp_fn_random_choice(mdp_fn_choices):
+    assert type(mdp_fn_choices) is list and len(mdp_fn_choices) > 0
+    return random.choice(mdp_fn_choices)
+
+
+"""
+size_bounds: (min_layout_size, max_layout_size)
+prop_empty: (min, max) proportion of empty space in generated layout
+prop_feats: (min, max) proportion of counters with features on them
+"""
+
+DEFAULT_MDP_GEN_PARAMS = {
+    "inner_shape": (5, 4),
+    "prop_empty": 0.6,
+    "prop_feats": 0.1,
+    "display": False
+}
+
 class LayoutGenerator(object):
     # NOTE: This class hasn't been tested extensively.
 
-    def __init__(self, outer_shape, mdp_params):
+    def __init__(self, outer_shape=(7, 7), mdp_params=DEFAULT_MDP_GEN_PARAMS):
         """
         Defines a layout generator that will return OvercoookedGridworld instances 
         with layout of size `outer_shape`
@@ -29,53 +48,44 @@ class LayoutGenerator(object):
 
     @staticmethod
     def mdp_gen_fn_from_dict(
-        mdp_params={},
-        mdp_choices=None,
-        size_bounds=((4, 7), (4, 7)), 
-        prop_empty=(0.6, 0.8),
-        prop_feats=(0.1, 0.2),
-        display=False
+            mdp_params=DEFAULT_MDP_GEN_PARAMS
     ):
         """
-        Returns an MDP generator with the passed in properties.
-
-        mdp_choices: selects MDP randomly among choices
-
-        OR (if mdp_choices is None)
-
-        size_bounds: (min_layout_size, max_layout_size)
-        prop_empty: (min, max) proportion of empty space in generated layout
-        prop_feats: (min, max) proportion of counters with features on them
+        mdp_params: it could take either
+        Returns a NON-PADDED MDP generator with the passed in properties.
         """
-        
+        assert "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None, \
+            "please use an instance of LayoutGenerator to generate any non-predefined layouts"
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        mdp_generator_fn = lambda: mdp
+        return mdp_generator_fn
+
+    def generate_padded_mdp(self):
+        """
+        Return a PADDED MDP with mdp params specified in self.mdp_params
+        """
+        mdp_params = self.mdp_params
         if "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            mdp_generator_fn = lambda: mdp
-        
-        elif mdp_choices is not None:
-            assert type(mdp_choices) is list
-            
-            # If list of MDPs, randomly choose one at each reset
-            mdp_sizes = []
-            for mdp_name in mdp_choices:
-                mdp = OvercookedGridworld.from_layout_name(mdp_name, **mdp_params)
-                mdp_sizes.append([mdp.width, mdp.height])
-            widths, heights = np.array(mdp_sizes).T
-            min_padding = max(widths), max(heights)            
-            
-            def mdp_generator_fn():
-                chosen_mdp = np.random.choice(mdp_choices)
-                mdp = OvercookedGridworld.from_layout_name(chosen_mdp, **mdp_params)
-                lg = LayoutGenerator(min_padding, mdp_params)
-                mdp_padded = lg.padded_mdp(mdp)
-                return mdp_padded
+            mdp_generator_fn = lambda: self.padded_mdp(mdp)
         else:
-            min_padding = (size_bounds[0][1], size_bounds[1][1])
-            layout_generator = LayoutGenerator(min_padding, mdp_params)
+            assert "inner_shape" in mdp_params.keys(), "mdp_params is missing inner_shape"
+            assert "prop_empty" in mdp_params.keys(), "mdp_params is missing prop_empty"
+            assert "prop_feats" in mdp_params.keys(), "mdp_params is missing prop_feats"
+            assert "display" in mdp_params.keys(), "mdp_params is missing display"
+            inner_shape = mdp_params["inner_shape"]
+            prop_empty = mdp_params["prop_empty"]
+            prop_feats = mdp_params["prop_feats"]
+            display = mdp_params["display"]
+
+            assert inner_shape[0] <= self.outer_shape[0] and inner_shape[1] <= self.outer_shape[1], \
+                "inner_shape cannot fit into the outershap"
+
+            layout_generator = LayoutGenerator(self.outer_shape, mdp_params)
             mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
-                inner_shape=[rnd_int_uniform(*dim) for dim in size_bounds],
-                prop_empty=rnd_uniform(*prop_empty),
-                prop_features=rnd_uniform(*prop_feats),
+                inner_shape=inner_shape,
+                prop_empty=prop_empty,
+                prop_features=prop_feats,
                 display=display
             )
 
