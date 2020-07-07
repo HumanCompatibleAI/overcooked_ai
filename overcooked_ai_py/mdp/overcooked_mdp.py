@@ -463,23 +463,21 @@ class PlayerState(object):
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
-    def __init__(self, players, objects, bonus_orders=set(), all_orders=set(), timestep=0, **kwargs):
+    def __init__(self, players, objects, bonus_orders=[], all_orders=[], timestep=0, **kwargs):
         """
         players (list(PlayerState)): Currently active PlayerStates (index corresponds to number)
         objects (dict({tuple:list(ObjectState)})):  Dictionary mapping positions (x, y) to ObjectStates. 
             NOTE: Does NOT include objects held by players (they are in 
             the PlayerState objects).
-        bonus_orders (set(Recipe)):   Current orders worth a bonus
-        all_orders (set(Recipe)):     Current orders allowed at all
+        bonus_orders (list(dict)):   Current orders worth a bonus
+        all_orders (list(dict)):     Current orders allowed at all
         timestep (int):  The current timestep of the state
 
         """
-        bonus_orders = set(bonus_orders)
-        all_orders = set(all_orders)
+        bonus_orders = set([Recipe.from_dict(order) for order in bonus_orders])
+        all_orders = set([Recipe.from_dict(order) for order in all_orders])
         for pos, obj in objects.items():
             assert obj.position == pos
-        assert all([o in Recipe.ALL_RECIPES for o in bonus_orders])
-        assert all([o in Recipe.ALL_RECIPES for o in all_orders])
         self.players = tuple(players)
         self.objects = objects
         self.bonus_orders = bonus_orders
@@ -589,8 +587,8 @@ class OvercookedState(object):
         return OvercookedState(
             players=[player.deepcopy() for player in self.players],
             objects={pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
-            bonus_orders=set(self.bonus_orders),
-            all_orders=set(self.all_orders),
+            bonus_orders=[order.to_dict() for order in self.bonus_orders],
+            all_orders=[order.to_dict() for order in self.all_orders],
             timestep=self.timestep)
 
     def time_independent_equal(self, other):
@@ -677,14 +675,14 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=set(), rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=Recipe.ALL_RECIPES, num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
         start_player_positions: tuple of positions for both players' starting positions
-        start_bonus_orders: List of recipes that are worth a bonus 
+        start_bonus_orders: List of recipes dicts that are worth a bonus 
         rew_shaping_params: reward given for completion of specific subgoals
-        all_orders: List of all available orders the players can make
+        all_orders: List of all available order dicts the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
         """
