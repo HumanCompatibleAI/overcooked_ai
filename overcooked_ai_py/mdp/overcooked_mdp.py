@@ -295,7 +295,7 @@ class SoupState(ObjectState):
     
     def to_dict(self):
         info_dict = super(SoupState, self).to_dict()
-        ingrdients_dict = [ingredient.to_dict for ingredient in self._ingredients]
+        ingrdients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
         info_dict['_ingredients'] = ingrdients_dict
         info_dict['_cooking_tick'] = self._cooking_tick
         return info_dict
