@@ -1344,6 +1344,9 @@ class OvercookedGridworld(object):
         """Player picked an object up from a counter or a dispenser"""
         obj_pickup_key = obj_name + "_pickup"
         if obj_pickup_key not in events_infos:
+            # TODO: add support for tomato event logging
+            if obj_name == "tomato":
+                return
             raise ValueError("Unknown event {}".format(obj_pickup_key))
         events_infos[obj_pickup_key][player_index] = True
         
