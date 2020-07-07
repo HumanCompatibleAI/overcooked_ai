@@ -298,6 +298,10 @@ class SoupState(ObjectState):
         ingrdients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
         info_dict['_ingredients'] = ingrdients_dict
         info_dict['_cooking_tick'] = self._cooking_tick
+        info_dict['is_cooking'] = self.is_cooking
+        info_dict['is_ready'] = self.is_ready
+        info_dict['is_idle'] = self.is_ready
+        info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
         return info_dict
 
     @classmethod
