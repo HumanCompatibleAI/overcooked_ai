@@ -466,7 +466,7 @@ class OvercookedState(object):
         ones held by players.
         """
         objects_by_type = defaultdict(list)
-        for pos, obj in self.objects.items():
+        for _pos, obj in self.objects.items():
             objects_by_type[obj.name].append(obj)
         return objects_by_type
 
@@ -596,15 +596,6 @@ class OvercookedState(object):
         return load_from_json(filename)
 
 
-NO_REW_SHAPING_PARAMS = {
-    "PLACEMENT_IN_POT_REW": 0,
-    "DISH_PICKUP_REWARD": 0,
-    "SOUP_PICKUP_REWARD": 0,
-    "DISH_DISP_DISTANCE_REW": 0,
-    "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0,
-}
-
 BASE_REW_SHAPING_PARAMS = {
     "PLACEMENT_IN_POT_REW": 3,
     "DISH_PICKUP_REWARD": 3,
@@ -665,7 +656,7 @@ class OvercookedGridworld(object):
         self.num_players = len(start_player_positions)
         self.start_bonus_orders = start_bonus_orders
         self.start_all_orders = start_all_orders
-        self.reward_shaping_params = NO_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
+        self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
         self._configure_recipes(num_items_for_soup, **kwargs)
@@ -851,6 +842,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
+        phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -860,7 +852,7 @@ class OvercookedGridworld(object):
         new_state = state.deepcopy()
 
         # Resolve interacts first
-        sparse_reward, shaped_reward = self.resolve_interacts(new_state, joint_action, events_infos)
+        sparse_reward_by_agent, shaped_reward_by_agent = self.resolve_interacts(new_state, joint_action, events_infos)
 
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
@@ -873,7 +865,16 @@ class OvercookedGridworld(object):
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
-        return new_state, sparse_reward, shaped_reward, events_infos
+
+        phi_s_prime = self.potential_function(new_state)
+        infos = {
+            "event_infos": events_infos,
+            "sparse_reward_by_agent": sparse_reward_by_agent,
+            "shaped_reward_by_agent": shaped_reward_by_agent,
+            "phi_s": phi_s,
+            "phi_s_prime": phi_s_prime
+        }
+        return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
@@ -1140,6 +1141,7 @@ class OvercookedGridworld(object):
         'cooking': [soup objs that are cooking but not ready]
         'ready': [ready soup objs],
         }
+        NOTE: all returned pots are just pot positions
         """
         pots_states_dict = defaultdict(list)
         for pot_pos in self.get_pot_locations():
@@ -1171,6 +1173,7 @@ class OvercookedGridworld(object):
         return [pos for pos in counter_locations if not state.has_object(pos)]
 
     def get_empty_pots(self, pot_states):
+        """Returns pots that have 0 items in them"""
         return pot_states["empty"]
 
     def get_ready_pots(self, pot_states):
@@ -1454,11 +1457,16 @@ class OvercookedGridworld(object):
             grid_string += "Bonus orders: {}\n".format(
                 state.bonus_orders
             )
+        grid_string += "State potential value: {}\n".format(self.potential_function(state))
         return grid_string
 
     ###################
     # STATE ENCODINGS #
     ###################
+
+    @property
+    def lossless_state_encoding_shape(self):
+        return np.array(list(self.shape) + [20])
 
     def lossless_state_encoding(self, overcooked_state, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
@@ -1545,6 +1553,10 @@ class OvercookedGridworld(object):
         num_players = len(overcooked_state.players)
         final_obs_for_players = tuple(process_for_player(i) for i in range(num_players))
         return final_obs_for_players
+
+    @property
+    def featurize_state_shape(self):
+        return np.array([62])
 
     def featurize_state(self, overcooked_state, mlp):
         """
@@ -1642,6 +1654,43 @@ class OvercookedGridworld(object):
             return (0, 0)
         dy_loc, dx_loc = pos_distance(closest_loc, player.position)
         return dy_loc, dx_loc
+
+
+    ###############################
+    # POTENTIAL REWARD SHAPING FN #
+    ###############################
+
+    def potential_function(self, state):
+        """
+        A potential function used for more principled reward shaping
+        For details see "Policy invariance under reward transformations:
+        Theory and application to reward shaping"
+
+        Essentially, this is the ɸ(s) function.
+        """
+        pot_states = self.get_pot_states(state)
+        potential_values = {
+            'holding_onion': 1,
+            'onion_in_pot': 3,
+            'holding_dish': 1, # For each dish when there is a full pot, corresponding to it
+            'holding_soup': 14
+        }
+
+        potential = 0
+        potential += len(state.player_objects_by_type['onion']) * potential_values['holding_onion']
+
+        all_pots_with_items = self.get_partially_full_pots(pot_states) + self.get_full_pots(pot_states)
+        soup_objects_in_pots_with_items = [state.get_object(pot_loc) for pot_loc in all_pots_with_items]
+        total_num_onions_in_pots = sum([pot.state[1] for pot in soup_objects_in_pots_with_items])
+        potential += total_num_onions_in_pots * potential_values['onion_in_pot']
+
+        num_ready_pots = len(self.get_full_pots(pot_states))
+        num_useful_dishes = min(len(state.player_objects_by_type['dish']), num_ready_pots)
+        potential += num_useful_dishes * potential_values['holding_dish']
+
+        potential += len(state.player_objects_by_type['soup']) * potential_values['holding_soup']
+        return potential
+
 
     ##############
     # DEPRECATED #

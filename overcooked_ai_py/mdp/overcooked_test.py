@@ -303,7 +303,7 @@ class TestGridworld(unittest.TestCase):
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
-            pred_state, sparse_reward, dense_reward, _ = self.base_mdp.get_state_transition(state, action)
+            pred_state, _ = self.base_mdp.get_state_transition(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
@@ -344,6 +344,16 @@ class TestFeaturizations(unittest.TestCase):
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlp), GreedyHumanModel(self.mlp))
         np.random.seed(0)
+
+    def test_lossless_state_featurization_shape(self):
+        s = self.base_mdp.get_standard_start_state()
+        obs = self.base_mdp.lossless_state_encoding(s)[0]
+        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.lossless_state_encoding_shape), "{} vs {}".format(obs.shape, self.base_mdp.lossless_state_encoding_shape))
+
+    def test_state_featurization_shape(self):
+        s = self.base_mdp.get_standard_start_state()
+        obs = self.base_mdp.featurize_state(s, self.mlp)[0]
+        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.featurize_state_shape), "{} vs {}".format(obs.shape, self.base_mdp.featurize_state_shape))
 
     def test_lossless_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
