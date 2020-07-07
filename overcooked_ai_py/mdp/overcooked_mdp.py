@@ -78,9 +78,13 @@ class Recipe:
         # TODO
         if hasattr(self, '_delivery_reward'):
             return self._delivery_reward
-        num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
-        num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
-        return 3 * num_tomatoes + 2 * num_onions
+        if hasattr(self, '_value_mapping') and self in self._value_mapping:
+            return self._value_mapping[self]
+        if hasattr(self, '_onion_value') and hasattr(self, '_tomato_value'):
+            num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
+            num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
+            return self._tomato_value * num_tomatoes + self._onion_value * num_onions
+        return 20
 
     @property
     def time(self):
@@ -140,6 +144,12 @@ class Recipe:
 
         if 'onion_time' in conf:
             cls._onion_time = conf['onion_time']
+
+        if 'tomato_value' in conf:
+            cls._tomato_value = conf['tomato_value']
+
+        if 'onion_value' in conf:
+            cls._onion_value = conf['onion_value']
 
     @classmethod
     def from_dict(cls, obj_dict):
