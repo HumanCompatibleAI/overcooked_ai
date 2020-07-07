@@ -76,13 +76,23 @@ class Recipe:
     @property
     def value(self):
         # TODO
-        return 20
+        if hasattr(self, '_delivery_reward'):
+            return self._delivery_reward
+        num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
+        num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
+        return 3 * num_tomatoes + 2 * num_onions
 
     @property
     def time(self):
         # TODO
         if hasattr(self, '_cook_time'):
             return self._cook_time
+        if hasattr(self, '_time_mapping') and self in self._time_mapping:
+            return self._time_mapping[self]
+        if hasattr(self, '_onion_time') and hasattr(self, '_tomato_time'):
+            num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
+            num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
+            return self._onion_time * num_onions + self._tomato_time * num_tomatoes
         return 20
 
     def to_dict(self):
@@ -103,6 +113,33 @@ class Recipe:
         # Backwards compatibility
         if 'cook_time' in conf:
             cls._cook_time = conf['cook_time']
+
+        if 'delivery_reward' in conf:
+            cls._delivery_reward = conf['delivery_reward']
+
+        if 'recipe_values' in conf:
+            if not 'all_orders' in conf:
+                raise ValueError("Invalid recipe configuration")
+            if not len(conf['all_orders']) == len(conf['recipe_values']):
+                raise ValueError("Invalid recipe configuration")
+            cls._value_mapping = {
+                cls.from_dict(recipe) : value for (recipe, value) in zip(conf['all_orders'], conf['recipe_values'])
+            }
+
+        if 'recipe_times' in conf:
+            if not 'all_orders' in conf:
+                raise ValueError("Invalid recipe configuration")
+            if not len(conf['all_orders']) == len(conf['recipe_times']):
+                raise ValueError("Invalid recipe configuration")
+            cls._time_mapping = {
+                cls.from_dict(recipe) : time for (recipe, time) in zip(conf['all_orders'], conf['recipe_times'])
+            }
+
+        if 'tomato_time' in conf:
+            cls._tomato_time = conf['tomato_time']
+
+        if 'onion_time' in conf:
+            cls._onion_time = conf['onion_time']
 
     @classmethod
     def from_dict(cls, obj_dict):
@@ -663,7 +700,7 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
-        self._configure_recipes(num_items_for_soup, **kwargs)
+        self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -722,8 +759,8 @@ class OvercookedGridworld(object):
         return OvercookedGridworld(**mdp_config)
 
 
-    def _configure_recipes(self, num_items_for_soup, **kwargs):
-        Recipe.configure({'num_items_for_soup' : num_items_for_soup, **kwargs })
+    def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
+        Recipe.configure({'num_items_for_soup' : num_items_for_soup, "all_orders" : start_all_orders, **kwargs })
 
     #####################
     # BASIC CLASS UTILS #
