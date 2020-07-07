@@ -1681,7 +1681,7 @@ class OvercookedGridworld(object):
 
         all_pots_with_items = self.get_partially_full_pots(pot_states) + self.get_full_pots(pot_states)
         soup_objects_in_pots_with_items = [state.get_object(pot_loc) for pot_loc in all_pots_with_items]
-        total_num_onions_in_pots = sum([pot.state[1] for pot in soup_objects_in_pots_with_items])
+        total_num_onions_in_pots = sum([len(soup.ingredients) for soup in soup_objects_in_pots_with_items])
         potential += total_num_onions_in_pots * potential_values['onion_in_pot']
 
         num_ready_pots = len(self.get_full_pots(pot_states))

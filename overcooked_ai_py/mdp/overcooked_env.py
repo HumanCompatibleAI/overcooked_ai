@@ -235,7 +235,7 @@ class OvercookedEnv(object):
             "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
             "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
             "ep_shaped_r_by_agent": self.game_stats["cumulative_shaped_rewards_by_agent"],
-            "ep_length": self.t
+            "ep_length": self.state.timestep
         }
         return env_info
 
