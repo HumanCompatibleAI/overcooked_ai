@@ -75,7 +75,6 @@ class Recipe:
 
     @property
     def value(self):
-        # TODO
         if hasattr(self, '_delivery_reward'):
             return self._delivery_reward
         if hasattr(self, '_value_mapping') and self in self._value_mapping:
@@ -88,7 +87,6 @@ class Recipe:
 
     @property
     def time(self):
-        # TODO
         if hasattr(self, '_cook_time'):
             return self._cook_time
         if hasattr(self, '_time_mapping') and self in self._time_mapping:
@@ -242,11 +240,7 @@ class SoupState(ObjectState):
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Time:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
-    @property
-    def position(self):
-        return self._position
-
-    @position.setter
+    @ObjectState.position.setter
     def position(self, new_pos):
         self._position = new_pos
         for ingredient in self._ingredients:

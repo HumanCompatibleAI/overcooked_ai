@@ -195,6 +195,7 @@ class AgentFromPolicy(Agent):
         self.policy.mdp = mdp
     
     def reset(self):
+        super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
 
 class RandomAgent(Agent):

@@ -90,6 +90,14 @@ class TestSoupState(unittest.TestCase):
         self.s3 = SoupState.get_soup((1, 1), num_onions=1, num_tomatoes=0, cooking_tick=1)
         self.s4 = SoupState.get_soup((1, 0), num_onions=0, num_tomatoes=2, finished=True)
 
+    def test_position(self):
+        new_pos = (2, 0)
+        self.s4.position = new_pos
+
+        for ingredient in self.s4._ingredients:
+            self.assertEqual(new_pos, ingredient.position)
+        self.assertEqual(new_pos, self.s4.position)
+
     def test_is_cooking(self):
         self.assertFalse(self.s1.is_cooking)
         self.assertFalse(self.s2.is_cooking)
