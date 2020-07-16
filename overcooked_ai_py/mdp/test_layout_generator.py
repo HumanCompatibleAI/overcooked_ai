@@ -1,10 +1,10 @@
-from overcooked_ai_py.mdp.layout_generator import LayoutGenerator, mdp_fn_random_choice
+from overcooked_ai_py.mdp.layout_generator import MDPParamsGenerator, LayoutGenerator, DEFAILT_PARAMS_SCHEDULE_FN
 
 
 
 def test_from_name(name):
-    mdp_params_lst = [{"layout_name": name}]
-    mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params_lst[0])
+    mdp_params = {"layout_name": name}
+    mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params)
     print("mdp_fn", mdp_fn)
     mdp = mdp_fn()
     print("mdp", mdp)
@@ -14,8 +14,12 @@ def test_from_name(name):
     print("start positions", mdp.start_player_positions)
     print("----")
 
-    lg = LayoutGenerator((10, 10), mdp_params_lst[0])
-    mdp_fn_2 = lg.generate_padded_mdp()
+
+def test_from_name_padded(name):
+    mdp_params = {"layout_name": name}
+    name_mpg = MDPParamsGenerator(mdp_params_always=mdp_params)
+    lg = LayoutGenerator(name_mpg, (10, 10))
+    mdp_fn_2 = lg.generate_padded_mdp
     print("mdp_fn_2", mdp_fn_2)
     mdp_2 = mdp_fn_2()
     print("mdp_2", mdp_2)
@@ -25,21 +29,14 @@ def test_from_name(name):
     print("success test_from_name")
 
 
-def test_from_params(inner_shape=(5, 4), prop_empty=0.6, prop_feats=0.1, display=False):
-    mdp_params = {
-        "inner_shape": inner_shape,
-        "prop_empty": prop_empty,
-        "prop_feats": prop_feats,
-        "display": display
-    }
+def test_from_params():
 
-    lg = LayoutGenerator((10, 10), mdp_params)
-    mdp_fn_2 = lg.generate_padded_mdp()
+    variable_mpg = MDPParamsGenerator(params_schedule_fn=DEFAILT_PARAMS_SCHEDULE_FN)
+    lg = LayoutGenerator(variable_mpg, (5, 4))
+    mdp_fn_2 = lg.generate_padded_mdp
     print("mdp_fn_2", mdp_fn_2)
-
-
-    for i in range(5):
-        mdp_2 = mdp_fn_2()
+    for i in range(1):
+        mdp_2 = mdp_fn_2({'yoyuogsfrg': 300})
         print("mdp_2 terrain", i)
         for l in mdp_2.terrain_mtx:
             print(l)
@@ -48,18 +45,10 @@ def test_from_params(inner_shape=(5, 4), prop_empty=0.6, prop_feats=0.1, display
         print("=======================")
     print("success test_from_params")
 
-def test_from_name_lst(name_lst):
-
-    mdp_params_lst = [{"layout_name": name} for name in name_lst]
-    mdp_lst = [LayoutGenerator.mdp_gen_fn_from_dict(mdp_params) for mdp_params in mdp_params_lst]
-    print("success test_from_name_lst")
-
 
 
 
 
 
 test_from_name("cramped_room")
-
-#test_from_name_lst(["cramped_room", "cramped_room_2"])
-# test_from_params()
+test_from_params()

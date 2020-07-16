@@ -217,7 +217,8 @@ class Graph(object):
                 smallest_dist = curr_dist
 
         if best_index is None:
-            raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index]))
+            raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
+                                    + "This could be caused by using another layout's planner on this layout")
 
         return [start_index] + self._get_node_index_path(best_index, goal_index)
 
