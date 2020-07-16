@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-
+from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState
+from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent
@@ -16,6 +16,190 @@ n, s = Direction.NORTH, Direction.SOUTH
 e, w = Direction.EAST, Direction.WEST
 stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
+
+def comb(n, k):
+    return factorial(n) / (factorial(n - k) * factorial(k))
+
+
+class TestRecipe(unittest.TestCase):
+
+    def setUp(self):
+        self.r1 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
+        self.r2 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
+        self.r3 = Recipe([Recipe.ONION, Recipe.TOMATO])
+        self.r4 = Recipe([Recipe.ONION, Recipe.TOMATO])
+        self.r5 = Recipe([Recipe.TOMATO, Recipe.ONION])
+        self.r6 = Recipe([Recipe.ONION, Recipe.ONION])
+
+        self.recipes = [self.r1, self.r2, self.r3, self.r4, self.r5, self.r6]
+
+    def tearDown(self):
+        Recipe.configure({})
+
+    def test_eq(self):
+
+        self.assertEqual(self.r1, self.r2, "Failed basic equality check")
+        self.assertNotEqual(self.r1, self.r3, "Failed Basic inequality check")
+        self.assertNotEqual(self.r1, self.r6, "Failed inequality check with all one ingredient")
+        self.assertEqual(self.r3, self.r4, "Failed basic equality check")
+        self.assertEqual(self.r4, self.r5, "Failed ordered equality check")
+
+    def test_caching(self):
+
+        self.assertIs(self.r1, self.r2)
+        self.assertIs(self.r3, self.r4)
+        self.assertIs(self.r4, self.r5)
+        self.assertFalse(self.r6 is self.r1, "different recipes cached to same value")
+
+    def test_value(self):
+        # TODO
+        for recipe in self.recipes:
+            self.assertEqual(recipe.value, 20)
+
+    def test_time(self):
+        # TODO
+        for recipe in self.recipes:
+            self.assertEqual(recipe.time, 20)
+
+    def test_all_recipes(self):
+        for recipe in self.recipes:
+            self.assertTrue(recipe in Recipe.ALL_RECIPES)
+
+        self.assertEqual(len(Recipe.ALL_RECIPES), self._expected_num_recipes(len(Recipe.ALL_INGREDIENTS), Recipe.MAX_NUM_INGREDIENTS))
+
+        Recipe.configure({ "max_num_ingredients" : 4 })
+
+        self.assertEqual(len(Recipe.ALL_RECIPES), self._expected_num_recipes(len(Recipe.ALL_INGREDIENTS), 4))
+
+    def test_invalid_input(self):
+
+        self.assertRaises(ValueError, Recipe, [Recipe.ONION, Recipe.TOMATO, "carrot"])
+        self.assertRaises(ValueError, Recipe, [Recipe.ONION]*4)
+        self.assertRaises(ValueError, Recipe, [])
+        self.assertRaises(ValueError, Recipe, "invalid argument")
+
+
+    def _expected_num_recipes(self, num_ingredients, max_len):
+        return comb(num_ingredients + max_len, num_ingredients) - 1
+
+class TestSoupState(unittest.TestCase):
+    
+    def setUp(self):
+        self.s1 = SoupState.get_soup((0, 0), num_onions=0, num_tomatoes=0)
+        self.s2 = SoupState.get_soup((0, 1), num_onions=2, num_tomatoes=1)
+        self.s3 = SoupState.get_soup((1, 1), num_onions=1, num_tomatoes=0, cooking_tick=1)
+        self.s4 = SoupState.get_soup((1, 0), num_onions=0, num_tomatoes=2, finished=True)
+
+    def test_position(self):
+        new_pos = (2, 0)
+        self.s4.position = new_pos
+
+        for ingredient in self.s4._ingredients:
+            self.assertEqual(new_pos, ingredient.position)
+        self.assertEqual(new_pos, self.s4.position)
+
+    def test_is_cooking(self):
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s2.is_cooking)
+        self.assertTrue(self.s3.is_cooking)
+        self.assertFalse(self.s4.is_cooking)
+
+    def test_is_ready(self):
+        self.assertFalse(self.s1.is_ready)
+        self.assertFalse(self.s2.is_ready)
+        self.assertFalse(self.s3.is_ready)
+        self.assertTrue(self.s4.is_ready)
+
+    def test_is_idle(self):
+        self.assertTrue(self.s1.is_idle)
+        self.assertTrue(self.s2.is_idle)
+        self.assertFalse(self.s3.is_idle)
+        self.assertFalse(self.s4.is_idle)
+
+    def test_is_full(self):
+        self.assertFalse(self.s1.is_full)
+        self.assertTrue(self.s2.is_full)
+        self.assertTrue(self.s3.is_full)
+        self.assertTrue(self.s4.is_full)
+
+    def test_cooking(self):
+        self.s1.add_ingredient_from_str(Recipe.ONION)
+        self.s1.add_ingredient_from_str(Recipe.TOMATO)
+        
+        self.assertTrue(self.s1.is_idle)
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s1.is_full)
+        
+        self.s1.begin_cooking()
+
+        self.assertFalse(self.s1.is_idle)
+        self.assertTrue(self.s1.is_full)
+        self.assertTrue(self.s1.is_cooking)
+
+        for _ in range(self.s1.cook_time):
+            self.s1.cook()
+
+        self.assertFalse(self.s1.is_cooking)
+        self.assertFalse(self.s1.is_idle)
+        self.assertTrue(self.s1.is_full)
+        self.assertTrue(self.s1.is_ready)
+
+    def test_attributes(self):
+        self.assertListEqual(self.s1.ingredients, [])
+        self.assertListEqual(self.s2.ingredients, [Recipe.ONION, Recipe.ONION, Recipe.TOMATO])
+        self.assertListEqual(self.s3.ingredients, [Recipe.ONION])
+        self.assertListEqual(self.s4.ingredients, [Recipe.TOMATO, Recipe.TOMATO])
+
+        try:
+            self.s1.recipe
+            self.fail("Expected ValueError to be raised")
+        except ValueError as e: 
+            pass
+        except Exception as e:
+            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
+
+        try:
+            self.s2.recipe
+            self.fail("Expected ValueError to be raised")
+        except ValueError as e: 
+            pass
+        except Exception as e:
+            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
+        self.assertEqual(self.s3.recipe, Recipe([Recipe.ONION]))
+        self.assertEqual(self.s4.recipe, Recipe([Recipe.TOMATO, Recipe.TOMATO]))
+
+    def test_invalid_ops(self):
+        
+        # Cannot cook an empty soup
+        self.assertRaises(ValueError, self.s1.begin_cooking)
+
+        # Must call 'begin_cooking' before cooking a soup
+        self.assertRaises(ValueError, self.s2.cook)
+
+        # Cannot cook a done soup
+        self.assertRaises(ValueError, self.s4.cook)
+
+        # Cannot begin cooking a soup that is already cooking
+        self.assertRaises(ValueError, self.s3.begin_cooking)
+
+        # Cannot begin cooking a soup that is already done
+        self.assertRaises(ValueError, self.s4.begin_cooking)
+
+        # Cannot add ingredients to a soup that is cooking
+        self.assertRaises(ValueError, self.s3.add_ingredient_from_str, Recipe.ONION)
+
+        # Cannot add ingredients to a soup that is ready
+        self.assertRaises(ValueError, self.s4.add_ingredient_from_str, Recipe.ONION)
+
+        # Cannot remove an ingredient from a soup that is ready
+        self.assertRaises(ValueError, self.s4.pop_ingredient)
+
+        # Cannot remove an ingredient from a soup that is cooking
+        self.assertRaises(ValueError, self.s3.pop_ingredient)
+
+        # Cannot remove an ingredient from a soup that is empty
+        self.assertRaises(ValueError, self.s1.pop_ingredient)
+
 
 
 class TestDirection(unittest.TestCase):
@@ -90,39 +274,44 @@ class TestGridworld(unittest.TestCase):
 
     def test_start_positions(self):
         expected_start_state = OvercookedState(
-            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['onion', 'any'])
+            [PlayerState((1, 2), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {})
         actual_start_state = self.base_mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
         mdp = OvercookedGridworld.from_layout_name('corridor')
         expected_start_state = OvercookedState(
-            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {}, order_list=None)
+            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {})
         actual_start_state = mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_actions(self):
         bad_state = OvercookedState(
-            [PlayerState((0, 0), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {}, order_list=['any'])
+            [PlayerState((0, 0), Direction.NORTH), PlayerState((3, 1), Direction.NORTH)], {})
         with self.assertRaises(AssertionError):
             self.base_mdp.get_actions(bad_state)
 
         self.assertEqual(self.base_mdp.get_actions(self.base_mdp.get_standard_start_state()),
                          [Action.ALL_ACTIONS, Action.ALL_ACTIONS])
 
+    def test_from_dict(self):
+        state_dict = {"players": [{"position": [2, 1], "orientation": [0, -1], "held_object": None }, {"position": [1, 1], "orientation": [0, -1], "held_object": None }], "objects": [{"name": "onion", "position": [1, 0], "state": None }], "order_list": None }
+        state = OvercookedState.from_dict(state_dict)
+        print(state)
+
+
     def test_transitions_and_environment(self):
         bad_state = OvercookedState(
-            [P((0, 0), s), P((3, 1), s)], {}, order_list=[])
+            [P((0, 0), s), P((3, 1), s)], {})
 
         with self.assertRaises(AssertionError):
             self.base_mdp.get_state_transition(bad_state, stay)
 
         env = OvercookedEnv.from_mdp(self.base_mdp)
-        env.state.order_list = ['onion', 'any']
 
         def check_transition(action, expected_state, expected_reward=0):
             state = env.state
-            pred_state, sparse_reward, dense_reward, _ = self.base_mdp.get_state_transition(state, action)
+            pred_state, _ = self.base_mdp.get_state_transition(state, action)
             self.assertEqual(pred_state, expected_state, '\n' + str(pred_state) + '\n' + str(expected_state))
             new_state, sparse_reward, _, _ = env.step(action)
             self.assertEqual(new_state, expected_state)
@@ -131,16 +320,17 @@ class TestGridworld(unittest.TestCase):
         check_transition([n, e], OvercookedState(
             [P((1, 1), n),
              P((3, 1), e)],
-            {}, order_list=['onion', 'any']))
+            {}, timestep=1))
 
     def test_common_mdp_jsons(self):
         traj_test_json_paths = iterate_over_json_files_in_dir("../common_tests/trajectory_tests/")
         for test_json_path in traj_test_json_paths:
             test_trajectory = AgentEvaluator.load_traj_from_json(test_json_path)
-            try:
-                AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
-            except AssertionError as e:
-                self.fail("File {} failed with error:\n{}".format(test_json_path, e))
+            # try:
+            #     AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
+            # except AssertionError as e:
+            #     self.fail("File {} failed with error:\n{}".format(test_json_path, e))
+            AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
 
     def test_four_player_mdp(self):
         try:
@@ -163,13 +353,23 @@ class TestFeaturizations(unittest.TestCase):
         self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlp), GreedyHumanModel(self.mlp))
         np.random.seed(0)
 
+    def test_lossless_state_featurization_shape(self):
+        s = self.base_mdp.get_standard_start_state()
+        obs = self.base_mdp.lossless_state_encoding(s)[0]
+        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.lossless_state_encoding_shape), "{} vs {}".format(obs.shape, self.base_mdp.lossless_state_encoding_shape))
+
+    def test_state_featurization_shape(self):
+        s = self.base_mdp.get_standard_start_state()
+        obs = self.base_mdp.featurize_state(s, self.mlp)[0]
+        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.featurize_state_shape), "{} vs {}".format(obs.shape, self.base_mdp.featurize_state_shape))
+
     def test_lossless_state_featurization(self):
         trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_states"]]
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/lossless_state_featurization")
-        expected_featurization = load_pickle("data/testing/lossless_state_featurization")
+        expected_featurization = load_pickle("./data/testing/lossless_state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
@@ -178,7 +378,7 @@ class TestFeaturizations(unittest.TestCase):
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, "data/testing/state_featurization")
-        expected_featurization = load_pickle("data/testing/state_featurization")
+        expected_featurization = load_pickle("./data/testing/state_featurization")
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 
@@ -217,6 +417,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         try:
             self.env.get_rollouts(self.rnd_agent_pair, 3)
         except Exception as e:
+            print(e.with_traceback())
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
     def test_one_player_env(self):

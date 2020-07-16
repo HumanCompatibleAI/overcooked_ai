@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='overcooked_ai',
-      version='0.0.1',
+      version='1.0.0',
       description='Cooperative multi-agent environment based on Overcooked',
       author='Micah Carroll',
       author_email='mdc@berkeley.edu',
@@ -11,6 +11,7 @@ setup(name='overcooked_ai',
       install_requires=[
         'numpy',
         'tqdm',
-        'gym'
+        'gym',
+        'ipython'
       ]
     )

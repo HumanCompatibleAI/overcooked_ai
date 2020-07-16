@@ -1,5 +1,6 @@
 import json, copy
 import numpy as np
+from IPython.display import display
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
@@ -161,7 +162,7 @@ class AgentEvaluator(object):
 
                 next_state, reward, done, info = simulation_env.step(actions[i])
 
-                assert states[i + 1] == next_state, "States differed (expected vs actual): {}".format(
+                assert states[i + 1].time_independent_equal(next_state), "States differed (expected vs actual): {}".format(
                     simulation_env.display_states(states[i + 1], next_state)
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)
@@ -201,6 +202,7 @@ class AgentEvaluator(object):
         This requires splitting each trajectory into two, one for each action in the
         joint action.
         """
+        trajs = copy.deepcopy(trajs)
         sb_traj_dict_keys = ["actions", "obs", "rewards", "episode_starts", "episode_returns"]
         sb_trajs_dict = { k:[] for k in sb_traj_dict_keys }
 
@@ -208,22 +210,23 @@ class AgentEvaluator(object):
 
         for traj_idx in range(len(trajs["ep_lengths"])):
             # Extract single-agent trajectory for each agent
-            for agent_idx in range(2):
+            # for agent_idx in range(2):
+            agent_idx = trajs["metadatas"]["ep_agent_idxs"][traj_idx]
                 
-                # Getting only actions for current agent index, and processing them to an array 
-                # with shape (1, )
-                processed_agent_actions = [[Action.ACTION_TO_INDEX[j_a[agent_idx]]] for j_a in trajs["ep_actions"][traj_idx]]
-                sb_trajs_dict["actions"].extend(processed_agent_actions)
+            # Getting only actions for current agent index, and processing them to an array 
+            # with shape (1, )
+            processed_agent_actions = [[Action.ACTION_TO_INDEX[j_a[agent_idx]]] for j_a in trajs["ep_actions"][traj_idx]]
+            sb_trajs_dict["actions"].extend(processed_agent_actions)
 
-                agent_obs = [both_agent_obs[agent_idx] for both_agent_obs in trajs["metadatas"]["ep_obs_for_both_agents"][traj_idx]]
-                sb_trajs_dict["obs"].extend(agent_obs)
+            agent_obs = [both_agent_obs[agent_idx] for both_agent_obs in trajs["metadatas"]["ep_obs_for_both_agents"][traj_idx]]
+            sb_trajs_dict["obs"].extend(agent_obs)
 
-                sb_trajs_dict["rewards"].extend(trajs["ep_rewards"][traj_idx])
+            sb_trajs_dict["rewards"].extend(trajs["ep_rewards"][traj_idx])
 
-                # Converting episode dones to episode starts
-                traj_starts = [1 if i == 0 else 0 for i in range(trajs["ep_lengths"][traj_idx])]
-                sb_trajs_dict["episode_starts"].extend(traj_starts)
-                sb_trajs_dict["episode_returns"].append(trajs["ep_returns"][traj_idx])
+            # Converting episode dones to episode starts
+            traj_starts = [1 if i == 0 else 0 for i in range(trajs["ep_lengths"][traj_idx])]
+            sb_trajs_dict["episode_starts"].extend(traj_starts)
+            sb_trajs_dict["episode_returns"].append(trajs["ep_returns"][traj_idx])
 
         sb_trajs_dict = { k:np.array(v) for k, v in sb_trajs_dict.items() }
 
