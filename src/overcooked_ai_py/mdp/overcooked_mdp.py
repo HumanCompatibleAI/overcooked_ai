@@ -889,6 +889,10 @@ class OvercookedGridworld(object):
         # After removing player positions from grid we have a terrain mtx
         mdp_config["terrain"] = layout_grid
         mdp_config["start_player_positions"] = player_positions
+        if "layout_name" not in mdp_config:
+            layout_name = "|".join(["".join(line) for line in layout_grid])
+            # print(layout_name)
+            mdp_config["layout_name"] = layout_name
 
         for k, v in params_to_overwrite.items():
             curr_val = mdp_config.get(k, None)

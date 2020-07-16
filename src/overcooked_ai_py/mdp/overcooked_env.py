@@ -1,9 +1,10 @@
 import gym, tqdm
+import time, random
 import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
-
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
 
 DEFAULT_ENV_PARAMS = {
     "horizon": 400
@@ -52,11 +53,12 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, info_level=1, _variable_mdp=True):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, _variable_mdp=True):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
         horizon (int):                  Number of steps before the environment returns done=True
+        mlp_params (dict):              params for MediumLevelPlanner
         info_level (int):               Change amount of logging
         _variable_mdp (bool):           This input should be ignored in nearly all cases. Should automatically keep 
                                         track of whether the mdp changes or is constant across episodes.
@@ -70,15 +72,31 @@ class OvercookedEnv(object):
         self.variable_mdp = _variable_mdp
         self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
+        self._mlp = None
+        self.mlp_params = mlp_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
+        # self.lst_len = 8
+        # self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
         self.reset()
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
                 Reduce info level of OvercookedEnv to not see this message.")
 
+
+    @property
+    def mlp(self):
+        print("mlp called")
+        # assert not self.env.variable_mdp, "Variable mdp is not currently supported for planning"
+        if self._mlp is None:
+            print("Computing Planner")
+            print(self.mdp.terrain_mtx)
+            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.mdp, self.mlp_params,
+                                                                  force_compute=False)
+        return self._mlp
+
     @staticmethod
-    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, info_level=1, _variable_mdp=False):
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, _variable_mdp=False):
         """
         Create an OvercookedEnv directly from a OvercookedGridworld mdp
         rather than a mdp generating function.
@@ -93,6 +111,7 @@ class OvercookedEnv(object):
             mdp_generator_fn=mdp_generator_fn,
             start_state_fn=start_state_fn,
             horizon=horizon,
+            mlp_params=mlp_params,
             info_level=info_level,
             _variable_mdp=_variable_mdp
         )
@@ -145,22 +164,42 @@ class OvercookedEnv(object):
             print(self)
         self.state = old_state
 
-    def print_state_transition(self, a_t, r_t, env_info):
+    def print_state_transition(self, a_t, r_t, env_info, fname=None):
         """
         Terminal graphics visualization of a state transition.
         """
         # TODO: turn this into a "formatting action probs" function and add action symbols too
         action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
-        action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {}\n{}\n".format(
-                self.state.timestep,
-                tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
-                r_t,
-                env_info["shaped_r_by_agent"],
-                action_probs,
-                self
+
+        action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs[0]] for player_action_probs in action_probs ]
+
+        if fname is None:
+            print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+                    self.t,
+                    tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
+                    r_t,
+                    env_info["shaped_r_by_agent"],
+                    action_probs,
+                    self.mdp.potential_function(self.state),
+                    0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
+                    self
+                )
             )
-        )
+        else:
+            f = open(fname, 'a')
+            print(
+                "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+                    self.t,
+                    tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
+                    r_t,
+                    env_info["shaped_r_by_agent"],
+                    action_probs,
+                    self.mdp.potential_function(self.state),
+                    0.99 * env_info["phi_s_prime"] - env_info["phi_s"],  # Assuming gamma 0.99
+                    self
+                ), file=f
+            )
+            f.close()
 
     ###################
     # BASIC ENV LOGIC #
@@ -198,14 +237,15 @@ class OvercookedEnv(object):
         """
         return self.mdp.lossless_state_encoding(state)
 
-    def featurize_state_mdp(self, state, mlp):
+    def featurize_state_mdp(self, state):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, mlp)
+        return self.mdp.featurize_state(state, self.mlp)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
+        # self.mdp = random.choice(self.mdp_lst)
         self.mdp = self.mdp_generator_fn()
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
@@ -298,7 +338,11 @@ class OvercookedEnv(object):
         trajectory = []
         done = False
 
-        if display: print(self)
+        if display:
+            fname = 'results_client_temp/roll_out_' + str(time.time()) + '.txt'
+            f = open(fname, 'w+')
+            print(self, file=f)
+            f.close()
         while not done:
             s_t = self.state
 
@@ -311,8 +355,8 @@ class OvercookedEnv(object):
             s_tp1, r_t, done, info = self.step(a_t, a_info_t)
             trajectory.append((s_t, a_t, r_t, done, info))
 
-            if display and self.state.timestep < display_until:
-                self.print_state_transition(a_t, r_t, info)
+            if display and self.t < display_until:
+                self.print_state_transition(a_t, r_t, info, fname)
 
         assert len(trajectory) == self.state.timestep, "{} vs {}".format(len(trajectory), self.state.timestep)
 

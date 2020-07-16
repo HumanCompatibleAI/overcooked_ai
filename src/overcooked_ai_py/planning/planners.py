@@ -1,17 +1,24 @@
-import itertools, os
+# this denotes whether we are running the clean version of planners
+clean = True
+
+import itertools, os, tqdm
 import numpy as np
 import pickle, time
 from overcooked_ai_py.utils import pos_distance, manhattan_distance
 from overcooked_ai_py.planning.search import SearchTree, Graph
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
-from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+if not clean:
+    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+
+from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
 SAFE_RUN = False
 
+MAX_HORIZON = 1e10
 
 NO_COUNTERS_PARAMS = {
         'start_orientations': False,
@@ -621,7 +628,9 @@ class JointMotionPlanner(object):
         # (not on objects and other aspects of state).
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
-        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state)
+
+        from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, order_list=['any', 'any'])
         env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
@@ -897,7 +906,7 @@ class MediumLevelActionManager(object):
 
 class MediumLevelPlanner(object):
     """
-    A planner that computes optimal plans for two agents to deliver a certain number of dishes 
+    A planner that computes optimal plans for two agents to deliver a certain number of dishes
     in an OvercookedGridworld using medium level actions (single motion goals) in the corresponding
     A* search problem.
     """
@@ -915,7 +924,7 @@ class MediumLevelPlanner(object):
         mdp = mlp_action_manager.mdp
         params = mlp_action_manager.params
         return MediumLevelPlanner(mdp, params, mlp_action_manager)
-    
+
     @staticmethod
     def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False, info=True):
         assert isinstance(mdp, OvercookedGridworld)
@@ -924,7 +933,7 @@ class MediumLevelPlanner(object):
 
         if force_compute:
             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
-        
+
         try:
             mlp = MediumLevelPlanner.from_action_manager_file(filename)
 
@@ -948,12 +957,13 @@ class MediumLevelPlanner(object):
         mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
         print("It took {} seconds to create mlp".format(time.time() - start_time))
         mlp.ml_action_manager.save_to_file(final_filepath)
+        print("MMMMMMMADE IT")
         return mlp
 
     def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
         """
         Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
-        
+
         Args:
             state (OvercookedState): starting state
 
@@ -962,7 +972,10 @@ class MediumLevelPlanner(object):
         """
         start_state = start_state.deepcopy()
         ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
-            
+
+        if start_state.order_list is None:
+            start_state.order_list = ['any'] * delivery_horizon
+
         full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
             start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
         )
@@ -976,11 +989,11 @@ class MediumLevelPlanner(object):
         curr_state = start_state
         curr_motion_state = start_state.players_pos_and_or
         prev_h = heuristic_fn(start_state, t, debug=False)
-        
+
         if len(ml_plan) > 0 and goal_info:
             print("First motion goal: ", ml_plan[0][0])
 
-        if debug:
+        if not clean and debug:
             print("Start state")
             OvercookedEnv.print_state(self.mdp, start_state)
 
@@ -991,11 +1004,11 @@ class MediumLevelPlanner(object):
             full_joint_action_plan.extend(joint_action_plan)
             t += 1
 
-            if debug:
+            if not clean and debug:
                 print(t)
                 OvercookedEnv.print_state(self.mdp, goal_state)
-            
-            if SAFE_RUN:
+
+            if not clean and SAFE_RUN:
                 s_prime, _ = OvercookedEnv.execute_plan(self.mdp, curr_state, joint_action_plan)
                 assert s_prime == goal_state
 
@@ -1021,7 +1034,12 @@ class MediumLevelPlanner(object):
             cost (int): A* Search cost
         """
         start_state = start_state.deepcopy()
-        
+
+        if start_state.order_list is None:
+            start_state.order_list = ["any"] * delivery_horizon
+        else:
+            start_state.order_list = start_state.order_list[:delivery_horizon]
+
         expand_fn = lambda state: self.get_successor_states(state)
         goal_fn = lambda state: state.num_orders_remaining == 0
         heuristic_fn = lambda state: h_fn(state)
@@ -1029,14 +1047,14 @@ class MediumLevelPlanner(object):
         search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
         ml_plan, cost = search_problem.A_star_graph_search(info=True)
         return ml_plan[1:], cost
-    
+
     def get_successor_states(self, start_state):
         """Successor states for medium-level actions are defined as
-        the first state in the corresponding motion plan in which 
+        the first state in the corresponding motion plan in which
         one of the two agents' subgoals is satisfied.
-    
+
         Returns: list of
-            joint_motion_goal: ((pos1, or1), (pos2, or2)) specifying the 
+            joint_motion_goal: ((pos1, or1), (pos2, or2)) specifying the
                                 motion plan goal for both agents
 
             successor_state:   OvercookedState corresponding to state
@@ -1054,7 +1072,7 @@ class MediumLevelPlanner(object):
             joint_motion_action_plans, end_pos_and_ors, plan_costs = self.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
             end_state = self.jmp.derive_state(start_state, end_pos_and_ors, joint_motion_action_plans)
 
-            if SAFE_RUN:
+            if not clean and SAFE_RUN:
                 assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
                 s_prime, _ = OvercookedEnv.execute_plan(self.mdp, start_state, joint_motion_action_plans, display=False)
                 assert end_state == s_prime,  [OvercookedEnv.print_state(self.mdp, s_prime), OvercookedEnv.print_state(self.mdp, end_state)]
@@ -1078,7 +1096,7 @@ class MediumLevelPlanner(object):
         successor_high_level_states = []
         for ml_action in ml_actions:
             action_plan, end_state, cost = self.get_embedded_low_level_action_plan(start_state, ml_action, other_agent, other_agent_idx)
-            
+
             if not self.mdp.is_terminal(end_state):
                 # Adding interact action and deriving last state
                 other_agent_action, _ = other_agent.action(end_state)
@@ -1430,7 +1448,7 @@ class Heuristic(object):
 
         heuristic_cost = forward_cost / 2
         
-        if debug:
+        if not clean and debug:
             env = OvercookedEnv.from_mdp(self.mdp)
             env.state = state
             print("\n" + "#"*35)
@@ -1556,7 +1574,7 @@ class Heuristic(object):
 
         heuristic_cost = (pot_to_delivery_costs + dish_to_pot_costs + items_to_pot_cost) / 2
 
-        if debug:
+        if not clean and debug:
             env = OvercookedEnv.from_mdp(self.mdp)
             env.state = state
             print("\n" + "#" * 35)
@@ -1573,3 +1591,5 @@ class Heuristic(object):
             print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
 
         return heuristic_cost
+
+
