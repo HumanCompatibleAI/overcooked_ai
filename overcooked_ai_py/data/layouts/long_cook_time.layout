@@ -11,7 +11,7 @@
     "start_all_orders": [
         { "ingredients" : ["onion", "onion", "onion"]},
         { "ingredients" : ["onion", "onion"]},
-        { "ingreidents" : ["onion"]}
+        { "ingredients" : ["onion"]}
     ],
     "start_bonus_orders" : [
     ],
