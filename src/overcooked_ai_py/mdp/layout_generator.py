@@ -17,6 +17,7 @@ CODE_TO_TYPE = {0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 4
 TYPE_TO_CODE = {v: k for k, v in CODE_TO_TYPE.items()}
 
 
+
 def mdp_fn_random_choice(mdp_fn_choices):
     assert type(mdp_fn_choices) is list and len(mdp_fn_choices) > 0
     return random.choice(mdp_fn_choices)
@@ -71,27 +72,8 @@ class MDPParamsGenerator(object):
         return mdp_params
 
 
-def mdp_fn_random_choice(mdp_fn_choices):
-    assert type(mdp_fn_choices) is list and len(mdp_fn_choices) > 0
-    return random.choice(mdp_fn_choices)
-
-
-"""
-size_bounds: (min_layout_size, max_layout_size)
-prop_empty: (min, max) proportion of empty space in generated layout
-prop_feats: (min, max) proportion of counters with features on them
-"""
-
-DEFAULT_MDP_GEN_PARAMS = {
-    "inner_shape": (5, 4),
-    "prop_empty": 0.6,
-    "prop_feats": 0.1,
-    "display": False
-}
-
 class LayoutGenerator(object):
     # NOTE: This class hasn't been tested extensively.
-
 
     def __init__(self, mdp_params_generator, outer_shape=(5, 4)):
         """
@@ -103,27 +85,45 @@ class LayoutGenerator(object):
 
     @staticmethod
     def mdp_gen_fn_from_dict(
-            mdp_params=DEFAULT_MDP_GEN_PARAMS
+            mdp_params, outer_shape=None, mdp_params_schedule_fn=None
     ):
         """
-        mdp_params: it could take either
-        Returns a NON-PADDED MDP generator with the passed in properties.
+        mdp_params: one set of fixed mdp parameter used by the enviroment
+        env_params: env parameters (horizon, etc)
+        outer_shape: outer shape of the environment
+        mdp_params_schedule_fn: the schedule for varying mdp params
         """
-        assert "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None, \
-            "please use an instance of LayoutGenerator to generate any non-predefined layouts"
-        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-        mdp_generator_fn = lambda: mdp
-        return mdp_generator_fn
+        # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
+        print("mdp_params_schedule_fn", mdp_params_schedule_fn)
+        if outer_shape is None:
+            assert type(mdp_params) is dict and "layout_name" in mdp_params
+            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+            mdp_fn = lambda: mdp
+        else:
+            # there is no schedule, we are using the same set of mdp_params all the time
+            if mdp_params_schedule_fn is None:
+                assert mdp_params is not None
+                mdp_pg = MDPParamsGenerator(mdp_params_always=mdp_params)
+            else:
+                assert mdp_params is None, "please remove the mdp_params from the variable, " \
+                                           "because mdp_params_schedule_fn exist and we will " \
+                                           "always use the schedule_fn if it exist"
+                mdp_pg = MDPParamsGenerator(params_schedule_fn=mdp_params_schedule_fn)
+            lg = LayoutGenerator(mdp_pg, outer_shape)
+            mdp_fn = lg.generate_padded_mdp
+        return mdp_fn
 
-    def generate_padded_mdp(self):
+    def generate_padded_mdp(self, outside_information={}):
         """
         Return a PADDED MDP with mdp params specified in self.mdp_params
         """
-        mdp_params = self.mdp_params
+        mdp_params = self.mdp_params_generator.generate(outside_information)
+        outer_shape = self.outer_shape
         if "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
             mdp_generator_fn = lambda: self.padded_mdp(mdp)
         else:
+
             assert "inner_shape" in mdp_params.keys(), "mdp_params is missing inner_shape"
             assert "prop_empty" in mdp_params.keys(), "mdp_params is missing prop_empty"
             assert "prop_feats" in mdp_params.keys(), "mdp_params is missing prop_feats"
@@ -133,11 +133,10 @@ class LayoutGenerator(object):
             prop_feats = mdp_params["prop_feats"]
             display = mdp_params["display"]
 
-
-            assert inner_shape[0] <= self.outer_shape[0] and inner_shape[1] <= self.outer_shape[1], \
+            assert inner_shape[0] <= outer_shape[0] and inner_shape[1] <= outer_shape[1], \
                 "inner_shape cannot fit into the outershap"
 
-            layout_generator = LayoutGenerator(self.outer_shape, mdp_params)
+            layout_generator = LayoutGenerator(self.mdp_params_generator, outer_shape=self.outer_shape)
             mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
                 inner_shape=inner_shape,
                 prop_empty=prop_empty,

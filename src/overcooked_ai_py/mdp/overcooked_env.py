@@ -237,11 +237,11 @@ class OvercookedEnv(object):
         """
         return self.mdp.lossless_state_encoding(state)
 
-    def featurize_state_mdp(self, state, mlp):
+    def featurize_state_mdp(self, state):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, mlp)
+        return self.mdp.featurize_state(state, self.mlp)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
@@ -355,8 +355,9 @@ class OvercookedEnv(object):
             s_tp1, r_t, done, info = self.step(a_t, a_info_t)
             trajectory.append((s_t, a_t, r_t, done, info))
 
-            if display and self.t < display_until:
+            if display and self.state.timestep < display_until:
                 self.print_state_transition(a_t, r_t, info, fname)
+
 
         assert len(trajectory) == self.state.timestep, "{} vs {}".format(len(trajectory), self.state.timestep)
 

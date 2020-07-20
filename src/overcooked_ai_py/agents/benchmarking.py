@@ -22,37 +22,25 @@ class AgentEvaluator(object):
     """
 
 
-    def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
         """
         mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
         env_params (dict): params for creation of an OvercookedEnv
-        mdp_fn_params (dict): params to setup random MDP generation
+        mdp_fn (callable function): a function that can be used to create mdp
         force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
         """
         assert type(mdp_params) is dict, "mdp_params must be a dictionary"
-
-        if mdp_fn_params is None:
+        assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
+        env_params["mlp_params"] = mlp_params
+        if mdp_fn is None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
             self.mdp_fn = lambda: mdp
             self.env = OvercookedEnv.from_mdp(mdp, **env_params)
         else:
-            self.mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
+            self.mdp_fn = mdp_fn
             self.env = OvercookedEnv(self.mdp_fn, **env_params)
 
-        
         self.force_compute = force_compute
-        self.debug = debug
-        self.mlp_params = mlp_params
-        self._mlp = None
-
-    @property
-    def mlp(self):
-        assert not self.env.variable_mdp, "Variable mdp is not currently supported for planning"
-        if self._mlp is None:
-            if self.debug: print("Computing Planner")
-            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params,
-                                                                  force_compute=self.force_compute)
-        return self._mlp
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))

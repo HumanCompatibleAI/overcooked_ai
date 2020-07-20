@@ -630,7 +630,7 @@ class JointMotionPlanner(object):
         # (otherwise Environment will terminate)
 
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, order_list=['any', 'any'])
+        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state)
         env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
@@ -973,9 +973,6 @@ class MediumLevelPlanner(object):
         start_state = start_state.deepcopy()
         ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
 
-        if start_state.order_list is None:
-            start_state.order_list = ['any'] * delivery_horizon
-
         full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
             start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
         )
@@ -1034,11 +1031,6 @@ class MediumLevelPlanner(object):
             cost (int): A* Search cost
         """
         start_state = start_state.deepcopy()
-
-        if start_state.order_list is None:
-            start_state.order_list = ["any"] * delivery_horizon
-        else:
-            start_state.order_list = start_state.order_list[:delivery_horizon]
 
         expand_fn = lambda state: self.get_successor_states(state)
         goal_fn = lambda state: state.num_orders_remaining == 0
