@@ -7,7 +7,7 @@
                 X  2        X
                 X XDXXXXXXXXX
                 X X
-                XSX"",
+                XSX""",
     "start_all_orders": [
         { "ingredients" : ["onion", "onion", "onion"]},
         { "ingredients" : ["onion", "onion"]},
