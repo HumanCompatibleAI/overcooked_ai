@@ -1,5 +1,6 @@
 import itertools, copy
 import numpy as np
+from collections import Counter
 from functools import reduce
 from collections import defaultdict, Counter
 from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict
@@ -1819,8 +1820,10 @@ class OvercookedGridworld(object):
         variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
                                  "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
         urgency_features = ["urgency"]
+
         all_objects = overcooked_state.all_objects_list
 
+        debug = True
         def make_layer(position, value):
                 layer = np.zeros(self.shape)
                 layer[position] = value
@@ -1838,13 +1841,8 @@ class OvercookedGridworld(object):
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
-            if horizon - overcooked_state.timestep < 40:
-                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
-                state_mask_dict["urgency"] = np.ones(self.shape)
 
-
-            # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
-            # state_mask_dict["urgency"] = np.ones(self.shape) * 40
+            state_mask_dict["timestep"] = np.ones(self.shape) * overcooked_state.timestep
 
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
@@ -1889,6 +1887,7 @@ class OvercookedGridworld(object):
                             state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time - obj._cooking_tick)
                             if obj.is_ready:
                                 state_mask_dict["soup_done"] += make_layer(obj.position, 1)
+
                     else:
                         # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
                         state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
