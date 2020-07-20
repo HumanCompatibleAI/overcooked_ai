@@ -1,5 +1,6 @@
 import itertools, copy
 import numpy as np
+from collections import Counter
 from functools import reduce
 from collections import defaultdict
 from overcooked_ai_py.utils import pos_distance, load_from_json
@@ -1526,11 +1527,12 @@ class OvercookedGridworld(object):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
-        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
-        variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
+        base_map_features = ["timestep", "pot_loc", "counter_loc", "onion_disp_loc", "tomato_disp_loc", "dish_disp_loc", "serve_loc"]
+        variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup", "soup_cook_time_remaining", "dishes", "onions", "tomatos"]
 
         all_objects = overcooked_state.all_objects_list
 
+        debug = True
         def make_layer(position, value):
                 layer = np.zeros(self.shape)
                 layer[position] = value
@@ -1547,6 +1549,8 @@ class OvercookedGridworld(object):
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
+            state_mask_dict["timestep"] = np.ones(self.shape) * overcooked_state.timestep
+
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
 
@@ -1555,6 +1559,9 @@ class OvercookedGridworld(object):
 
             for loc in self.get_onion_dispenser_locations():
                 state_mask_dict["onion_disp_loc"][loc] = 1
+
+            for loc in self.get_tomato_dispenser_locations():
+                state_mask_dict["tomato_disp_loc"][loc] = 1
 
             for loc in self.get_dish_dispenser_locations():
                 state_mask_dict["dish_disp_loc"][loc] = 1
@@ -1572,12 +1579,22 @@ class OvercookedGridworld(object):
             for obj in all_objects:
                 if obj.name == "soup":
                     if Recipe.ONION in obj.ingredients:
+                        # get the ingredients into a {object: number} dictionary
+                        ingredients_dict = Counter(obj.ingredients)
+                        assert "onion" in ingredients_dict.keys()
                         if obj.position in self.get_pot_locations():
-                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, len(obj.ingredients))
-                            state_mask_dict["onions_cook_time"] += make_layer(obj.position, max(0, obj._cooking_tick))
+                            if obj.is_idle:
+                                state_mask_dict["onions_in_pot"] += make_layer(obj.position, ingredients_dict["onion"])
+                                state_mask_dict["tomatos_in_pot"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            else:
+                                state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                                state_mask_dict["tomatos_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                                state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time - max(0, obj._cooking_tick))
                         else:
-                            # If player soup is not in a pot, put it in separate mask
-                            state_mask_dict["onion_soup_loc"] += make_layer(obj.position, 1)
+                            # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
+                            state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                            state_mask_dict["tomatos_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, 0)
                     else:
                         raise ValueError("Unrecognized soup")
 
@@ -1585,10 +1602,15 @@ class OvercookedGridworld(object):
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
                 elif obj.name == "onion":
                     state_mask_dict["onions"] += make_layer(obj.position, 1)
+                elif obj.name == "tomato":
+                    state_mask_dict["tomatos"] += make_layer(obj.position, 1)
                 else:
                     raise ValueError("Unrecognized object")
 
             if debug:
+                print("terrain----")
+                print(np.array(self.terrain_mtx))
+                print("-----------")
                 print(len(LAYERS))
                 print(len(state_mask_dict))
                 for k, v in state_mask_dict.items():
@@ -1735,6 +1757,7 @@ class OvercookedGridworld(object):
 
         all_pots_with_items = self.get_partially_full_pots(pot_states) + self.get_full_pots(pot_states)
         soup_objects_in_pots_with_items = [state.get_object(pot_loc) for pot_loc in all_pots_with_items]
+        # need to be updated
         total_num_onions_in_pots = sum([len(soup.ingredients) for soup in soup_objects_in_pots_with_items])
         potential += total_num_onions_in_pots * potential_values['onion_in_pot']
 
