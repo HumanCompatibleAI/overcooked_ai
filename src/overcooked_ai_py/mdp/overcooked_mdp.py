@@ -1844,6 +1844,8 @@ class OvercookedGridworld(object):
 
             state_mask_dict["timestep"] = np.ones(self.shape) * overcooked_state.timestep
 
+            state_mask_dict["soup_cook_time_remaining"] = np.ones(self.shape) * 400
+
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
 
