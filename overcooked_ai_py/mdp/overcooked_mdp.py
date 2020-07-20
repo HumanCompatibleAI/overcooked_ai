@@ -488,6 +488,8 @@ class OvercookedState(object):
         self._all_orders = all_orders
         self.timestep = timestep
 
+        assert self.bonus_orders.issubset(self.all_orders), "Bonus orders must be a subset of all orders"
+
     @property
     def player_positions(self):
         return tuple([player.position for player in self.players])
