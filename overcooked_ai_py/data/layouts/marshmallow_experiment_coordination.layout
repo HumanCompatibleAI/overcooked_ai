@@ -14,6 +14,6 @@
     "onion_value" : 20,
     "tomato_value" : 10,
     "onion_time" : 15,
-    "tomato_time" : 10
+    "tomato_time" : 10,
     "rew_shaping_params": None
 }
