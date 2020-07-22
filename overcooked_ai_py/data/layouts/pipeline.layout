@@ -1,0 +1,20 @@
+{
+    "grid":  """XXXPDPXXX
+                X       X
+                X XXXXX X
+                X X     X
+                X XXXXX X
+                X  1 2  X
+                XXXOSOXXX""",
+    "start_bonus_orders": [
+        { "ingredients" : ["onion", "onion"]},
+    ],
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]},
+        { "ingredients" : ["onion", "onion"]},
+        { "ingredients" : ["onion"]}
+    ],
+    "onion_value" : 10,
+    "onion_time" : 10,
+    "rew_shaping_params": None
+}

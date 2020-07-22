@@ -40,11 +40,36 @@ class Recipe:
     def __init__(self, ingredients):
         self._ingredients = ingredients
 
+    def __int__(self):
+        num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
+        num_onions = len([_ for _ in self.ingredients if _ == Recipe.ONION])
+
+        mixed_mask = int(bool(num_tomatoes * num_onions))
+        mixed_shift = (Recipe.MAX_NUM_INGREDIENTS + 1)**len(Recipe.ALL_INGREDIENTS)
+        encoding = num_onions + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_tomatoes
+
+        return mixed_mask * encoding * mixed_shift + encoding
+
     def __hash__(self):
         return hash(self.ingredients)
 
     def __eq__(self, other):
         return self.ingredients == other.ingredients
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __lt__(self, other):
+        return int(self) < int(other)
+
+    def __le__(self, other):
+        return int(self) <= int(other)
+
+    def __gt__(self, other):
+        return int(self) > int(other)
+
+    def __ge__(self, other):
+        return int(self) >= int(other)
 
     def __repr__(self):
         return self.ingredients.__repr__()
@@ -478,17 +503,19 @@ class OvercookedState(object):
         timestep (int):  The current timestep of the state
 
         """
-        bonus_orders = set([Recipe.from_dict(order) for order in bonus_orders])
-        all_orders = set([Recipe.from_dict(order) for order in all_orders])
+        bonus_orders = [Recipe.from_dict(order) for order in bonus_orders]
+        all_orders = [Recipe.from_dict(order) for order in all_orders]
         for pos, obj in objects.items():
             assert obj.position == pos
         self.players = tuple(players)
         self.objects = objects
-        self.bonus_orders = bonus_orders
+        self._bonus_orders = bonus_orders
         self._all_orders = all_orders
         self.timestep = timestep
 
-        assert self.bonus_orders.issubset(self.all_orders), "Bonus orders must be a subset of all orders"
+        assert len(set(self.bonus_orders)) == len(self.bonus_orders), "Bonus orders must not have duplicates"
+        assert len(set(self.all_orders)) == len(self.all_orders), "All orders must not have duplicates"
+        assert set(self.bonus_orders).issubset(set(self.all_orders)), "Bonus orders must be a subset of all orders"
 
     @property
     def player_positions(self):
@@ -547,7 +574,11 @@ class OvercookedState(object):
 
     @property
     def all_orders(self):
-        return self._all_orders if self._all_orders else Recipe.ALL_RECIPES
+        return sorted(self._all_orders) if self._all_orders else sorted(Recipe.ALL_RECIPES)
+
+    @property
+    def bonus_orders(self):
+        return sorted(self._bonus_orders)
 
     def has_object(self, pos):
         return pos in self.objects
@@ -571,7 +602,7 @@ class OvercookedState(object):
         return obj
 
     @classmethod
-    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=set(), all_orders=set()):
+    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects based on the passed in player
         positions and orientations and order list
@@ -581,7 +612,7 @@ class OvercookedState(object):
             objects={}, bonus_orders=bonus_orders, all_orders=all_orders)
 
     @classmethod
-    def from_player_positions(cls, player_positions, bonus_orders=set(), all_orders=set()):
+    def from_player_positions(cls, player_positions, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects and with players facing
         North based on the passed in player positions and order list
@@ -609,7 +640,7 @@ class OvercookedState(object):
         return self.time_independent_equal(other) and self.timestep == other.timestep
 
     def __hash__(self):
-        order_list_hash = hash(tuple(sorted(self.bonus_orders))) + hash(tuple(sorted(self.all_orders)))
+        order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
         return hash(
             (self.players, tuple(self.objects.values()), order_list_hash)
         )
