@@ -341,7 +341,7 @@ class SoupState(ObjectState):
         info_dict['_cooking_tick'] = self._cooking_tick
         info_dict['is_cooking'] = self.is_cooking
         info_dict['is_ready'] = self.is_ready
-        info_dict['is_idle'] = self.is_ready
+        info_dict['is_idle'] = self.is_idle
         info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
         return info_dict
 
@@ -679,7 +679,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -689,6 +689,7 @@ class OvercookedGridworld(object):
         all_orders: List of all available order dicts the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
+        start_state: Default start state returned by get_standard_start_state
         """
         self.height = len(terrain)
         self.width = len(terrain[0])
@@ -702,6 +703,7 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
+        self.start_state = start_state
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
@@ -822,6 +824,8 @@ class OvercookedGridworld(object):
                 raise ValueError('Invalid action')
 
     def get_standard_start_state(self):
+        if self.start_state:
+            return self.start_state
         start_state = OvercookedState.from_player_positions(
             self.start_player_positions, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders
         )
