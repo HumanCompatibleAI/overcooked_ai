@@ -6,15 +6,14 @@
     "start_all_orders": [
         { "ingredients" : ["onion", "onion", "tomato"]},
         { "ingredients" : ["tomato", "tomato", "tomato"]},
-        { "ingredients" : ["tomato", "tomato"]},
         { "ingredients" : ["onion", "tomato"]},
         { "ingredients" : ["tomato"]},
         { "ingredients" : ["onion"]}
     ],
     "start_bonus_orders" : [
-        { "ingredients" : ["tomato", "tomato", "tomato"]},
+        { "ingredients" : ["tomato"]},
         { "ingredients" : ["tomato", "onion", "onion"]},
-        { "ingredients" : ["onion", "tomato"]},
+        { "ingredients" : ["tomato", "tomato", "tomato"]}
         { "ingredients" : ["onion"]}
     ],
     "tomato_time" : 10,
