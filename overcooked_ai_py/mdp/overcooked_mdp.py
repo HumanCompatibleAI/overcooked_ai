@@ -362,7 +362,7 @@ class SoupState(ObjectState):
                 return SoupState.get_soup(obj_dict['position'], num_onions=num_ingredient, cooking_tick=cooking_tick, finished=finished)
 
         ingredients_objs = [ObjectState.from_dict(ing_dict) for ing_dict in obj_dict['_ingredients']]
-        obj_dict['_ingredients'] = ingredients_objs
+        obj_dict['ingredients'] = ingredients_objs
         return cls(**obj_dict)
 
     @classmethod
