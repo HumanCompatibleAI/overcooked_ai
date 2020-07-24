@@ -663,8 +663,6 @@ class OvercookedState(object):
         state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
         object_list = [SoupState.from_dict(o) for o in state_dict["objects"]]
         state_dict["objects"] = { ob.position : ob for ob in object_list }
-        state_dict["bonus_orders"] = [Recipe.from_dict(order) for order in state_dict.get('bonus_orders', [])]
-        state_dict['all_orders'] = [Recipe.from_dict(order) for order in state_dict.get('all_orders', [])]
         return OvercookedState(**state_dict)
     
     @staticmethod
@@ -712,7 +710,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
