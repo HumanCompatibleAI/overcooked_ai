@@ -76,8 +76,8 @@ class OvercookedEnv(object):
         self.mlp_params = mlp_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-        # self.lst_len = 8
-        # self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
+        self.lst_len = 1
+        self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
         self.reset()
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
@@ -235,18 +235,18 @@ class OvercookedEnv(object):
         """
         Wrapper of the mdp's lossless_encoding
         """
-        return self.mdp.lossless_state_encoding(state)
+        return self.mdp.lossless_state_encoding(state, self.horizon)
 
     def featurize_state_mdp(self, state):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.mlp)
+        return self.mdp.featurize_state(state, self.horizon, self.mlp)
 
     def reset(self):
         """Resets the environment. Does NOT reset the agent."""
-        # self.mdp = random.choice(self.mdp_lst)
-        self.mdp = self.mdp_generator_fn()
+        self.mdp = random.choice(self.mdp_lst)
+        # self.mdp = self.mdp_generator_fn()
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:
@@ -339,7 +339,7 @@ class OvercookedEnv(object):
         done = False
 
         if display:
-            fname = 'results_client_temp/roll_out_' + str(time.time()) + '.txt'
+            fname = 'results_og_client_temp/roll_out_' + str(time.time()) + '.txt'
             f = open(fname, 'w+')
             print(self, file=f)
             f.close()

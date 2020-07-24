@@ -18,6 +18,7 @@ class Recipe:
     ALL_INGREDIENTS = [ONION, TOMATO]
 
     ALL_RECIPES_CACHE = {}
+    STR_REP = {'tomato': "†", 'onion': "ø"}
 
     _computed = False
     _configured = False
@@ -57,7 +58,7 @@ class Recipe:
         return hash(self.ingredients)
 
     def __eq__(self, other):
-        return self.ingredients == other.ingredients
+        return sorted(self.ingredients) == sorted(other.ingredients)
 
     def __ne__(self, other):
         return not self == other
@@ -324,6 +325,16 @@ class SoupState(ObjectState):
         supercls_str = super(SoupState, self).__repr__()
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
+
+    def display_string(self):
+        res = "{"
+        for ingredient in sorted(self.ingredients):
+            res += Recipe.STR_REP[ingredient]
+        if self.is_cooking:
+            res += str(self._cooking_tick)
+        elif self.is_ready:
+            res += str("✓")
+        return res
 
     @ObjectState.position.setter
     def position(self, new_pos):
@@ -837,6 +848,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
 
+
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
         """
@@ -866,10 +878,7 @@ class OvercookedGridworld(object):
         One can override default configuration parameters of the mdp in
         partial_mdp_config.
         """
-        if "layout_name" in base_layout_params.keys():
-            mdp_config = base_layout_params.copy()
-        else:
-            mdp_config = {}
+        mdp_config = copy.deepcopy(base_layout_params)
 
         layout_grid = [[c for c in row] for row in layout_grid]
         OvercookedGridworld._assert_valid_grid(layout_grid)
@@ -1216,8 +1225,8 @@ class OvercookedGridworld(object):
         assert soup.name == 'soup', "Tried to deliver something that wasn't soup"
         assert soup.is_ready, "Tried to deliever soup that isn't ready"
         player.remove_object()
-
         return self.get_recipe_value(state, soup.recipe)
+
 
 
     def resolve_movement(self, state, joint_action):
@@ -1410,6 +1419,31 @@ class OvercookedGridworld(object):
 
     def get_partially_full_pots(self, pot_states):
         return list(set().union(*[pot_states['{}_items'.format(i)] for i in range(1, Recipe.MAX_NUM_INGREDIENTS)]))
+
+    def get_pot_need_ingredient_poss(self, state, ingredient):
+        """
+        get the list of pot position that need a particular ingredient
+        """
+        assert ingredient in Recipe.ALL_INGREDIENTS, "%s is not a valid ingredient" % ingredient
+        # use set operation to save time
+        res = set([])
+        for pot_pos in self.get_pot_locations():
+            if not state.has_object(pot_pos):
+                s_ct = Counter()
+            else:
+                soup = state.get_object(pot_pos)
+                # if the soupe is idling, we could still add ingredients to it
+                if soup.is_idle:
+                    s_ct = Counter(soup.ingredients)
+                # if the soup is cooking or done, nothing could be done
+                else: continue
+            for order_ct in self.all_orders_ct:
+                # ingredients need to be needed
+                if ingredient in order_ct - s_ct:
+                    res.add(pot_pos)
+                    continue
+        return res
+
 
     def soup_ready_at_location(self, state, pos):
         if not state.has_object(pos):
@@ -1750,6 +1784,7 @@ class OvercookedGridworld(object):
         grid_string = ""
         for y, terrain_row in enumerate(self.terrain_mtx):
             for x, element in enumerate(terrain_row):
+                grid_string_add = ""
                 if (x, y) in players_dict.keys():
                     player = players_dict[(x, y)]
                     orientation = player.orientation
@@ -1758,43 +1793,36 @@ class OvercookedGridworld(object):
                     player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
                     assert len(player_idx_lst) == 1
 
-                    grid_string += Action.ACTION_TO_CHAR[orientation]
+                    grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
                     if player_object:
-                        grid_string += player_object.name[:1]
-                        grid_string += str(player_idx_lst[0])
+                        grid_string_add += str(player_idx_lst[0])
+                        if player_object.name[0] == "s":
+                            # this is a soup
+                            grid_string_add += player_object.display_string()
+                        else:
+                            grid_string_add += player_object.name[:1]
                     else:
-                        grid_string += str(player_idx_lst[0])
+                        grid_string_add += str(player_idx_lst[0])
                 else:
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
-                        grid_string = grid_string + element + state_obj.name[:1]
+                        if state_obj.name[0] == "s":
+                            grid_string_add += (element + state_obj.display_string())
+                        else:
+                            grid_string_add += (element + state_obj.name[:1])
 
                     elif element == "P" and state.has_object((x, y)):
                         soup = state.get_object((x, y))
-                        # TODO: Figure out a way to represent more rich soup space
-                        if Recipe.ONION in soup.ingredients:
-                            grid_string += "ø"
-                        elif Recipe.TOMATO in soup.ingredients:
-                            grid_string += "†"
-                        else:
-                            grid_string += " "
-
-                        if soup.is_cooking:
-                            grid_string += str(soup._cooking_tick)
-                        
-                        # NOTE: do not currently have terminal graphics 
-                        # support for cooking times greater than 3.
-                        elif len(soup.ingredients) == 2:
-                            grid_string += "="
-                        elif len(soup.ingredients) == 1:
-                            grid_string += "-"
-                        else:
-                            grid_string += " "
+                        # display soup
+                        grid_string_add += soup.display_string()
                     else:
-                        grid_string += element + " "
+                        grid_string_add += element + " "
+                grid_string += grid_string_add
+                grid_string += "".join([" "] * (7 - len(grid_string_add)))
+                grid_string += " "
 
-            grid_string += "\n"
+            grid_string += "\n\n"
         
         if state.bonus_orders:
             grid_string += "Bonus orders: {}\n".format(
@@ -1811,6 +1839,7 @@ class OvercookedGridworld(object):
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [26])
 
+
     def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
@@ -1820,10 +1849,8 @@ class OvercookedGridworld(object):
         variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
                                  "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
         urgency_features = ["urgency"]
-
         all_objects = overcooked_state.all_objects_list
 
-        debug = True
         def make_layer(position, value):
                 layer = np.zeros(self.shape)
                 layer[position] = value
@@ -1841,10 +1868,10 @@ class OvercookedGridworld(object):
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
-
             state_mask_dict["timestep"] = np.ones(self.shape) * overcooked_state.timestep
 
             state_mask_dict["soup_cook_time_remaining"] = np.ones(self.shape) * 400
+
 
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
@@ -1934,7 +1961,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlp):
+    def featurize_state(self, overcooked_state, horizon, mlp):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
@@ -2038,10 +2065,6 @@ class OvercookedGridworld(object):
 
     def potential_function(self, state, mp, gamma=0.99):
         """
-        A potential function used for more principled reward shaping
-        For details see "Policy invariance under reward transformations:
-        Theory and application to reward shaping"
-
         Essentially, this is the ɸ(s) function.
 
         The main goal here to to approximately infer the actions of an optimal agent, and derive an estimate for the value

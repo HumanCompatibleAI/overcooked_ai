@@ -31,8 +31,13 @@ prop_feats: (min, max) proportion of counters with features on them
 
 DEFAULT_MDP_GEN_PARAMS = {
     "inner_shape": (5, 4),
-    "prop_empty": 0.6,
+    "prop_empty": 0.95,
     "prop_feats": 0.1,
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+    ],
+    "recipe_values" : [20],
+    "recipe_times" : [20],
     "display": False
 }
 
@@ -40,8 +45,13 @@ DEFAULT_MDP_GEN_PARAMS = {
 def DEFAILT_PARAMS_SCHEDULE_FN(outside_information):
     mdp_default_gen_params = {
         "inner_shape": (5, 4),
-        "prop_empty": 0.6,
+        "prop_empty": 0.95,
         "prop_feats": 0.1,
+        "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+        ],
+        "recipe_values" : [20],
+        "recipe_times" : [20],
         "display": False
     }
     return mdp_default_gen_params
@@ -128,10 +138,17 @@ class LayoutGenerator(object):
             assert "prop_empty" in mdp_params.keys(), "mdp_params is missing prop_empty"
             assert "prop_feats" in mdp_params.keys(), "mdp_params is missing prop_feats"
             assert "display" in mdp_params.keys(), "mdp_params is missing display"
+            assert "start_all_orders" in mdp_params.keys(), "mdp_params is missing start_orders"
+            assert "recipe_values" in mdp_params.keys(), "mdp_params is missing recipe_values"
+            assert "recipe_times" in mdp_params.keys(), "mdp_params is missing recipe_times"
             inner_shape = mdp_params["inner_shape"]
             prop_empty = mdp_params["prop_empty"]
             prop_feats = mdp_params["prop_feats"]
             display = mdp_params["display"]
+
+            recipe_params = {"start_all_orders": mdp_params["start_all_orders"],
+                             "recipe_values": mdp_params["recipe_values"],
+                             "recipe_times": mdp_params["recipe_times"]}
 
             assert inner_shape[0] <= outer_shape[0] and inner_shape[1] <= outer_shape[1], \
                 "inner_shape cannot fit into the outershap"
@@ -141,6 +158,7 @@ class LayoutGenerator(object):
                 inner_shape=inner_shape,
                 prop_empty=prop_empty,
                 prop_features=prop_feats,
+                base_param=recipe_params,
                 display=display
             )
 
@@ -155,7 +173,7 @@ class LayoutGenerator(object):
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
         return OvercookedGridworld.from_grid(mdp_grid)
 
-    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True):
+    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, base_param={}, display=True):
         grid = Grid(inner_shape)
         self.dig_space_with_disjoint_sets(grid, prop_empty)
         self.add_features(grid, prop_features)
@@ -163,7 +181,7 @@ class LayoutGenerator(object):
         padded_grid = self.embed_grid(grid)
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
-        return OvercookedGridworld.from_grid(mdp_grid)
+        return OvercookedGridworld.from_grid(mdp_grid, base_param)
 
     def padded_grid_to_layout_grid(self, padded_grid, start_positions, display=False):
         if display:
@@ -235,7 +253,8 @@ class LayoutGenerator(object):
         """
         Places one round of basic features and then adds random features 
         until prop_features of valid locations are filled"""
-        feature_types = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC]  # NOTE: currently disabled TOMATO_DISPENSER
+        feature_types = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC]
+        # feature_types = [POT, ONION_DISPENSER, TOMATO_DISPENSER, DISH_DISPENSER, SERVING_LOC]  # NOTE: currently disabled TOMATO_DISPENSER
 
         valid_locations = grid.valid_feature_locations()
         np.random.shuffle(valid_locations)
