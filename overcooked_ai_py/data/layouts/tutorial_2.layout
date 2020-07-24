@@ -5,10 +5,11 @@
                 O   1 S
                 XXXXXXX""",
     "start_all_orders" : [
-    ]
+        { "ingredients" : ["onion", "tomato", "tomato"]}
+    ],
     "start_bonus_orders" : [
         { "ingredients" : ["onion", "tomato", "tomato"]}
     ],
-    "order_bonus" : Infinity
+    "order_bonus" : float('inf'),
     "rew_shaping_params": None
 }

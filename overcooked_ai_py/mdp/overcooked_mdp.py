@@ -630,8 +630,6 @@ class OvercookedState(object):
         state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
         object_list = [SoupState.from_dict(o) for o in state_dict["objects"]]
         state_dict["objects"] = { ob.position : ob for ob in object_list }
-        state_dict["bonus_orders"] = [Recipe.from_dict(order) for order in state_dict.get('bonus_orders', [])]
-        state_dict['all_orders'] = [Recipe.from_dict(order) for order in state_dict.get('all_orders', [])]
         return OvercookedState(**state_dict)
     
     @staticmethod
@@ -719,6 +717,8 @@ class OvercookedGridworld(object):
         grid = base_layout_params['grid']
         del base_layout_params['grid']
         base_layout_params['layout_name'] = layout_name
+        if 'start_state' in base_layout_params:
+            base_layout_params['start_state'] = OvercookedState.from_dict(base_layout_params['start_state'])
 
         # Clean grid
         grid = [layout_row.strip() for layout_row in grid.split("\n")]
