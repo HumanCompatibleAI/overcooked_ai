@@ -50,5 +50,5 @@ def test_from_params():
 
 
 
-test_from_name("cramped_room")
+# test_from_name("cramped_room_tomato")
 test_from_params()
