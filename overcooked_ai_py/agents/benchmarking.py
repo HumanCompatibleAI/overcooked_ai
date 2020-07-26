@@ -8,6 +8,8 @@ from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.visualization.extract_events import extract_events
+from overcooked_ai_py.visualization.visualization_utils import run_html_in_ipython, run_html_in_web, create_chart_html
 
 
 class AgentEvaluator(object):
@@ -264,11 +266,16 @@ class AgentEvaluator(object):
         return dict_traj
 
     @staticmethod
-    def load_traj_from_json(filename):
-        traj_dict = load_from_json(filename)
+    def get_traj_from_traj_dict(traj_dict):
         traj_dict["ep_states"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_states"]]
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
+        for key in traj_dict.keys():
+            if key != "metadatas": traj_dict[key] = np.array(traj_dict[key])
         return traj_dict
+
+    @staticmethod
+    def load_traj_from_json(filename):
+        return AgentEvaluator.get_traj_from_traj_dict(load_from_json(filename))
 
     ############################
     # TRAJ MANINPULATION UTILS #
@@ -377,8 +384,12 @@ class AgentEvaluator(object):
         display(out, t)
 
     # EVENTS VISUALIZATION METHODS #
-    
+        
     @staticmethod
-    def events_visualization(trajs, traj_index):
-        # TODO
-        pass
+    def events_visualization(trajs, traj_index=0, ipython=False, chart_settings=None):
+        events = extract_events(trajs, traj_index)
+        html = create_chart_html(events, chart_settings)
+        if ipython:
+            run_html_in_ipython(html)
+        else:
+            run_html_in_web(html)
