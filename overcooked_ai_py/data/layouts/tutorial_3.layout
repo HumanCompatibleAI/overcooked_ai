@@ -7,8 +7,8 @@
     "start_all_orders" : [
     ],
     "start_bonus_orders" : [
+        { "ingredients" : ["onion", "tomato", "tomato"]}
     ],
-    "tomato_value" : 5,
-    "onion_value" : 10,
+    "order_bonus" : float('inf'),
     "rew_shaping_params": None
 }
