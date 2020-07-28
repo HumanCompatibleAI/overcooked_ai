@@ -1569,7 +1569,7 @@ class OvercookedGridworld(object):
                              "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
                                  "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
-
+        # urgency_features = ["urgency"]
         all_objects = overcooked_state.all_objects_list
 
         def make_layer(position, value):
@@ -1585,6 +1585,7 @@ class OvercookedGridworld(object):
                         for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.ALL_DIRECTIONS)]
 
             LAYERS = ordered_player_features + base_map_features + variable_map_features
+            # LAYERS = ordered_player_features + base_map_features + variable_map_features + urgency_features
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
