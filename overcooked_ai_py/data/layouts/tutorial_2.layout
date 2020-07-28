@@ -1,0 +1,14 @@
+{
+    "grid":  """XXPXXXX
+                O   2 S
+                XTPDXXX
+                O   1 S
+                XXXXXXX""",
+    "start_all_orders" : [
+    ],
+    "start_bonus_orders" : [
+    ],
+    "tomato_value" : 5,
+    "onion_value" : 10,
+    "rew_shaping_params": None
+}

@@ -40,11 +40,36 @@ class Recipe:
     def __init__(self, ingredients):
         self._ingredients = ingredients
 
+    def __int__(self):
+        num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
+        num_onions = len([_ for _ in self.ingredients if _ == Recipe.ONION])
+
+        mixed_mask = int(bool(num_tomatoes * num_onions))
+        mixed_shift = (Recipe.MAX_NUM_INGREDIENTS + 1)**len(Recipe.ALL_INGREDIENTS)
+        encoding = num_onions + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_tomatoes
+
+        return mixed_mask * encoding * mixed_shift + encoding
+
     def __hash__(self):
         return hash(self.ingredients)
 
     def __eq__(self, other):
         return self.ingredients == other.ingredients
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __lt__(self, other):
+        return int(self) < int(other)
+
+    def __le__(self, other):
+        return int(self) <= int(other)
+
+    def __gt__(self, other):
+        return int(self) > int(other)
+
+    def __ge__(self, other):
+        return int(self) >= int(other)
 
     def __repr__(self):
         return self.ingredients.__repr__()
@@ -341,7 +366,7 @@ class SoupState(ObjectState):
         info_dict['_cooking_tick'] = self._cooking_tick
         info_dict['is_cooking'] = self.is_cooking
         info_dict['is_ready'] = self.is_ready
-        info_dict['is_idle'] = self.is_ready
+        info_dict['is_idle'] = self.is_idle
         info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
         return info_dict
 
@@ -362,7 +387,7 @@ class SoupState(ObjectState):
                 return SoupState.get_soup(obj_dict['position'], num_onions=num_ingredient, cooking_tick=cooking_tick, finished=finished)
 
         ingredients_objs = [ObjectState.from_dict(ing_dict) for ing_dict in obj_dict['_ingredients']]
-        obj_dict['_ingredients'] = ingredients_objs
+        obj_dict['ingredients'] = ingredients_objs
         return cls(**obj_dict)
 
     @classmethod
@@ -478,15 +503,19 @@ class OvercookedState(object):
         timestep (int):  The current timestep of the state
 
         """
-        bonus_orders = set([Recipe.from_dict(order) for order in bonus_orders])
-        all_orders = set([Recipe.from_dict(order) for order in all_orders])
+        bonus_orders = [Recipe.from_dict(order) for order in bonus_orders]
+        all_orders = [Recipe.from_dict(order) for order in all_orders]
         for pos, obj in objects.items():
             assert obj.position == pos
         self.players = tuple(players)
         self.objects = objects
-        self.bonus_orders = bonus_orders
+        self._bonus_orders = bonus_orders
         self._all_orders = all_orders
         self.timestep = timestep
+
+        assert len(set(self.bonus_orders)) == len(self.bonus_orders), "Bonus orders must not have duplicates"
+        assert len(set(self.all_orders)) == len(self.all_orders), "All orders must not have duplicates"
+        assert set(self.bonus_orders).issubset(set(self.all_orders)), "Bonus orders must be a subset of all orders"
 
     @property
     def player_positions(self):
@@ -545,7 +574,11 @@ class OvercookedState(object):
 
     @property
     def all_orders(self):
-        return self._all_orders if self._all_orders else Recipe.ALL_RECIPES
+        return sorted(self._all_orders) if self._all_orders else sorted(Recipe.ALL_RECIPES)
+
+    @property
+    def bonus_orders(self):
+        return sorted(self._bonus_orders)
 
     def has_object(self, pos):
         return pos in self.objects
@@ -569,7 +602,7 @@ class OvercookedState(object):
         return obj
 
     @classmethod
-    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=set(), all_orders=set()):
+    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects based on the passed in player
         positions and orientations and order list
@@ -579,7 +612,7 @@ class OvercookedState(object):
             objects={}, bonus_orders=bonus_orders, all_orders=all_orders)
 
     @classmethod
-    def from_player_positions(cls, player_positions, bonus_orders=set(), all_orders=set()):
+    def from_player_positions(cls, player_positions, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects and with players facing
         North based on the passed in player positions and order list
@@ -607,7 +640,7 @@ class OvercookedState(object):
         return self.time_independent_equal(other) and self.timestep == other.timestep
 
     def __hash__(self):
-        order_list_hash = hash(tuple(sorted(self.bonus_orders))) + hash(tuple(sorted(self.all_orders)))
+        order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
         return hash(
             (self.players, tuple(self.objects.values()), order_list_hash)
         )
@@ -630,8 +663,6 @@ class OvercookedState(object):
         state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
         object_list = [SoupState.from_dict(o) for o in state_dict["objects"]]
         state_dict["objects"] = { ob.position : ob for ob in object_list }
-        state_dict["bonus_orders"] = [Recipe.from_dict(order) for order in state_dict.get('bonus_orders', [])]
-        state_dict['all_orders'] = [Recipe.from_dict(order) for order in state_dict.get('all_orders', [])]
         return OvercookedState(**state_dict)
     
     @staticmethod
@@ -679,7 +710,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -689,6 +720,7 @@ class OvercookedGridworld(object):
         all_orders: List of all available order dicts the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
+        start_state: Default start state returned by get_standard_start_state
         """
         self.height = len(terrain)
         self.width = len(terrain[0])
@@ -702,6 +734,7 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
+        self.start_state = start_state
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
@@ -717,6 +750,8 @@ class OvercookedGridworld(object):
         grid = base_layout_params['grid']
         del base_layout_params['grid']
         base_layout_params['layout_name'] = layout_name
+        if 'start_state' in base_layout_params:
+            base_layout_params['start_state'] = OvercookedState.from_dict(base_layout_params['start_state'])
 
         # Clean grid
         grid = [layout_row.strip() for layout_row in grid.split("\n")]
@@ -822,6 +857,8 @@ class OvercookedGridworld(object):
                 raise ValueError('Invalid action')
 
     def get_standard_start_state(self):
+        if self.start_state:
+            return self.start_state
         start_state = OvercookedState.from_player_positions(
             self.start_player_positions, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders
         )
