@@ -8,6 +8,9 @@ from overcooked_ai_py.planning.search import SearchTree
 
 class Agent(object):
 
+    def __init__(self):
+        self.reset()
+
     def action(self, state):
         """
         Should return an action, and an action info dictionary.
@@ -51,7 +54,12 @@ class Agent(object):
         self.mdp = mdp
 
     def reset(self):
-        pass
+        """
+        One should always reset agents in between trajectory rollouts, as resetting
+        usually clears history or other trajectory-specific attributes.
+        """
+        self.agent_index = None
+        self.mdp = None
 
 
 class AgentGroup(object):
@@ -64,8 +72,6 @@ class AgentGroup(object):
         self.agents = agents
         self.n = len(self.agents)
         self.reset()
-        for i, agent in enumerate(self.agents):
-            agent.set_agent_index(i)
 
         if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
             assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
@@ -79,8 +85,13 @@ class AgentGroup(object):
             a.set_mdp(mdp)
 
     def reset(self):
-        for a in self.agents:
-            a.reset()
+        """
+        When resetting an agent group, we know that the agent indices will remain the same,
+        but we have no guarantee about the mdp, that must be set again separately.
+        """
+        for i, agent in enumerate(self.agents):
+            agent.reset()
+            agent.set_agent_index(i)
 
 
 class AgentPair(AgentGroup):
@@ -143,13 +154,13 @@ class NNPolicy(object):
     def __init__(self):
         pass
 
-    def multi_state_policy(states, agent_indices):
+    def multi_state_policy(self, states, agent_indices):
         """
         A function that takes in multiple OvercookedState instances and their respective agent indices and returns action probabilities.
         """
         raise NotImplementedError()
 
-    def multi_obs_policy(states):
+    def multi_obs_policy(self, states):
         """
         A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
         """
@@ -179,12 +190,13 @@ class AgentFromPolicy(Agent):
             actions_and_infos_n.append((action, {"action_probs": action_probs}))
         return actions_and_infos_n
 
-    def actions_from_observations(self, obs):
-        """
-        An action method that takes in states in post-processed form, and returns respective actions.
-        """
-        return self.policy.multi_obs_policy(obs)
-
+    def set_mdp(self, mdp):
+        super().set_mdp(mdp)
+        self.policy.mdp = mdp
+    
+    def reset(self):
+        super(AgentFromPolicy, self).reset()
+        self.policy.mdp = None
 
 class RandomAgent(Agent):
     """
@@ -407,7 +419,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _, _, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
 
@@ -496,17 +508,10 @@ class GreedyHumanModel(Agent):
         counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
         pot_states_dict = self.mlp.mdp.get_pot_states(state)
 
-        # NOTE: this most likely will fail in some tomato scenarios
-        curr_order = state.curr_order
 
         if not player.has_object():
-
-            if curr_order == 'any':
-                ready_soups = pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
-                cooking_soups = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking']
-            else:
-                ready_soups = pot_states_dict[curr_order]['ready']
-                cooking_soups = pot_states_dict[curr_order]['cooking']
+            ready_soups = pot_states_dict['ready']
+            cooking_soups = pot_states_dict['cooking']
 
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
@@ -514,15 +519,13 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                next_order = None
-                if state.num_orders_remaining > 1:
-                    next_order = state.next_order
+                next_order = list(state.all_orders)[0]
 
-                if next_order == 'onion':
+                if 'onion' in next_order:
                     motion_goals = am.pickup_onion_actions(counter_objects)
-                elif next_order == 'tomato':
+                elif 'tomato' in next_order:
                     motion_goals = am.pickup_tomato_actions(counter_objects)
-                elif next_order is None or next_order == 'any':
+                else:
                     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
 
         else:
