@@ -40,11 +40,36 @@ class Recipe:
     def __init__(self, ingredients):
         self._ingredients = ingredients
 
+    def __int__(self):
+        num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
+        num_onions = len([_ for _ in self.ingredients if _ == Recipe.ONION])
+
+        mixed_mask = int(bool(num_tomatoes * num_onions))
+        mixed_shift = (Recipe.MAX_NUM_INGREDIENTS + 1)**len(Recipe.ALL_INGREDIENTS)
+        encoding = num_onions + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_tomatoes
+
+        return mixed_mask * encoding * mixed_shift + encoding
+
     def __hash__(self):
         return hash(self.ingredients)
 
     def __eq__(self, other):
         return self.ingredients == other.ingredients
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __lt__(self, other):
+        return int(self) < int(other)
+
+    def __le__(self, other):
+        return int(self) <= int(other)
+
+    def __gt__(self, other):
+        return int(self) > int(other)
+
+    def __ge__(self, other):
+        return int(self) >= int(other)
 
     def __repr__(self):
         return self.ingredients.__repr__()
@@ -364,7 +389,7 @@ class SoupState(ObjectState):
         info_dict['_cooking_tick'] = self._cooking_tick
         info_dict['is_cooking'] = self.is_cooking
         info_dict['is_ready'] = self.is_ready
-        info_dict['is_idle'] = self.is_ready
+        info_dict['is_idle'] = self.is_idle
         info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
         return info_dict
 
@@ -385,7 +410,7 @@ class SoupState(ObjectState):
                 return SoupState.get_soup(obj_dict['position'], num_onions=num_ingredient, cooking_tick=cooking_tick, finished=finished)
 
         ingredients_objs = [ObjectState.from_dict(ing_dict) for ing_dict in obj_dict['_ingredients']]
-        obj_dict['_ingredients'] = ingredients_objs
+        obj_dict['ingredients'] = ingredients_objs
         return cls(**obj_dict)
 
     @classmethod
@@ -501,15 +526,19 @@ class OvercookedState(object):
         timestep (int):  The current timestep of the state
 
         """
-        bonus_orders = set([Recipe.from_dict(order) for order in bonus_orders])
-        all_orders = set([Recipe.from_dict(order) for order in all_orders])
+        bonus_orders = [Recipe.from_dict(order) for order in bonus_orders]
+        all_orders = [Recipe.from_dict(order) for order in all_orders]
         for pos, obj in objects.items():
             assert obj.position == pos
         self.players = tuple(players)
         self.objects = objects
-        self.bonus_orders = bonus_orders
+        self._bonus_orders = bonus_orders
         self._all_orders = all_orders
         self.timestep = timestep
+
+        assert len(set(self.bonus_orders)) == len(self.bonus_orders), "Bonus orders must not have duplicates"
+        assert len(set(self.all_orders)) == len(self.all_orders), "All orders must not have duplicates"
+        assert set(self.bonus_orders).issubset(set(self.all_orders)), "Bonus orders must be a subset of all orders"
 
     @property
     def player_positions(self):
@@ -568,7 +597,11 @@ class OvercookedState(object):
 
     @property
     def all_orders(self):
-        return self._all_orders if self._all_orders else Recipe.ALL_RECIPES
+        return sorted(self._all_orders) if self._all_orders else sorted(Recipe.ALL_RECIPES)
+
+    @property
+    def bonus_orders(self):
+        return sorted(self._bonus_orders)
 
     def has_object(self, pos):
         return pos in self.objects
@@ -592,7 +625,7 @@ class OvercookedState(object):
         return obj
 
     @classmethod
-    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=set(), all_orders=set()):
+    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects based on the passed in player
         positions and orientations and order list
@@ -602,7 +635,7 @@ class OvercookedState(object):
             objects={}, bonus_orders=bonus_orders, all_orders=all_orders)
 
     @classmethod
-    def from_player_positions(cls, player_positions, bonus_orders=set(), all_orders=set()):
+    def from_player_positions(cls, player_positions, bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects and with players facing
         North based on the passed in player positions and order list
@@ -630,7 +663,7 @@ class OvercookedState(object):
         return self.time_independent_equal(other) and self.timestep == other.timestep
 
     def __hash__(self):
-        order_list_hash = hash(tuple(sorted(self.bonus_orders))) + hash(tuple(sorted(self.all_orders)))
+        order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
         return hash(
             (self.players, tuple(self.objects.values()), order_list_hash)
         )
@@ -653,8 +686,6 @@ class OvercookedState(object):
         state_dict["players"] = [PlayerState.from_dict(p) for p in state_dict["players"]]
         object_list = [SoupState.from_dict(o) for o in state_dict["objects"]]
         state_dict["objects"] = { ob.position : ob for ob in object_list }
-        state_dict["bonus_orders"] = [Recipe.from_dict(order) for order in state_dict.get('bonus_orders', [])]
-        state_dict['all_orders'] = [Recipe.from_dict(order) for order in state_dict.get('all_orders', [])]
         return OvercookedState(**state_dict)
     
     @staticmethod
@@ -719,7 +750,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -729,6 +760,7 @@ class OvercookedGridworld(object):
         all_orders: List of all available order dicts the players can make
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
+        start_state: Default start state returned by get_standard_start_state
         """
         self.height = len(terrain)
         self.width = len(terrain[0])
@@ -742,7 +774,11 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
+<<<<<<< HEAD
         self._optimal_possible_recipe = {}
+=======
+        self.start_state = start_state
+>>>>>>> origin/encoding
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
@@ -758,6 +794,8 @@ class OvercookedGridworld(object):
         grid = base_layout_params['grid']
         del base_layout_params['grid']
         base_layout_params['layout_name'] = layout_name
+        if 'start_state' in base_layout_params:
+            base_layout_params['start_state'] = OvercookedState.from_dict(base_layout_params['start_state'])
 
         # Clean grid
         grid = [layout_row.strip() for layout_row in grid.split("\n")]
@@ -863,6 +901,8 @@ class OvercookedGridworld(object):
                 raise ValueError('Invalid action')
 
     def get_standard_start_state(self):
+        if self.start_state:
+            return self.start_state
         start_state = OvercookedState.from_player_positions(
             self.start_player_positions, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders
         )
@@ -1669,13 +1709,15 @@ class OvercookedGridworld(object):
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [20])
 
-    def lossless_state_encoding(self, overcooked_state, debug=False):
+    def lossless_state_encoding(self, overcooked_state, horizon, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
-        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
-        variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
-
+        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "tomato_disp_loc",
+                             "dish_disp_loc", "serve_loc"]
+        variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
+                                 "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
+        urgency_features = ["urgency"]
         all_objects = overcooked_state.all_objects_list
 
         def make_layer(position, value):
@@ -1690,10 +1732,19 @@ class OvercookedGridworld(object):
                         ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
                         for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.ALL_DIRECTIONS)]
 
-            LAYERS = ordered_player_features + base_map_features + variable_map_features
+            # LAYERS = ordered_player_features + base_map_features + variable_map_features
+            LAYERS = ordered_player_features + base_map_features + variable_map_features + urgency_features
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
+            if horizon - overcooked_state.timestep < 40:
+                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
+                state_mask_dict["urgency"] = np.ones(self.shape)
+
+
+            # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
+            # state_mask_dict["urgency"] = np.ones(self.shape) * 40
+
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
 
@@ -1702,6 +1753,9 @@ class OvercookedGridworld(object):
 
             for loc in self.get_onion_dispenser_locations():
                 state_mask_dict["onion_disp_loc"][loc] = 1
+
+            for loc in self.get_tomato_dispenser_locations():
+                state_mask_dict["tomato_disp_loc"][loc] = 1
 
             for loc in self.get_dish_dispenser_locations():
                 state_mask_dict["dish_disp_loc"][loc] = 1
@@ -1718,24 +1772,43 @@ class OvercookedGridworld(object):
             # OBJECT & STATE LAYERS
             for obj in all_objects:
                 if obj.name == "soup":
-                    if Recipe.ONION in obj.ingredients:
-                        if obj.position in self.get_pot_locations():
-                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, len(obj.ingredients))
-                            state_mask_dict["onions_cook_time"] += make_layer(obj.position, max(0, obj._cooking_tick))
+                    # removed the next line because onion doesn't have to be in all the soups?
+                    # if Recipe.ONION in obj.ingredients:
+                    # get the ingredients into a {object: number} dictionary
+                    ingredients_dict = Counter(obj.ingredients)
+                    # assert "onion" in ingredients_dict.keys()
+                    if obj.position in self.get_pot_locations():
+                        if obj.is_idle:
+                            # onions_in_pot and tomatoes_in_pot are used when the soup is idling, and ingredients could still be added
+                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, ingredients_dict["onion"])
+                            state_mask_dict["tomatoes_in_pot"] += make_layer(obj.position, ingredients_dict["tomato"])
                         else:
-                            # If player soup is not in a pot, put it in separate mask
-                            state_mask_dict["onion_soup_loc"] += make_layer(obj.position, 1)
+                            state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                            state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time_remaining)
+                            if obj.is_ready:
+                                state_mask_dict["soup_done"] += make_layer(obj.position, 1)
                     else:
-                        raise ValueError("Unrecognized soup")
+                        # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
+                        state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                        state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                        state_mask_dict["soup_done"] += make_layer(obj.position, 1)
+                    # else:
+                    #     raise ValueError("Unrecognized soup")
 
                 elif obj.name == "dish":
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
                 elif obj.name == "onion":
                     state_mask_dict["onions"] += make_layer(obj.position, 1)
+                elif obj.name == "tomato":
+                    state_mask_dict["tomatoes"] += make_layer(obj.position, 1)
                 else:
                     raise ValueError("Unrecognized object")
 
             if debug:
+                print("terrain----")
+                print(np.array(self.terrain_mtx))
+                print("-----------")
                 print(len(LAYERS))
                 print(len(state_mask_dict))
                 for k, v in state_mask_dict.items():
