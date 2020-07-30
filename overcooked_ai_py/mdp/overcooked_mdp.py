@@ -75,11 +75,11 @@ class Recipe:
 
     @property
     def value(self):
-        if hasattr(self, '_delivery_reward'):
+        if self._delivery_reward:
             return self._delivery_reward
-        if hasattr(self, '_value_mapping') and self in self._value_mapping:
+        if self._value_mapping and self in self._value_mapping:
             return self._value_mapping[self]
-        if hasattr(self, '_onion_value') and hasattr(self, '_tomato_value'):
+        if self._onion_value and self._tomato_value:
             num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
             num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
             return self._tomato_value * num_tomatoes + self._onion_value * num_onions
@@ -87,11 +87,11 @@ class Recipe:
 
     @property
     def time(self):
-        if hasattr(self, '_cook_time'):
+        if self._cook_time:
             return self._cook_time
-        if hasattr(self, '_time_mapping') and self in self._time_mapping:
+        if self._time_mapping and self in self._time_mapping:
             return self._time_mapping[self]
-        if hasattr(self, '_onion_time') and hasattr(self, '_tomato_time'):
+        if self._onion_time and self._tomato_time:
             num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
             num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
             return self._onion_time * num_onions + self._tomato_time * num_tomatoes
@@ -99,6 +99,20 @@ class Recipe:
 
     def to_dict(self):
         return { 'ingredients' : self.ingredients }
+
+    def neighbors(self):
+        """
+        Return all "neighbor" recipes to this recipe. A neighbor recipe is one that can be obtained
+        by adding exactly one ingredient to the current recipe
+        """
+        neighbors = []
+        if len(self.ingredients) == self.MAX_NUM_INGREDIENTS:
+            return neighbors
+        for ingredient in self.ALL_INGREDIENTS:
+            new_ingredients = [*self.ingredients, ingredient]
+            new_recipe = Recipe(new_ingredients)
+            neighbors.append(new_recipe)
+        return neighbors
 
     @classproperty
     def ALL_RECIPES(cls):
@@ -111,6 +125,15 @@ class Recipe:
     def configure(cls, conf):
         cls._computed = False
         cls.MAX_NUM_INGREDIENTS = conf.get('max_num_ingredients', 3)
+
+        cls._cook_time = None
+        cls._delivery_reward = None
+        cls._value_mapping = None
+        cls._time_mapping = None
+        cls._onion_value = None
+        cls._onion_time = None
+        cls._tomato_value = None
+        cls._tomato_time = None
 
         # Backwards compatibility
         if 'cook_time' in conf:
@@ -649,6 +672,13 @@ BASE_REW_SHAPING_PARAMS = {
 }
 
 EVENT_TYPES = [
+    # Tomato events
+    'tomato_pickup',
+    'useful_tomato_pickup',
+    'tomato_drop',
+    'useful_tomato_drop',
+    'potting_tomato',
+
     # Onion events
     'onion_pickup',
     'useful_onion_pickup',
@@ -665,7 +695,17 @@ EVENT_TYPES = [
     # Soup events
     'soup_pickup',
     'soup_delivery',
-    'soup_drop'
+    'soup_drop',
+
+    # Potting events
+    'optimal_onion_potting',
+    'optimal_tomato_potting',
+    'viable_onion_potting',
+    'viable_tomato_potting',
+    'catastrophic_onion_potting',
+    'catastrophic_tomato_potting',
+    'useless_onion_potting',
+    'useless_tomato_potting'
 ]
 
 class OvercookedGridworld(object):
@@ -702,6 +742,7 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
+        self._optimal_possible_recipe = {}
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
@@ -885,7 +926,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-        phi_s = self.potential_function(state)
+        # phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -909,13 +950,11 @@ class OvercookedGridworld(object):
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
 
-        phi_s_prime = self.potential_function(new_state)
+        # phi_s_prime = self.potential_function(new_state)
         infos = {
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
-            "phi_s": phi_s,
-            "phi_s_prime": phi_s_prime
         }
         return new_state, infos
 
@@ -1009,11 +1048,13 @@ class OvercookedGridworld(object):
                     # Add ingredient if possible
                     soup = new_state.get_object(i_pos)
                     if not soup.is_full:
+                        old_soup = soup.deepcopy()
                         obj = player.remove_object()
                         soup.add_ingredient(obj)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
 
-                        # Log onion potting
+                        # Log potting
+                        self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
@@ -1029,6 +1070,21 @@ class OvercookedGridworld(object):
 
         return sparse_reward, shaped_reward
 
+    def get_recipe_value(self, state, recipe):
+        """
+        Return the reward the player should receive for delivering this recipe
+
+        The player receives 0 if recipe not in all_orders, receives base value * order_bonus
+        if recipe is in bonus orders, and receives base value otherwise
+        """
+        if not recipe in state.all_orders:
+            return 0
+        
+        if not recipe in state.bonus_orders:
+            return recipe.value
+
+        return self.order_bonus * recipe.value
+
     def deliver_soup(self, state, player, soup):
         """
         Deliver the soup, and get reward if there is no order list
@@ -1038,13 +1094,7 @@ class OvercookedGridworld(object):
         assert soup.is_ready, "Tried to deliever soup that isn't ready"
         player.remove_object()
 
-        if not soup.recipe in state.all_orders:
-            return 0
-
-        if not soup.recipe in state.bonus_orders:
-            return soup.value
-
-        return self.order_bonus * soup.value
+        return self.get_recipe_value(state, soup.recipe)
 
 
     def resolve_movement(self, state, joint_action):
@@ -1219,6 +1269,9 @@ class OvercookedGridworld(object):
         """Returns pots that have 0 items in them"""
         return pot_states["empty"]
 
+    def get_non_empty_pots(self, pot_states):
+        return self.get_full_pots(pot_states) + self.get_partially_full_pots(pot_states)
+
     def get_ready_pots(self, pot_states):
         return pot_states['ready']
 
@@ -1297,6 +1350,55 @@ class OvercookedGridworld(object):
                 free_counters_valid_for_both.append(free_counter)
         return free_counters_valid_for_both
 
+    def _get_optimal_possible_recipe(self, state, recipe):
+        """
+        Traverse the recipe-space graph using DFS to find the best possible recipe that can be made
+        from the current recipe
+
+        Because we can't have empty recipes, we handle the case by letting recipe==None be a stand-in for empty recipe
+        """
+        visited = set()
+        stack = []
+        best_recipe = recipe
+        best_value = 0
+        if not recipe:
+            for ingredient in Recipe.ALL_INGREDIENTS:
+                stack.append(Recipe([ingredient]))
+        else:
+            stack.append(recipe)
+
+        while stack:
+            curr_recipe = stack.pop()
+            if curr_recipe not in visited:
+                visited.add(curr_recipe)
+                curr_value = self.get_recipe_value(state, curr_recipe)
+
+                if curr_value > best_value:
+                    best_value, best_recipe = curr_value, curr_recipe
+                
+                for neighbor in curr_recipe.neighbors():
+                    if not neighbor in visited:
+                        stack.append(neighbor)
+            
+        return best_recipe
+
+
+    def get_optimal_possible_recipe(self, state, recipe):
+        """
+        Return the best possible recipe that can be made starting with ingredients in `recipe`
+        Uses self._optimal_possible_recipe as a cache to avoid re-computing. This only works because
+        the recipe values are currently static (i.e. bonus_orders doesn't change). Would need to have cache
+        flushed if order dynamics are introduced
+        """
+        # Returned cached value if present
+        if recipe in self._optimal_possible_recipe:
+            return self._optimal_possible_recipe[recipe]
+
+        # Compute best recipe now and store in cache for later use
+        opt_recipe = self._get_optimal_possible_recipe(state, recipe)
+        self._optimal_possible_recipe[recipe] = opt_recipe
+        return opt_recipe
+
     @staticmethod
     def _assert_valid_grid(grid):
         """Raises an AssertionError if the grid is invalid.
@@ -1344,18 +1446,36 @@ class OvercookedGridworld(object):
     # EVENT LOGGING HELPER METHODS #
     ################################
 
+    def log_object_potting(self, events_infos, state, old_soup, new_soup, obj_name, player_index):
+        """Player added an ingredient to a pot"""
+        obj_pickup_key = "potting_" + obj_name
+        if obj_pickup_key not in events_infos:
+            raise ValueError("Unknown event {}".format(obj_pickup_key))
+        events_infos[obj_pickup_key][player_index] = True
+
+        POTTING_FNS = {
+            "optimal" : self.is_potting_optimal,
+            "catastrophic" : self.is_potting_catastrophic,
+            "viable" : self.is_potting_viable,
+            "useless" : self.is_potting_useless
+        }
+
+        for outcome, outcome_fn in POTTING_FNS.items():
+            if outcome_fn(state, old_soup, new_soup):
+                potting_key = "{}_{}_potting".format(outcome, obj_name)
+                events_infos[potting_key][player_index] = True
+
+    
     def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index):
         """Player picked an object up from a counter or a dispenser"""
         obj_pickup_key = obj_name + "_pickup"
         if obj_pickup_key not in events_infos:
-            # TODO: add support for tomato event logging
-            if obj_name == "tomato":
-                return
             raise ValueError("Unknown event {}".format(obj_pickup_key))
         events_infos[obj_pickup_key][player_index] = True
         
         USEFUL_PICKUP_FNS = {
-            "onion": self.is_onion_pickup_useful,
+            "tomato" : self.is_ingredient_pickup_useful,
+            "onion": self.is_ingredient_pickup_useful,
             "dish": self.is_dish_pickup_useful
         }
         if obj_name in USEFUL_PICKUP_FNS:
@@ -1367,14 +1487,12 @@ class OvercookedGridworld(object):
         """Player dropped the object on a counter"""
         obj_drop_key = obj_name + "_drop"
         if obj_drop_key not in events_infos:
-            # TODO: add support for tomato event logging
-            if obj_name == "tomato":
-                return
             raise ValueError("Unknown event {}".format(obj_drop_key))
         events_infos[obj_drop_key][player_index] = True
         
         USEFUL_DROP_FNS = {
-            "onion": self.is_onion_drop_useful,
+            "tomato" : self.is_ingredient_drop_useful,
+            "onion": self.is_ingredient_drop_useful,
             "dish": self.is_dish_drop_useful
         }
         if obj_name in USEFUL_DROP_FNS:
@@ -1416,7 +1534,7 @@ class OvercookedGridworld(object):
         other_player_holding_onion = other_player.has_object() and other_player.get_object().name == "onion"
         return all_non_full and not other_player_holding_onion
 
-    def is_onion_pickup_useful(self, state, pot_states, player_index):
+    def is_ingredient_pickup_useful(self, state, pot_states, player_index):
         """
         NOTE: this only works if self.num_players == 2
         Always useful unless:
@@ -1428,7 +1546,7 @@ class OvercookedGridworld(object):
         other_player_has_dish = other_player.has_object() and other_player.get_object().name == "dish"
         return not (all_pots_full and not other_player_has_dish)
         
-    def is_onion_drop_useful(self, state, pot_states, player_index):
+    def is_ingredient_drop_useful(self, state, pot_states, player_index):
         """
         NOTE: this only works if self.num_players == 2
         Useful if:
@@ -1440,6 +1558,43 @@ class OvercookedGridworld(object):
         other_player = state.players[1 - player_index]
         other_player_holding_dish = other_player.has_object() and other_player.get_object().name == "dish"
         return all_pots_full and not other_player_holding_dish
+
+    def is_potting_optimal(self, state, old_soup, new_soup):
+        """
+        True if the highest valued soup possible is the same before and after the potting
+        """
+        old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
+        new_recipe = Recipe(new_soup.ingredients)
+        old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))
+        new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
+        return old_val == new_val
+
+    def is_potting_viable(self, state, old_soup, new_soup):
+        """
+        True if there exists a non-zero reward soup possible from new ingredients
+        """
+        new_recipe = Recipe(new_soup.ingredients)
+        new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
+        return new_val > 0
+
+    def is_potting_catastrophic(self, state, old_soup, new_soup):
+        """
+        True if no non-zero reward soup is possible from new ingredients
+        """
+        old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
+        new_recipe = Recipe(new_soup.ingredients)
+        old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))
+        new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
+        return old_val > 0 and new_val == 0
+
+    def is_potting_useless(self, state, old_soup, new_soup):
+        """
+        True if ingredient added to a soup that was already gauranteed to be worth at most 0 points
+        """
+        old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
+        old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))
+        return old_val == 0
+
 
 
     #####################
@@ -1503,7 +1658,7 @@ class OvercookedGridworld(object):
             grid_string += "Bonus orders: {}\n".format(
                 state.bonus_orders
             )
-        grid_string += "State potential value: {}\n".format(self.potential_function(state))
+        # grid_string += "State potential value: {}\n".format(self.potential_function(state))
         return grid_string
 
     ###################
@@ -1706,37 +1861,146 @@ class OvercookedGridworld(object):
     # POTENTIAL REWARD SHAPING FN #
     ###############################
 
-    def potential_function(self, state):
+    def potential_function(self, state, mp, gamma=0.99, max_steps=20):
         """
         A potential function used for more principled reward shaping
         For details see "Policy invariance under reward transformations:
         Theory and application to reward shaping"
 
         Essentially, this is the ɸ(s) function.
+
+        The main goal here to to approximately infer the actions of an optimal agent, and derive an estimate for the value
+        function of the optimal policy. The perfect potential function is indeed the value function
+
+        At a high level, we assume each agent acts independetly, and greedily optimally, and then, using the decay factor "gamma", 
+        we calculate the expected discounted reward under this policy
+
+        Some implementation details:
+            * the process of delivering a soup is broken into 4 steps
+                * Step 1: placing the first ingredient into an empty pot
+                * Step 2: placing the remaining ingredients in the pot
+                * Step 3: cooking the soup/retreiving a dish with which to serve the soup
+                * Step 4: delivering the soup once it is in a dish
+            * Here is an exhaustive list of the greedy assumptions made at each step
+                * step 1:
+                    * If an agent is holding an ingredient that could be used to cook an optimal soup, it will use it in that soup
+                    * If no such optimal soup exists, but there is an empty pot, the agent will place the ingredient there
+                    * If neither of the above cases holds, no potential is awarded for possessing the ingredient
+                * step 2:
+                    * The agent will always try to cook the highest valued soup possible based on the current ingredients in a pot
+                    * Any agent possessing a missing ingredient for an optimal soup will travel directly to the closest such pot
+                    * If the optimal soup has all ingredients, the closest agent not holding anything will go to cook it
+                * step 3:
+                    * Any player holding a dish attempts to serve the highest valued soup based on recipe values and cook time remaining
+                * step 4:
+                    * Any agent holding a soup will go directly to the nearest serving area
+            * At every step, the expected reward is discounted by multiplying the optimal reward by gamma ^ (estimated #steps to complete greedy action)
+            * In the case that certain actions are infeasible (i.e. an agent is holding a soup in step 4, but no path exists to a serving
+              area), estimated number of steps in order to complete the action defaults to `max_steps`
+            * Cooperative behavior between the two agents is not considered for complexity reasons
+            * Soups that are worth <1 points are rounded to be worth 1 point. This is to incentivize the agent to cook a worthless soup
+              that happens to be in a pot in order to free up the pot
+
+        Parameters:
+            state: OvercookedState instance representing the state to evaluate potential for
+            mp: MotionPlanner instance used to calculate gridworld distances to objects
+            gamma: float, discount factor
+            max_steps: int, number of steps a high level action is assumed to take in worst case
+        
+        Returns
+            phi(state), the potential of the state
         """
-        pot_states = self.get_pot_states(state)
+        # Hard-coded constants needed for potential function
         potential_values = {
-            'holding_onion': 1,
-            'onion_in_pot': 3,
-            'holding_dish': 1, # For each dish when there is a full pot, corresponding to it
-            'holding_soup': 14
+            'tomato_value' : Recipe._tomato_value if hasattr(Recipe, '_tomato_value') else 1,
+            'onion_value' : Recipe._onion_value if hasattr(Recipe, '_onion_value') else 1
         }
-
+        pot_states = self.get_pot_states(state)
+        min_coeff = gamma**max_steps
         potential = 0
-        potential += len(state.player_objects_by_type['onion']) * potential_values['holding_onion']
 
-        all_pots_with_items = self.get_partially_full_pots(pot_states) + self.get_full_pots(pot_states)
-        soup_objects_in_pots_with_items = [state.get_object(pot_loc) for pot_loc in all_pots_with_items]
-        total_num_onions_in_pots = sum([len(soup.ingredients) for soup in soup_objects_in_pots_with_items])
-        potential += total_num_onions_in_pots * potential_values['onion_in_pot']
+        # Get list of all soups that have >0 ingredients, sorted based on value of best possible recipe 
+        idle_soups = [state.get_object(pos) for pos in self.get_full_but_not_cooking_pots(pot_states)]
+        idle_soups.extend([state.get_object(pos) for pos in self.get_partially_full_pots(pot_states)])
+        idle_soups = sorted(idle_soups, key=lambda soup : self.get_recipe_value(state, self.get_optimal_possible_recipe(state, Recipe(soup.ingredients))), reverse=True)
 
-        num_ready_pots = len(self.get_full_pots(pot_states))
-        num_useful_dishes = min(len(state.player_objects_by_type['dish']), num_ready_pots)
-        potential += num_useful_dishes * potential_values['holding_dish']
+        cooking_soups = [state.get_object(pos) for pos in self.get_cooking_pots(pot_states)]
+        done_soups = [state.get_object(pos) for pos in self.get_ready_pots(pot_states)]
+        non_idle_soup_vals = { soup : min_coeff**2 * max(self.get_recipe_value(state, soup.recipe), 1) for soup in cooking_soups + done_soups }
 
-        potential += len(state.player_objects_by_type['soup']) * potential_values['holding_soup']
+        players_holding_soups = [player for player in state.players if player.has_object() and player.get_object().name == 'soup']
+        players_holding_dishes = [player for player in state.players if player.has_object() and player.get_object().name == 'dish']
+        players_holding_tomatoes = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.TOMATO]
+        players_holding_onions = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.ONION]
+        players_holding_nothing = [player for player in state.players if not player.has_object()]
+
+        for player in players_holding_soups:
+            delivery_dist = mp.min_cost_to_feature(player.pos_and_or, self.terrain_pos_dict['S'])
+            potential += max(gamma**delivery_dist, min_coeff) * max(self.get_recipe_value(state, player.get_object().recipe), 1)
+
+        for player in players_holding_dishes:
+            best_pickup_soup = None
+            best_pickup_value = 0
+            for soup in non_idle_soup_vals:
+                pickup_dist = mp.min_cost_to_feature(player.pos_and_or, [soup.position])
+                is_useful = int(pickup_dist < np.inf)
+                pickup_soup_value = min_coeff * max(self.get_recipe_value(state, soup.recipe), 1)
+                cook_time_remaining = soup.cook_time - soup._cooking_tick
+                discount = max(gamma**max(cook_time_remaining, pickup_dist), min_coeff)
+                pickup_value = discount * pickup_soup_value * is_useful
+                if pickup_dist < np.inf and pickup_value > best_pickup_value:
+                    best_pickup_soup = soup
+                    best_pickup_value = pickup_value
+            
+            if best_pickup_soup:
+                non_idle_soup_vals[best_pickup_soup] = max(non_idle_soup_vals[best_pickup_soup], best_pickup_value)
+
+        for soup in non_idle_soup_vals:
+            potential += non_idle_soup_vals[soup]
+
+        for soup in idle_soups:
+            curr_recipe = Recipe(soup.ingredients)
+            opt_recipe = self.get_optimal_possible_recipe(state, curr_recipe)
+            missing_ingredients = list(opt_recipe.ingredients)
+            for ingredient in soup.ingredients:
+                missing_ingredients.remove(ingredient)
+
+            discount = min_coeff**2
+
+            for ingredient in missing_ingredients:
+                pertinent_players = players_holding_tomatoes if ingredient == Recipe.TOMATO else players_holding_onions
+                dist = np.inf
+                closest_player = None
+                for player in pertinent_players:
+                    curr_dist = mp.min_cost_to_feature(player.pos_and_or, [soup.position])
+                    if curr_dist < dist:
+                        dist = curr_dist
+                        closest_player = player
+                discount *= max(min_coeff, gamma**dist)
+                if closest_player:
+                    pertinent_players.remove(closest_player)
+
+            if missing_ingredients:
+                discount *= gamma
+            else:
+                cook_dist = min([mp.min_cost_to_feature(player.pos_and_or, [soup.position]) for player in players_holding_nothing], default=np.inf)
+                discount *= max(gamma**cook_dist, min_coeff)
+
+            potential += discount * max(self.get_recipe_value(state, opt_recipe), 1)
+
+        for player in players_holding_tomatoes:
+            dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
+            is_useful = int(dist < np.inf)
+            discount = max(min_coeff, gamma**dist) * min_coeff**2 * is_useful
+            potential += discount * potential_values['tomato_value']
+
+        for player in players_holding_onions:
+            dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
+            is_useful = int(dist < np.inf)
+            discount = max(min_coeff, gamma**dist) * min_coeff**2 * is_useful
+            potential += discount * potential_values['onion_value']
+
         return potential
-
 
     ##############
     # DEPRECATED #

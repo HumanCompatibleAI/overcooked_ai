@@ -159,7 +159,6 @@ class OvercookedEnv(object):
                 env_info["shaped_r_by_agent"],
                 action_probs,
                 self.mdp.potential_function(self.state),
-                0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
                 self
             )
         )
@@ -213,6 +212,10 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
+    def potential(self, mlp, state=None, gamma=0.99, max_steps=20):
+        state = state if state else self.state
+        return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma, max_steps=max_steps)
+
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
         The normal timestep info dict will contain infos specifc to each agent's action taken,
@@ -224,8 +227,6 @@ class OvercookedEnv(object):
         # TODO: This can be further simplified by having all the mdp_infos copied over to the env_infos automatically 
         env_info["sparse_r_by_agent"] = mdp_infos["sparse_reward_by_agent"]
         env_info["shaped_r_by_agent"] = mdp_infos["shaped_reward_by_agent"]
-        env_info["phi_s"] = mdp_infos["phi_s"] # previous state
-        env_info["phi_s_prime"] = mdp_infos["phi_s_prime"] # new state
         return env_info
 
     def _add_episode_info(self, env_info):
