@@ -1,7 +1,7 @@
 import itertools, copy
 import numpy as np
 from functools import reduce
-from collections import defaultdict
+from collections import defaultdict, Counter
 from overcooked_ai_py.utils import pos_distance, load_from_json
 from overcooked_ai_py import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -1782,7 +1782,7 @@ class OvercookedGridworld(object):
                         else:
                             state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
                             state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
-                            state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time_remaining)
+                            state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time - obj._cooking_tick)
                             if obj.is_ready:
                                 state_mask_dict["soup_done"] += make_layer(obj.position, 1)
                     else:
@@ -1982,8 +1982,8 @@ class OvercookedGridworld(object):
         """
         # Hard-coded constants needed for potential function
         potential_values = {
-            'tomato_value' : Recipe._tomato_value if hasattr(Recipe, '_tomato_value') else 1,
-            'onion_value' : Recipe._onion_value if hasattr(Recipe, '_onion_value') else 1
+            'tomato_value' : Recipe._tomato_value if hasattr(Recipe, '_tomato_value') and Recipe._tomato_value else 1,
+            'onion_value' : Recipe._onion_value if hasattr(Recipe, '_onion_value') and Recipe._onion_value else 1
         }
         pot_states = self.get_pot_states(state)
         potential = 0
