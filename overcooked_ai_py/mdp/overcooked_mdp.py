@@ -1,7 +1,7 @@
 import itertools, copy
 import numpy as np
 from functools import reduce
-from collections import defaultdict
+from collections import defaultdict, Counter
 from overcooked_ai_py.utils import pos_distance, load_from_json
 from overcooked_ai_py import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -294,6 +294,10 @@ class SoupState(ObjectState):
     @property
     def cook_time(self):
         return self.recipe.time
+
+    @property
+    def cook_time_remaining(self):
+        return max(0, self.cook_time - self._cooking_tick)
 
     @property
     def is_ready(self):
@@ -1551,7 +1555,7 @@ class OvercookedGridworld(object):
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [20])
 
-    def lossless_state_encoding(self, overcooked_state, horizon, debug=False):
+    def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
