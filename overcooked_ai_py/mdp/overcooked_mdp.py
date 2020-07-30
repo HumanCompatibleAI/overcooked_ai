@@ -1551,13 +1551,15 @@ class OvercookedGridworld(object):
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [20])
 
-    def lossless_state_encoding(self, overcooked_state, debug=False):
+    def lossless_state_encoding(self, overcooked_state, horizon, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
-        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "dish_disp_loc", "serve_loc"]
-        variable_map_features = ["onions_in_pot", "onions_cook_time", "onion_soup_loc", "dishes", "onions"]
-
+        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "tomato_disp_loc",
+                             "dish_disp_loc", "serve_loc"]
+        variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
+                                 "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
+        urgency_features = ["urgency"]
         all_objects = overcooked_state.all_objects_list
 
         def make_layer(position, value):
@@ -1572,10 +1574,19 @@ class OvercookedGridworld(object):
                         ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
                         for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.ALL_DIRECTIONS)]
 
-            LAYERS = ordered_player_features + base_map_features + variable_map_features
+            # LAYERS = ordered_player_features + base_map_features + variable_map_features
+            LAYERS = ordered_player_features + base_map_features + variable_map_features + urgency_features
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
+            if horizon - overcooked_state.timestep < 40:
+                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
+                state_mask_dict["urgency"] = np.ones(self.shape)
+
+
+            # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
+            # state_mask_dict["urgency"] = np.ones(self.shape) * 40
+
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
 
@@ -1584,6 +1595,9 @@ class OvercookedGridworld(object):
 
             for loc in self.get_onion_dispenser_locations():
                 state_mask_dict["onion_disp_loc"][loc] = 1
+
+            for loc in self.get_tomato_dispenser_locations():
+                state_mask_dict["tomato_disp_loc"][loc] = 1
 
             for loc in self.get_dish_dispenser_locations():
                 state_mask_dict["dish_disp_loc"][loc] = 1
@@ -1600,24 +1614,43 @@ class OvercookedGridworld(object):
             # OBJECT & STATE LAYERS
             for obj in all_objects:
                 if obj.name == "soup":
-                    if Recipe.ONION in obj.ingredients:
-                        if obj.position in self.get_pot_locations():
-                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, len(obj.ingredients))
-                            state_mask_dict["onions_cook_time"] += make_layer(obj.position, max(0, obj._cooking_tick))
+                    # removed the next line because onion doesn't have to be in all the soups?
+                    # if Recipe.ONION in obj.ingredients:
+                    # get the ingredients into a {object: number} dictionary
+                    ingredients_dict = Counter(obj.ingredients)
+                    # assert "onion" in ingredients_dict.keys()
+                    if obj.position in self.get_pot_locations():
+                        if obj.is_idle:
+                            # onions_in_pot and tomatoes_in_pot are used when the soup is idling, and ingredients could still be added
+                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, ingredients_dict["onion"])
+                            state_mask_dict["tomatoes_in_pot"] += make_layer(obj.position, ingredients_dict["tomato"])
                         else:
-                            # If player soup is not in a pot, put it in separate mask
-                            state_mask_dict["onion_soup_loc"] += make_layer(obj.position, 1)
+                            state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                            state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time_remaining)
+                            if obj.is_ready:
+                                state_mask_dict["soup_done"] += make_layer(obj.position, 1)
                     else:
-                        raise ValueError("Unrecognized soup")
+                        # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
+                        state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
+                        state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                        state_mask_dict["soup_done"] += make_layer(obj.position, 1)
+                    # else:
+                    #     raise ValueError("Unrecognized soup")
 
                 elif obj.name == "dish":
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
                 elif obj.name == "onion":
                     state_mask_dict["onions"] += make_layer(obj.position, 1)
+                elif obj.name == "tomato":
+                    state_mask_dict["tomatoes"] += make_layer(obj.position, 1)
                 else:
                     raise ValueError("Unrecognized object")
 
             if debug:
+                print("terrain----")
+                print(np.array(self.terrain_mtx))
+                print("-----------")
                 print(len(LAYERS))
                 print(len(state_mask_dict))
                 for k, v in state_mask_dict.items():
