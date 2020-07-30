@@ -774,11 +774,8 @@ class OvercookedGridworld(object):
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
-<<<<<<< HEAD
         self._optimal_possible_recipe = {}
-=======
         self.start_state = start_state
->>>>>>> origin/encoding
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
 
     @staticmethod
@@ -1709,7 +1706,7 @@ class OvercookedGridworld(object):
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [20])
 
-    def lossless_state_encoding(self, overcooked_state, horizon, debug=False):
+    def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
