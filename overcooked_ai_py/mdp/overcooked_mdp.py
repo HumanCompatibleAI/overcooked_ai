@@ -1916,90 +1916,150 @@ class OvercookedGridworld(object):
             'onion_value' : Recipe._onion_value if hasattr(Recipe, '_onion_value') else 1
         }
         pot_states = self.get_pot_states(state)
-        min_coeff = gamma**max_steps
         potential = 0
+
+        # Minimal timestep discount that can be applied at each high level "step"
+        min_coeff = gamma**max_steps
 
         # Get list of all soups that have >0 ingredients, sorted based on value of best possible recipe 
         idle_soups = [state.get_object(pos) for pos in self.get_full_but_not_cooking_pots(pot_states)]
         idle_soups.extend([state.get_object(pos) for pos in self.get_partially_full_pots(pot_states)])
         idle_soups = sorted(idle_soups, key=lambda soup : self.get_recipe_value(state, self.get_optimal_possible_recipe(state, Recipe(soup.ingredients))), reverse=True)
 
+        # Build mapping of non_idle soups to the potential value each one will contribue
+        # Default potential value is maximimal discount for last two steps applied to optimal recipe value
         cooking_soups = [state.get_object(pos) for pos in self.get_cooking_pots(pot_states)]
         done_soups = [state.get_object(pos) for pos in self.get_ready_pots(pot_states)]
         non_idle_soup_vals = { soup : min_coeff**2 * max(self.get_recipe_value(state, soup.recipe), 1) for soup in cooking_soups + done_soups }
 
+        # Get descriptive list of players based on different attributes
+        # Note that these lists are mutually exclusive
         players_holding_soups = [player for player in state.players if player.has_object() and player.get_object().name == 'soup']
         players_holding_dishes = [player for player in state.players if player.has_object() and player.get_object().name == 'dish']
         players_holding_tomatoes = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.TOMATO]
         players_holding_onions = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.ONION]
         players_holding_nothing = [player for player in state.players if not player.has_object()]
 
+        ### Step 4 potential ###
+
+        # Add potential for each player with a soup
         for player in players_holding_soups:
+            # Even if delivery_dist is infinite, we still award potential (as an agent might need to pass the soup to other player first)
             delivery_dist = mp.min_cost_to_feature(player.pos_and_or, self.terrain_pos_dict['S'])
             potential += max(gamma**delivery_dist, min_coeff) * max(self.get_recipe_value(state, player.get_object().recipe), 1)
 
+
+
+        ### Step 3 potential ###
+
+        # Reweight each non-idle soup value based on agents with dishes performing greedily-optimally as outlined in docstring
         for player in players_holding_dishes:
             best_pickup_soup = None
             best_pickup_value = 0
+
+            # find best soup to pick up with dish agent currently has
             for soup in non_idle_soup_vals:
+                # How far away the soup is (inf if not-reachable)
                 pickup_dist = mp.min_cost_to_feature(player.pos_and_or, [soup.position])
+
+                # mask to award zero score if not reachable
+                # Note: this means that potentially "useful" dish pickups (where agent passes dish to other agent
+                # that can reach the soup) do not recive a potential bump
                 is_useful = int(pickup_dist < np.inf)
+
+                # Always assume worst-case discounting for step 4, and bump zero-valued soups to 1 as mentioned in docstring
                 pickup_soup_value = min_coeff * max(self.get_recipe_value(state, soup.recipe), 1)
                 cook_time_remaining = soup.cook_time - soup._cooking_tick
                 discount = max(gamma**max(cook_time_remaining, pickup_dist), min_coeff)
+
+                # Final discount-adjusted value for this player pursuing this soup
                 pickup_value = discount * pickup_soup_value * is_useful
+
+                # Update best soup found for this player
                 if pickup_dist < np.inf and pickup_value > best_pickup_value:
                     best_pickup_soup = soup
                     best_pickup_value = pickup_value
             
+            # Set best-case score for this soup. Can only improve upon previous players policies
+            # Note cooperative policies between players not considered
             if best_pickup_soup:
                 non_idle_soup_vals[best_pickup_soup] = max(non_idle_soup_vals[best_pickup_soup], best_pickup_value)
 
+        # Apply potential for each idle soup as calculated above
         for soup in non_idle_soup_vals:
             potential += non_idle_soup_vals[soup]
 
+
+
+        ### Step 2 potential ###
+
+        # Iterate over idle soups in decreasing order of value so we greedily prioritize higher valued soups
         for soup in idle_soups:
+            # Calculate optimal recipe
             curr_recipe = Recipe(soup.ingredients)
             opt_recipe = self.get_optimal_possible_recipe(state, curr_recipe)
+
+            # Calculate missing ingredients needed to complete optimal recipe
             missing_ingredients = list(opt_recipe.ingredients)
             for ingredient in soup.ingredients:
                 missing_ingredients.remove(ingredient)
 
+            # Base discount for steps 3-4
             discount = min_coeff**2
 
+            # Add a multiplicative discount for each needed ingredient (this has the effect of giving more award to soups
+            # that are closer to being completed)
             for ingredient in missing_ingredients:
+                # Players who might have an ingredient we need
                 pertinent_players = players_holding_tomatoes if ingredient == Recipe.TOMATO else players_holding_onions
                 dist = np.inf
                 closest_player = None
+
+                # Find closest player with ingredient we need
                 for player in pertinent_players:
                     curr_dist = mp.min_cost_to_feature(player.pos_and_or, [soup.position])
                     if curr_dist < dist:
                         dist = curr_dist
                         closest_player = player
+
+                # Update discount to account for adding this missing ingredient (defaults to min_coeff if no pertinent players exist)
                 discount *= max(min_coeff, gamma**dist)
+
+                # Cross off this player's ingreident contribution so it can't be double-counted
                 if closest_player:
                     pertinent_players.remove(closest_player)
 
+            # Update discount to account for time it takes to start the soup cooking once last ingredient is added
             if missing_ingredients:
+                # We assume it only takes one timestep if there are missing ingredients since the agent delivering the last ingredient
+                # will be at the pot already
                 discount *= gamma
             else:
+                # Otherwise, we assume that every player holding nothing will make a beeline to this soup since it's already optimal
                 cook_dist = min([mp.min_cost_to_feature(player.pos_and_or, [soup.position]) for player in players_holding_nothing], default=np.inf)
                 discount *= max(gamma**cook_dist, min_coeff)
 
             potential += discount * max(self.get_recipe_value(state, opt_recipe), 1)
 
+
+        ### Step 1 Potential ###
+
+        # Add potential for each tomato that is left over after using all others to complete optimal recipes
         for player in players_holding_tomatoes:
+            # will be inf if there exists no empty pot that is reachable
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
             is_useful = int(dist < np.inf)
             discount = max(min_coeff, gamma**dist) * min_coeff**2 * is_useful
             potential += discount * potential_values['tomato_value']
 
+        # Add potential for each onion that is remaining after using others to complete optimal recipes if possible
         for player in players_holding_onions:
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
             is_useful = int(dist < np.inf)
             discount = max(min_coeff, gamma**dist) * min_coeff**2 * is_useful
             potential += discount * potential_values['onion_value']
 
+        # At last
         return potential
 
     ##############

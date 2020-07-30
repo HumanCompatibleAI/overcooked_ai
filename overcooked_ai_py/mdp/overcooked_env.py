@@ -152,13 +152,12 @@ class OvercookedEnv(object):
         # TODO: turn this into a "formatting action probs" function and add action symbols too
         action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {}\n{}\n".format(
                 self.state.timestep,
                 tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                 r_t,
                 env_info["shaped_r_by_agent"],
                 action_probs,
-                self.mdp.potential_function(self.state),
                 self
             )
         )
@@ -213,6 +212,10 @@ class OvercookedEnv(object):
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
     def potential(self, mlp, state=None, gamma=0.99, max_steps=20):
+        """
+        Return the potential of the environment's current state, if no state is provided
+        Otherwise return the potential of `state`
+        """
         state = state if state else self.state
         return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma, max_steps=max_steps)
 
