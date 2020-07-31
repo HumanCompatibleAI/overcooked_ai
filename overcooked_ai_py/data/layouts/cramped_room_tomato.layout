@@ -3,13 +3,17 @@
                 O  2T
                 X1  X
                 XDXSX""",
-    "start_bonus_orders": [],
+    "start_bonus_orders": [
+        { "ingredients" : ["tomato", "onion"]}
+    ],
     "start_all_orders" : [
         { "ingredients" : ["onion", "onion", "onion"]},
         { "ingredients" : ["tomato", "tomato", "tomato"]},
         { "ingredients" : ["tomato", "onion"] }
     ],
-    "recipe_values" : [10, 20, 15],
-    "recipe_times" : [20, 15, 10],
+    "tomato_value" : 10,
+    "onion_value" : 15,
+    "tomato_time" : 10,
+    "onion_time" :10,
     "rew_shaping_params": None
 }
