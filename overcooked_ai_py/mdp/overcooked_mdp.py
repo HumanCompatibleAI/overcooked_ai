@@ -1,8 +1,7 @@
 import itertools, copy
 import numpy as np
-from collections import Counter
 from functools import reduce
-from collections import defaultdict
+from collections import defaultdict, Counter
 from overcooked_ai_py.utils import pos_distance, load_from_json
 from overcooked_ai_py import read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -1569,7 +1568,7 @@ class OvercookedGridworld(object):
                              "dish_disp_loc", "serve_loc"]
         variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
                                  "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
-        # urgency_features = ["urgency"]
+        urgency_features = ["urgency"]
         all_objects = overcooked_state.all_objects_list
 
         def make_layer(position, value):
@@ -1584,11 +1583,16 @@ class OvercookedGridworld(object):
                         ["player_{}_orientation_{}".format(i, Direction.DIRECTION_TO_INDEX[d])
                         for i, d in itertools.product([primary_agent_idx, other_agent_idx], Direction.ALL_DIRECTIONS)]
 
-            LAYERS = ordered_player_features + base_map_features + variable_map_features
-            # LAYERS = ordered_player_features + base_map_features + variable_map_features + urgency_features
+            # LAYERS = ordered_player_features + base_map_features + variable_map_features
+            LAYERS = ordered_player_features + base_map_features + variable_map_features + urgency_features
             state_mask_dict = {k:np.zeros(self.shape) for k in LAYERS}
 
             # MAP LAYERS
+            if horizon - overcooked_state.timestep < 40:
+                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
+                state_mask_dict["urgency"] = np.ones(self.shape)
+
+
             # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
             # state_mask_dict["urgency"] = np.ones(self.shape) * 40
 
