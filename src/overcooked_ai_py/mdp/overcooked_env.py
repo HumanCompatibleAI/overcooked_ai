@@ -339,7 +339,7 @@ class OvercookedEnv(object):
         done = False
 
         if display:
-            fname = 'results_og_client_temp/roll_out_' + str(time.time()) + '.txt'
+            fname = 'results_client_temp/roll_out_' + str(time.time()) + '.txt'
             f = open(fname, 'w+')
             print(self, file=f)
             f.close()

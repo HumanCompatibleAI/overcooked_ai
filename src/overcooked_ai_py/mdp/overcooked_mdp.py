@@ -1,9 +1,13 @@
 import itertools, copy
 import numpy as np
-from collections import Counter
 from functools import reduce
 from collections import defaultdict, Counter
+<<<<<<< HEAD:src/overcooked_ai_py/mdp/overcooked_mdp.py
 from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict
+=======
+from overcooked_ai_py.utils import pos_distance, load_from_json
+from overcooked_ai_py import read_layout_dict
+>>>>>>> wrapped up self-play training, starting to work on planners:overcooked_ai_py/mdp/overcooked_mdp.py
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
