@@ -11,7 +11,9 @@
         { "ingredients" : ["onion", "onion", "onion"]},
         { "ingredients" : ["tomato", "tomato", "tomato"]}
     ],
-    "recipe_values" : [20, 10],
-    "recipe_times" : [20, 10],
+    "tomato_value" : 10,
+    "onion_value" : 20,
+    "tomato_time" : 10,
+    "onion_time" :10,
     "rew_shaping_params": None
 }
