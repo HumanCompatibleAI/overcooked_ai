@@ -1,18 +1,22 @@
 {
-    "grid":  """XTPXXXXSX
+    "grid":  """XPTXXXXSX
                 D      2X
                 XXXX XXXX
                 D      1X
-                XOPXXXXSX""",
+                XPOXXXXSX""",
     "start_bonus_orders": [
         { "ingredients" : ["tomato", "onion"]},
+        { "ingredients" : ["tomato"]},
+        { "ingredients" : ["tomato", "tomato"]}
     ],
     "start_all_orders" : [
+        { "ingredients" : ["tomato"]},
         { "ingredients" : ["onion", "onion", "onion"]},
         { "ingredients" : ["tomato", "tomato", "tomato"]},
         { "ingredients" : ["tomato", "onion"] }
     ],
-    "recipe_values" : [20, 20, 20],
-    "recipe_times" : [20, 20, 20],
-    "rew_shaping_params": None
+    "onion_value" : 21,
+    "tomato_value" : 13,
+    "onion_time" : 15,
+    "tomato_time" : 7
 }
