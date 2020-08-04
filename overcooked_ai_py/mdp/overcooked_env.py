@@ -152,14 +152,12 @@ class OvercookedEnv(object):
         # TODO: turn this into a "formatting action probs" function and add action symbols too
         action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {}\n{}\n".format(
                 self.state.timestep,
                 tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                 r_t,
                 env_info["shaped_r_by_agent"],
                 action_probs,
-                self.mdp.potential_function(self.state),
-                0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
                 self
             )
         )
@@ -213,6 +211,14 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
+    def potential(self, mlp, state=None, gamma=0.99, max_steps=20):
+        """
+        Return the potential of the environment's current state, if no state is provided
+        Otherwise return the potential of `state`
+        """
+        state = state if state else self.state
+        return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma, max_steps=max_steps)
+
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
         The normal timestep info dict will contain infos specifc to each agent's action taken,
@@ -224,8 +230,6 @@ class OvercookedEnv(object):
         # TODO: This can be further simplified by having all the mdp_infos copied over to the env_infos automatically 
         env_info["sparse_r_by_agent"] = mdp_infos["sparse_reward_by_agent"]
         env_info["shaped_r_by_agent"] = mdp_infos["shaped_reward_by_agent"]
-        env_info["phi_s"] = mdp_infos["phi_s"] # previous state
-        env_info["phi_s_prime"] = mdp_infos["phi_s_prime"] # new state
         return env_info
 
     def _add_episode_info(self, env_info):

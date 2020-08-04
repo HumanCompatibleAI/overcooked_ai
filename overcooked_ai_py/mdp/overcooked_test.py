@@ -7,7 +7,7 @@ from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAM
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS, MotionPlanner
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir
 
 
@@ -337,6 +337,304 @@ class TestGridworld(unittest.TestCase):
             OvercookedGridworld.from_layout_name("multiplayer_schelling")
         except AssertionError as e:
             print("Loading > 2 player map failed with error:", e)
+
+    def test_potential_function(self):
+        self.base_mdp_2 = OvercookedGridworld.from_layout_name('mdp_test_tomato')
+        mp = MotionPlanner(self.base_mdp_2)
+        state = self.base_mdp_2.get_standard_start_state()
+        val0 = self.base_mdp_2.potential_function(state, mp)
+        self.assertEqual(val0, 0, "Start potential should be zero")
+
+        # Pick up onion
+        print("pick up onion")
+        print(self.base_mdp_2.state_string(state))
+        print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        actions = [Direction.EAST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val1 = self.base_mdp_2.potential_function(state, mp)
+        
+
+        # Pick up tomato
+        print("pick up tomtato")
+        actions = [Direction.WEST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val2 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val0, val1, "Picking up onion should increase potential")
+        self.assertLess(val1, val2, "Picking up tomato should increase potential")
+
+        # Pot tomato
+        print("pot tomato")
+        actions = [Direction.EAST, Direction.NORTH, Action.INTERACT, Direction.WEST]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val3 = self.base_mdp_2.potential_function(state, mp)
+        
+        # Pot onion
+        print("pot onion")
+        actions = [Direction.WEST, Direction.NORTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val4 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val2, val3, "Potting tomato should increase potential")
+        self.assertLess(val3, val4, "Potting onion should increase potential")
+
+        ## Repeat on second pot ##
+
+        # Pick up onion
+        print("pick up onion")
+        state, _ = self.base_mdp_2.get_state_transition(state, [Action.INTERACT, Action.STAY])
+        val5 = self.base_mdp_2.potential_function(state, mp)
+        print(self.base_mdp_2.state_string(state))
+        print("potential: ", self.base_mdp_2.potential_function(state, mp))
+
+        # Pick up tomato
+        print("pick up tomato")
+        actions = [Direction.SOUTH, Direction.EAST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val6 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val4, val5, "Picking up onion should increase potential")
+        self.assertLess(val5, val6, "Picking up tomato should increase potential")
+
+        # Pot onion
+        print("pot onion")
+        actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH, Action.INTERACT, Direction.WEST]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val7 = self.base_mdp_2.potential_function(state, mp)
+
+        # Pot tomato
+        print("pot tomato")
+        actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val8 = self.base_mdp_2.potential_function(state, mp)
+
+        
+
+        self.assertLess(val6, val7, "Potting onion should increase potential")
+        self.assertLess(val7, val8, "Potting tomato should increase potential")
+
+        ## Useless pickups ##
+        
+        # pickup tomato
+        print("pickup tomato")
+        actions = [Action.INTERACT, Direction.NORTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val9 = self.base_mdp_2.potential_function(state, mp)
+
+        # pickup tomato
+        print("pickup tomato")
+        actions = [Direction.EAST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val10 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLessEqual(val9, val8, "Extraneous pickup should not increase potential")
+        self.assertLessEqual(val10, val8, "Extraneous pickup should not increase potential")
+
+        ## Catastrophic soup failure ##
+        
+        # pot tomato
+        print("pot catastrophic tomato")
+        actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val11 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val11, val10, "Catastrophic potting should decrease potential")
+
+        ## Bonus soup creation
+
+        # pick up onion
+        print("pick up onion")
+        actions = [Direction.NORTH, Action.INTERACT, Direction.WEST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val12 = self.base_mdp_2.potential_function(state, mp)
+
+        # pot onion
+        print("pot onion")
+        actions = [Direction.EAST, Direction.NORTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val13 = self.base_mdp_2.potential_function(state, mp)
+
+        # Cook soup
+        print("cook soup")
+        actions = [Action.INTERACT, Direction.WEST]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val14 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val11, val12, "Useful onion pickup should increase potential")
+        self.assertLess(val12, val13, "Potting useful onion should increase potential")
+        self.assertLess(val13, val14, "Cooking optimal soup should increase potential")
+
+        ## Soup pickup ##
+
+        # Pick up dish
+        print("pick up dish")
+        actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val15 = self.base_mdp_2.potential_function(state, mp)
+
+        # Move towards pot
+        print("move towards pot")
+        actions = [Direction.EAST, Direction.NORTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val16 = self.base_mdp_2.potential_function(state, mp)
+
+        # Pickup soup
+        print("pickup soup")
+        state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, Action.INTERACT])
+        print(self.base_mdp_2.state_string(state))
+        print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val17 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val14, val15, "Useful dish pickups should increase potential")
+        self.assertLess(val15, val16, "Moving towards soup with dish should increase potential")
+        self.assertLess(val16, val17, "Picking up soup should increase potential")
+
+        ## Removing failed soup from pot
+
+        # move towards failed soup
+        print("move torwards failed soup")
+        actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val18 = self.base_mdp_2.potential_function(state, mp)
+
+        # Cook failed soup
+        actions = [Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val19 = self.base_mdp_2.potential_function(state, mp)
+
+        # Pickup dish
+        print("pickup dish")
+        actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val20 = self.base_mdp_2.potential_function(state, mp)
+
+        # Move towards soup
+        print("move towards soup")
+        actions = [Direction.EAST, Direction.SOUTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val21 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val17, val18, "Moving towards failed soup should increase potential")
+        self.assertLess(val18, val19, "Cooking failed soup should increase potential")
+        self.assertLess(val19, val20, "Dish pickup for failed soup is still useful")
+        self.assertLess(val20, val21, "Moving towars pertinant pot with dish should increase potential")
+
+        ## Deliver failed soup ##
+
+        # Pickup failed soup
+        actions = [Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val22 = self.base_mdp_2.potential_function(state, mp)
+
+        # Move towards serving area
+        print("move towards servering area")
+        actions = [Direction.EAST, Direction.SOUTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [action, Action.STAY])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val23 = self.base_mdp_2.potential_function(state, mp)
+
+        # Move away from serving area
+        print("move away from serving area")
+        state, _ = self.base_mdp_2.get_state_transition(state, [Direction.NORTH, Action.STAY])
+        print(self.base_mdp_2.state_string(state))
+        print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val24 = self.base_mdp_2.potential_function(state, mp)
+
+        self.assertLess(val21, val22, "Picking up failed soup should increase potential")
+        self.assertAlmostEqual(val23, val22, delta=0.2, msg="Moving to serve failed soup doesn't change potential much")
+        self.assertAlmostEqual(val23, val24, delta=0.2, msg="Moving away from serving area with failed soup doesn't change much")
+
+        ## Deliver successful soup ##
+
+        # Move towards serving area
+        print("move towards serving area")
+        actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH]
+        for action in actions:
+            state, _ = self.base_mdp_2.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp_2.state_string(state))
+            print("potential: ", self.base_mdp_2.potential_function(state, mp))
+        val25 = self.base_mdp_2.potential_function(state, mp)
+
+        # Deliver soup
+        print("deliver successful soup")
+        state, rewards = self.base_mdp_2.get_state_transition(state, [Action.STAY, Action.INTERACT])
+        print(self.base_mdp_2.state_string(state))
+        print("potential: ", self.base_mdp_2.potential_function(state, mp))
+
+        self.assertLess(val24, val25, "Moving towards serving area with valid soup increases potential")
+        self.assertEqual(sum(rewards['sparse_reward_by_agent']), 50, "Soup was not properly devivered, probably an error with MDP logic")
+
+        # Restore recipe configuration for other mdp
+        OvercookedGridworld.from_layout_name(
+            "mdp_test",
+            **{'cook_time': 5, 'start_order_list': ['onion', 'any']}
+        )
+
+
+
+
 
 def random_joint_action():
     num_actions = len(Action.ALL_ACTIONS)
