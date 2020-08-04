@@ -268,16 +268,11 @@ class AgentEvaluator(object):
         return dict_traj
 
     @staticmethod
-    def get_traj_from_traj_dict(traj_dict):
+    def load_traj_from_json(filename):
+        traj_dict = load_from_json(filename)
         traj_dict["ep_states"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_states"]]
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
-        for key in traj_dict.keys():
-            if key != "metadatas": traj_dict[key] = np.array(traj_dict[key])
         return traj_dict
-
-    @staticmethod
-    def load_traj_from_json(filename):
-        return AgentEvaluator.get_traj_from_traj_dict(load_from_json(filename))
 
     ############################
     # TRAJ MANINPULATION UTILS #
