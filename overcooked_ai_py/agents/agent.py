@@ -395,6 +395,18 @@ class GreedyHumanModel(Agent):
         return actions_and_infos_n
 
     def action(self, state):
+
+        ################
+        player = state.players[self.agent_index]
+        pot_states_dict = self.mlp.mdp.get_pot_states(state)
+        # Press interact if in front of soup that is full but not cooking
+        pos_of_facing_terrain = Action.move_in_direction(player.position, player.orientation)
+        facing_terrain_type = self.mdp.get_terrain_type_at_pos(pos_of_facing_terrain)
+        if facing_terrain_type == "P" and pos_of_facing_terrain in pot_states_dict["3_items"]:
+            # Onions are ready but haven't started cooking yet
+            return Action.INTERACT, {}
+        ################
+
         possible_motion_goals = self.ml_action(state)
 
         # Once we have identified the motion goals for the medium
