@@ -1,8 +1,8 @@
 {
-    "grid":  """SSSSSSSSSSSSSSSSSS
-                STSSSSSS  SSSSSSOS
-                P 1            2 P
-                SSSSSSSSSSSSSSSSSS""",
+    "grid":  """XXXXXSSSXXXXX
+                XXTSSS SSSOXX
+                P 1       2 P
+                XXDSSSSSSSDXX""",
     "start_bonus_orders": [
         { "ingredients" : ["onion", "onion", "tomato"]},
         { "ingredients" : ["tomato", "tomato", "onion"]}
