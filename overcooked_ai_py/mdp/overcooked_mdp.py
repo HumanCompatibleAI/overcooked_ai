@@ -120,7 +120,7 @@ class Recipe:
             num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
             num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
             return self._onion_time * num_onions + self._tomato_time * num_tomatoes
-        return 20
+        return 8
 
     def to_dict(self):
         return { 'ingredients' : self.ingredients }
@@ -407,7 +407,7 @@ class SoupState(ObjectState):
             # Legacy soup representation
             ingredient, num_ingredient, time = obj_dict['state']
             cooking_tick = -1 if time == 0 else time
-            finished = time >= 20
+            finished = time >= 8
             if ingredient == Recipe.TOMATO:
                 return SoupState.get_soup(obj_dict['position'], num_tomatoes=num_ingredient, cooking_tick=cooking_tick, finished=finished)
             else:
