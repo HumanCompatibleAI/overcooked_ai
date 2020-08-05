@@ -384,6 +384,13 @@ class AgentEvaluator(object):
         
     @staticmethod
     def events_visualization(trajs, traj_index=0, ipython=False, chart_settings=None):
+        """
+        Displays chart with visualization of events (when items pickups happened etc.)
+        ipython - chooses between opening chart
+        in default browser or below ipython cell (for ipython=True)
+        chart_settings - json with various chart settings that overwrittes default ones
+        for more info see create_chart_html function with comments aboutr default chart settings
+        """
         events = extract_events(trajs, traj_index)
         html = create_chart_html(events, chart_settings)
         if ipython:
