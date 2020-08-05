@@ -152,12 +152,11 @@ class OvercookedEnv(object):
         # TODO: turn this into a "formatting action probs" function and add action symbols too
         action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
-        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {}\n{}\n".format(
+        print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}".format(
                 self.state.timestep,
                 tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                 r_t,
                 env_info["shaped_r_by_agent"],
-                action_probs,
                 self
             )
         )
