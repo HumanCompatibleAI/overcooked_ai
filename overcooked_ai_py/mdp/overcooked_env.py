@@ -211,13 +211,13 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
-    def potential(self, mlp, state=None, gamma=0.99, max_steps=20):
+    def potential(self, mlp, state=None, gamma=0.99):
         """
         Return the potential of the environment's current state, if no state is provided
         Otherwise return the potential of `state`
         """
         state = state if state else self.state
-        return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma, max_steps=max_steps)
+        return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma)
 
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
