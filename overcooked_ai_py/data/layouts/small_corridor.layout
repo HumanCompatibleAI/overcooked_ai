@@ -4,9 +4,11 @@
                 X  XXXXXXX  X
                 X           X
                 XSXXXXXXXXPPX""",
-    "start_order_list": None,
-    "cook_time": 20,
-    "num_items_for_soup": 3,
-    "delivery_reward": 20,
+    "start_bonus_orders": [],
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+    ],
+    "recipe_values" : [20],
+    "recipe_times" : [20],
     "rew_shaping_params": None
 }
