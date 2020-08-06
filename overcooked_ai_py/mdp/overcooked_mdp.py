@@ -791,7 +791,9 @@ class OvercookedGridworld(object):
         self.order_bonus = order_bonus
         self.start_state = start_state
         self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
-        self.get_optimal_possible_recipe = self.get_optimal_possible_recipe_generator()
+        self._opt_recipe_discount_cache = {}
+        self._opt_recipe_cache = {}
+        self._prev_potential_params = {}
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -1451,43 +1453,35 @@ class OvercookedGridworld(object):
         return best_recipe
 
 
-    def get_optimal_possible_recipe_generator(self):
+    def get_optimal_possible_recipe(self, state, recipe, discounted=False, potential_params={}, return_value=False):
         """
         Return the best possible recipe that can be made starting with ingredients in `recipe`
         Uses self._optimal_possible_recipe as a cache to avoid re-computing. This only works because
         the recipe values are currently static (i.e. bonus_orders doesn't change). Would need to have cache
         flushed if order dynamics are introduced
         """
-        discount_cache = {}
-        non_discount_cache = {}
-        prev_potential_params = {}
-
-        def get_optimal_possible_recipe(state, recipe, discounted=False, potential_params={}, return_value=False):
-            nonlocal discount_cache, non_discount_cache, prev_potential_params
-            cache_valid = not discounted or prev_potential_params == potential_params
-            if not cache_valid:
-                if discounted:
-                    discount_cache = {}
-                else:
-                    non_discount_cache = {}
-
+        cache_valid = not discounted or self._prev_potential_params == potential_params
+        if not cache_valid:
             if discounted:
-                cache = discount_cache
-                prev_potential_params = potential_params
+                self._opt_recipe_discount_cache = {}
             else:
-                cache = non_discount_cache
+                self._opt_recipe_cache = {}
 
-            if recipe not in cache:
-                # Compute best recipe now and store in cache for later use
-                opt_recipe, value = self._get_optimal_possible_recipe(state, recipe, discounted=discounted, potential_params=potential_params, return_value=True)
-                cache[recipe] = (opt_recipe, value)
+        if discounted:
+            cache = self._opt_recipe_discount_cache
+            self._prev_potential_params = potential_params
+        else:
+            cache = self._opt_recipe_cache
 
-            # Return best recipe (and value) from cache
-            if return_value:
-                return cache[recipe]
-            return cache[recipe][0]
+        if recipe not in cache:
+            # Compute best recipe now and store in cache for later use
+            opt_recipe, value = self._get_optimal_possible_recipe(state, recipe, discounted=discounted, potential_params=potential_params, return_value=True)
+            cache[recipe] = (opt_recipe, value)
 
-        return get_optimal_possible_recipe
+        # Return best recipe (and value) from cache
+        if return_value:
+            return cache[recipe]
+        return cache[recipe][0]
         
 
 
