@@ -48,6 +48,9 @@ class Recipe:
     def __eq__(self, other):
         return sorted(self.ingredients) == sorted(other.ingredients)
 
+    def __lt__(self, other):
+        return self.ingredients.__repr__() < other.ingredients.__repr__()
+
     def __repr__(self):
         return self.ingredients.__repr__()
 
@@ -733,7 +736,7 @@ class OvercookedGridworld(object):
         One can overwrite the default mdp configuration using partial_mdp_config.
         """
         params_to_overwrite = params_to_overwrite.copy()
-        print("layout name", layout_name)
+        # print("layout name", layout_name)
         base_layout_params = read_layout_dict(layout_name)
 
         grid = base_layout_params['grid']
@@ -900,7 +903,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action):
+    def get_state_transition(self, state, joint_action, ignore_info=False):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -911,7 +914,6 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-        phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -935,14 +937,18 @@ class OvercookedGridworld(object):
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
 
-        phi_s_prime = self.potential_function(new_state)
-        infos = {
-            "event_infos": events_infos,
-            "sparse_reward_by_agent": sparse_reward_by_agent,
-            "shaped_reward_by_agent": shaped_reward_by_agent,
-            "phi_s": phi_s,
-            "phi_s_prime": phi_s_prime
-        }
+        if not ignore_info:
+            phi_s = self.potential_function(state)
+            phi_s_prime = self.potential_function(new_state)
+            infos = {
+                "event_infos": events_infos,
+                "sparse_reward_by_agent": sparse_reward_by_agent,
+                "shaped_reward_by_agent": shaped_reward_by_agent,
+                "phi_s": phi_s,
+                "phi_s_prime": phi_s_prime
+            }
+        else:
+            infos = {}
         return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
@@ -1055,6 +1061,20 @@ class OvercookedGridworld(object):
 
         return sparse_reward, shaped_reward
 
+    def get_recipe_value(self, state, recipe):
+        """
+        Return the reward the player should receive for delivering this recipe
+        The player receives 0 if recipe not in all_orders, receives base value * order_bonus
+        if recipe is in bonus orders, and receives base value otherwise
+        """
+        if not recipe in state.all_orders:
+            return 0
+
+        if not recipe in state.bonus_orders:
+            return recipe.value
+
+        return self.order_bonus * recipe.value
+
     def deliver_soup(self, state, player, soup):
         """
         Deliver the soup, and get reward if there is no order list
@@ -1064,13 +1084,7 @@ class OvercookedGridworld(object):
         assert soup.is_ready, "Tried to deliever soup that isn't ready"
         player.remove_object()
 
-        if not soup.recipe in state.all_orders:
-            return 0
-
-        if not soup.recipe in state.bonus_orders:
-            return soup.value
-        print("qqqqq", soup.ingredients, self.order_bonus * soup.value)
-        return self.order_bonus * soup.value
+        return self.get_recipe_value(state, soup.recipe)
 
 
     def resolve_movement(self, state, joint_action):
@@ -1201,6 +1215,12 @@ class OvercookedGridworld(object):
     @property
     def num_pots(self):
         return len(self.get_pot_locations())
+
+    def max_recipe_value(self, state):
+        max_reg_order = max([self.get_recipe_value(state, reg_r) for reg_r in state.all_orders])
+        max_bonus_order = 0 if len(state.bonus_orders) == 0 \
+            else self.order_bonus * max([self.get_recipe_value(state, bonus_r) for bonus_r in state.bonus_orders])
+        return max(max_reg_order, max_bonus_order)
 
     def get_pot_states(self, state):
         """Returns dict with structure:
@@ -1788,7 +1808,7 @@ class OvercookedGridworld(object):
     def walk_distance(self, start_loc, end_loc):
         start_loc_t = (start_loc[1], start_loc[0])
         end_loc_t = (end_loc[1], end_loc[0])
-        return shortest_walk_dist(self.walkgraph, start_loc_t, end_loc_t, self.terrain_mtx, True)
+        return shortest_walk_dist(self.walkgraph, start_loc_t, end_loc_t, self.terrain_mtx, False)
 
     def get_max_ingredient_dist(self):
         # maximum distance for each of the available ingredients from its dispenser to the pot
@@ -1816,7 +1836,7 @@ class OvercookedGridworld(object):
         serve_poss = self.get_serving_locations()
         return max(self.walk_distance(p, s) for p, s in itertools.product(pot_poss, serve_poss))
 
-    def soup_score(self, soup):
+    def soup_score(self, state, soup):
         # give soup a score.
         s_ct = Counter(soup.ingredients)
         res = 0
@@ -1835,8 +1855,9 @@ class OvercookedGridworld(object):
                         res += self.max_ingredient_dist[ing]
                     break
         else:
-            if s_ct in self.all_orders_ct:
-                res = soup.value - (soup.value/20) * soup.cook_time_remaining/soup.cook_time
+            soup_value = self.get_recipe_value(state, soup.recipe)
+            if soup_value > 0:
+                res = soup_value - (soup_value/20) * soup.cook_time_remaining/soup.cook_time
             else:
                 res = - 1 * soup.cook_time_remaining/soup.cook_time
         return res
@@ -1892,7 +1913,7 @@ class OvercookedGridworld(object):
 
         # second, give potential to the soup in the pot, using soup_score function
         for soup_i in soup_objects_in_pots_with_items:
-            potential_dict["soup_in_pot"] = self.soup_score(soup_i) * potential_values['soup_in_pot']
+            potential_dict["soup_in_pot"] = self.soup_score(state, soup_i) * potential_values['soup_in_pot']
 
         # thirdly, give potential to the dish moving when there is a cooking or ready pot
         cooking_or_ready_pots = self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states)
@@ -1901,7 +1922,7 @@ class OvercookedGridworld(object):
                 soup_in_pot = state.get_object(p)
                 # we will weigh the dish movement by the value of the soup inside the pot,
                 # to make sure reward values are consistent
-                soup_weight = self.soup_score(soup_in_pot) / 20.0
+                soup_weight = self.soup_score(state, soup_in_pot) / 20.0
                 min_dist = min([self.walk_distance(dish_player.position, p) for dish_player in
                                 state.player_objects_by_type['dish']])
                 progress = self.max_dish_dist - min_dist
@@ -1910,9 +1931,9 @@ class OvercookedGridworld(object):
         # lastly, give potential to the soup moving towards a serving location
         for soup_player in state.player_objects_by_type['soup']:
             # the backwards cost of the soup
-            soup_in_pot_value = self.soup_score(soup_player) * potential_values['soup_in_pot']
+            soup_in_pot_value = self.soup_score(state, soup_player) * potential_values['soup_in_pot']
             # the backwards cost of the movement of soup
-            soup_weight = self.soup_score(soup_player) / 20.0
+            soup_weight = self.soup_score(state, soup_player) / 20.0
             dish_mov_value = soup_weight * self.max_dish_dist * potential_values['player_mov_dish']
             soup_player_pos = soup_player.position
             min_dist = min([self.walk_distance(soup_player_pos, s) for s in self.get_serving_locations()])
