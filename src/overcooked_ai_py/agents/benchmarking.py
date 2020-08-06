@@ -5,7 +5,7 @@ from IPython.display import display
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.planning.planners import MediumLevelPlanner
@@ -42,37 +42,38 @@ class AgentEvaluator(object):
 
         self.force_compute = force_compute
 
-    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
+    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, regen_mdp=True):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, regen_mdp=regen_mdp)
 
-    def evaluate_human_model_pair(self, num_games=1, display=False):
-        a0 = GreedyHumanModel(self.mlp)
-        a1 = GreedyHumanModel(self.mlp)
+    def evaluate_human_model_pair(self, num_games=1, display=False, regen_mdp=True):
+        a0 = GreedyHumanModel(self.env.mlp)
+        a1 = GreedyHumanModel(self.env.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, regen_mdp=regen_mdp)
 
-    def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
-        a0 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
-        a1 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
-        a0.mlp.env = self.env
-        a1.mlp.env = self.env
-        agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+    # Depreciated. Need to amend Heuristic before reactivating CoupledPlanningAgent:
+    # def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
+    #     a0 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
+    #     a1 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
+    #     a0.mlp.env = self.env
+    #     a1.mlp.env = self.env
+    #     agent_pair = AgentPair(a0, a1)
+    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+    #
+    # def evaluate_one_optimal_one_random(self, num_games, display=True):
+    #     a0 = CoupledPlanningAgent(self.env.mlp)
+    #     a1 = RandomAgent()
+    #     agent_pair = AgentPair(a0, a1)
+    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+    #
+    # def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
+    #     h = GreedyHumanModel(self.env.mlp)
+    #     r = CoupledPlanningAgent(self.env.mlp)
+    #     agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
+    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_one_optimal_one_random(self, num_games, display=True):
-        a0 = CoupledPlanningAgent(self.mlp)
-        a1 = RandomAgent()
-        agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-
-    def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
-        h = GreedyHumanModel(self.mlp)
-        r = CoupledPlanningAgent(self.mlp)
-        agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True, regen_mdp=True):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
@@ -81,7 +82,7 @@ class AgentEvaluator(object):
         horizon_env = self.env.copy()
         horizon_env.horizon = self.env.horizon if game_length is None else game_length
         horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
-        horizon_env.reset()
+        horizon_env.reset(regen_mdp)
         return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):

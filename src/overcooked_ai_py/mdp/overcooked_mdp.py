@@ -856,7 +856,7 @@ class OvercookedGridworld(object):
         One can overwrite the default mdp configuration using partial_mdp_config.
         """
         params_to_overwrite = params_to_overwrite.copy()
-        print("layout name", layout_name)
+        # print("layout name", layout_name)
         base_layout_params = read_layout_dict(layout_name)
 
         grid = base_layout_params['grid']
@@ -1032,7 +1032,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action):
+    def get_state_transition(self, state, joint_action, ignore_info=False):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -1356,6 +1356,12 @@ class OvercookedGridworld(object):
     @property
     def num_pots(self):
         return len(self.get_pot_locations())
+
+    def max_recipe_value(self, state):
+        max_reg_order = max([self.get_recipe_value(state, reg_r) for reg_r in state.all_orders])
+        max_bonus_order = 0 if len(state.bonus_orders) == 0 \
+            else self.order_bonus * max([self.get_recipe_value(state, bonus_r) for bonus_r in state.bonus_orders])
+        return max(max_reg_order, max_bonus_order)
 
     def get_pot_states(self, state):
         """Returns dict with structure:
