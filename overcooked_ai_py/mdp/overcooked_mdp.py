@@ -319,6 +319,10 @@ class SoupState(ObjectState):
         return self.recipe.time
 
     @property
+    def cook_time_remaining(self):
+        return max(0, self.cook_time - self._cooking_tick)
+
+    @property
     def is_ready(self):
         if self.is_idle:
             return False
