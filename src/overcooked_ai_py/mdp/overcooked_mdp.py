@@ -1810,6 +1810,7 @@ class OvercookedGridworld(object):
                     else:
                         grid_string_add += str(player_idx_lst[0])
                 else:
+                    grid_string_add += element
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
@@ -1821,8 +1822,7 @@ class OvercookedGridworld(object):
                         soup = state.get_object((x, y))
                         # display soup
                         grid_string_add += soup.display_string()
-                    else:
-                        grid_string_add += element + " "
+
                 grid_string += grid_string_add
                 grid_string += "".join([" "] * (7 - len(grid_string_add)))
                 grid_string += " "
