@@ -343,7 +343,6 @@ class TestGridworld(unittest.TestCase):
         mp = MotionPlanner(self.base_mdp_2)
         state = self.base_mdp_2.get_standard_start_state()
         val0 = self.base_mdp_2.potential_function(state, mp)
-        self.assertEqual(val0, 0, "Start potential should be zero")
 
         # Pick up onion
         print("pick up onion")
