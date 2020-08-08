@@ -22,11 +22,12 @@
     "babel-preset-env": "^1.7.0",
     "babelify": "^8.0.0",
     "canvas": "^2.5.0",
-    "jest": "^23.6.0",
+    "dot-prop": ">=5.1.1",
+    "jest": "^26.2.2",
     "jest-canvas-mock": "^2.1.0",
     "jest-expect-message": "^1.0.2",
     "jquery": "^3.5.0",
-    "nodemon": "^1.19.1",
+    "nodemon": "^2.0.4",
     "set-value": ">=2.0.1"
   },
   "browserify": {
