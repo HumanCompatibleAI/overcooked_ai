@@ -3,9 +3,16 @@
                 O  2O
                 T1  T
                 XDPSX""",
-    "start_order_list": None,
-    "cook_time": 20,
-    "num_items_for_soup": 3,
-    "delivery_reward": 20,
-    "rew_shaping_params": None
+    "start_all_orders": [ 
+        { "ingredients" : ["onion"]},
+        { "ingredients" : ["onion", "onion", "onion"]},
+        { "ingredients" : ["onion", "tomato", "onion"]}
+    ],
+    "start_bonus_orders" : [
+        { "ingredients" : ["onion", "tomato", "onion"]}
+    ],
+    "tomato_value" : 5,
+    "onion_value" : 10,
+    "tomato_time" : 2,
+    "onion_time" : 2
 }

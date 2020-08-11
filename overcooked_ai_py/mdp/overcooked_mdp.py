@@ -2,8 +2,7 @@ import itertools, copy
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, load_from_json
-from overcooked_ai_py import read_layout_dict
+from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -16,13 +15,16 @@ class Recipe:
     TOMATO = 'tomato'
     ONION = 'onion'
     ALL_INGREDIENTS = [ONION, TOMATO]
-    MAX_NUM_INGREDIENTS = 3
 
     ALL_RECIPES_CACHE = {}
 
     _computed = False
+    _configured = False
+    _conf = {}
     
     def __new__(cls, ingredients):
+        if not cls._configured:
+            raise ValueError("Recipe class must be configured before recipes can be created")
         # Some basic argument verification
         if not ingredients or not hasattr(ingredients, '__iter__') or len(ingredients) == 0:
             raise ValueError("Invalid input recipe. Must be ingredients iterable with non-zero length")
@@ -146,8 +148,16 @@ class Recipe:
             cls._computed = True
         return set(cls.ALL_RECIPES_CACHE.values())
 
+    @classproperty
+    def configuration(cls):
+        if not cls._configured:
+            raise ValueError("Recipe class not yet configured")
+        return cls._conf
+
     @classmethod
     def configure(cls, conf):
+        cls._conf = conf
+        cls._configured = True
         cls._computed = False
         cls.MAX_NUM_INGREDIENTS = conf.get('max_num_ingredients', 3)
 
@@ -160,7 +170,41 @@ class Recipe:
         cls._tomato_value = None
         cls._tomato_time = None
 
-        # Backwards compatibility
+        ## Basic checks for validity ##
+
+        # Mutual Exclusion
+        if 'tomato_time' in conf and not 'onion_time' in conf or 'onion_time' in conf and not 'tomato_time' in conf:
+            raise ValueError("Must specify both 'onion_time' and 'tomato_time'")
+        if 'tomato_value' in conf and not 'onion_value' in conf or 'onion_value' in conf and not 'tomato_value' in conf:
+            raise ValueError("Must specify both 'onion_value' and 'tomato_value'")
+        if 'tomato_value' in conf and 'delivery_reward' in conf:
+            raise ValueError("'delivery_reward' incompatible with '<ingredient>_value'")
+        if 'tomato_value' in conf and 'recipe_values' in conf:
+            raise ValueError("'recipe_values' incompatible with '<ingredient>_value'")
+        if 'recipe_values' in conf and 'delivery_reward' in conf:
+            raise ValueError("'delivery_reward' incompatible with 'recipe_values'")
+        if 'tomato_time' in conf and 'cook_time' in conf:
+            raise ValueError("'cook_time' incompatible with '<ingredient>_time")
+        if 'tomato_time' in conf and 'recipe_times' in conf:
+            raise ValueError("'recipe_times' incompatible with '<ingredient>_time'")
+        if 'recipe_times' in conf and 'cook_time' in conf:
+            raise ValueError("'delivery_reward' incompatible with 'recipe_times'")
+
+        # recipe_ lists and orders compatibility
+        if 'recipe_values' in conf:
+            if not 'all_orders' in conf or not conf['all_orders']:
+                raise ValueError("Must specify 'all_orders' if 'recipe_values' specified")
+            if not len(conf['all_orders']) == len(conf['recipe_values']):
+                raise ValueError("Number of recipes in 'all_orders' must be the same as number in 'recipe_values")
+        if 'recipe_times' in conf:
+            if not 'all_orders' in conf or not conf['all_orders']:
+                raise ValueError("Must specify 'all_orders' if 'recipe_times' specified")
+            if not len(conf['all_orders']) == len(conf['recipe_times']):
+                raise ValueError("Number of recipes in 'all_orders' must be the same as number in 'recipe_times")
+
+        
+        ## Conifgure ##
+
         if 'cook_time' in conf:
             cls._cook_time = conf['cook_time']
 
@@ -168,19 +212,11 @@ class Recipe:
             cls._delivery_reward = conf['delivery_reward']
 
         if 'recipe_values' in conf:
-            if not 'all_orders' in conf:
-                raise ValueError("Invalid recipe configuration")
-            if not len(conf['all_orders']) == len(conf['recipe_values']):
-                raise ValueError("Invalid recipe configuration")
             cls._value_mapping = {
                 cls.from_dict(recipe) : value for (recipe, value) in zip(conf['all_orders'], conf['recipe_values'])
             }
 
         if 'recipe_times' in conf:
-            if not 'all_orders' in conf:
-                raise ValueError("Invalid recipe configuration")
-            if not len(conf['all_orders']) == len(conf['recipe_times']):
-                raise ValueError("Invalid recipe configuration")
             cls._time_mapping = {
                 cls.from_dict(recipe) : time for (recipe, time) in zip(conf['all_orders'], conf['recipe_times'])
             }
@@ -286,7 +322,7 @@ class SoupState(ObjectState):
     def __repr__(self):
         supercls_str = super(SoupState, self).__repr__()
         ingredients_str = self._ingredients.__repr__()
-        return "{}\nIngredients:\t{}\nCooking Time:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
+        return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
     @ObjectState.position.setter
     def position(self, new_pos):
@@ -390,11 +426,15 @@ class SoupState(ObjectState):
         info_dict = super(SoupState, self).to_dict()
         ingrdients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
         info_dict['_ingredients'] = ingrdients_dict
-        info_dict['_cooking_tick'] = self._cooking_tick
+        info_dict['cooking_tick'] = self._cooking_tick
         info_dict['is_cooking'] = self.is_cooking
         info_dict['is_ready'] = self.is_ready
         info_dict['is_idle'] = self.is_idle
         info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
+
+        # This is for backwards compatibility w/ overcooked-demo
+        # Should be removed once overcooked-demo is updated to use 'cooking_tick' instead of '_cooking_tick'
+        info_dict['_cooking_tick'] = self._cooking_tick
         return info_dict
 
     @classmethod
@@ -513,7 +553,7 @@ class PlayerState(object):
         player_dict = copy.deepcopy(player_dict)
         held_obj = player_dict["held_object"]
         if held_obj is not None:
-            player_dict["held_object"] = ObjectState.from_dict(held_obj)
+            player_dict["held_object"] = SoupState.from_dict(held_obj)
         return PlayerState(**player_dict)
 
 
@@ -681,7 +721,8 @@ class OvercookedState(object):
             "players": [p.to_dict() for p in self.players],
             "objects": [obj.to_dict() for obj in self.objects.values()],
             "bonus_orders": [order.to_dict() for order in self.bonus_orders],
-            "all_orders" : [order.to_dict() for order in self.all_orders]
+            "all_orders" : [order.to_dict() for order in self.all_orders],
+            "timestep" : self.timestep
         }
 
     @staticmethod
@@ -691,10 +732,6 @@ class OvercookedState(object):
         object_list = [SoupState.from_dict(o) for o in state_dict["objects"]]
         state_dict["objects"] = { ob.position : ob for ob in object_list }
         return OvercookedState(**state_dict)
-    
-    @staticmethod
-    def from_json(filename):
-        return load_from_json(filename)
 
 
 BASE_REW_SHAPING_PARAMS = {
@@ -769,18 +806,20 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[r.to_dict() for r in Recipe.ALL_RECIPES], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
         start_player_positions: tuple of positions for both players' starting positions
         start_bonus_orders: List of recipes dicts that are worth a bonus 
         rew_shaping_params: reward given for completion of specific subgoals
-        all_orders: List of all available order dicts the players can make
+        all_orders: List of all available order dicts the players can make, defaults to all possible recipes if empy list provided
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
         start_state: Default start state returned by get_standard_start_state
         """
+        self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
+        self.start_all_orders = [r.to_dict() for r in Recipe.ALL_RECIPES] if not start_all_orders else start_all_orders
         self.height = len(terrain)
         self.width = len(terrain[0])
         self.shape = (self.width, self.height)
@@ -789,12 +828,10 @@ class OvercookedGridworld(object):
         self.start_player_positions = start_player_positions
         self.num_players = len(start_player_positions)
         self.start_bonus_orders = start_bonus_orders
-        self.start_all_orders = start_all_orders
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
         self.start_state = start_state
-        self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
@@ -859,7 +896,12 @@ class OvercookedGridworld(object):
 
 
     def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
-        Recipe.configure({'num_items_for_soup' : num_items_for_soup, "all_orders" : start_all_orders, **kwargs })
+        self.recipe_config = {
+            "num_items_for_soup" : num_items_for_soup,
+            "all_orders" : start_all_orders,
+            **kwargs
+        }
+        Recipe.configure(self.recipe_config)
 
     #####################
     # BASIC CLASS UTILS #
@@ -1758,7 +1800,7 @@ class OvercookedGridworld(object):
 
     @property
     def lossless_state_encoding_shape(self):
-        return np.array(list(self.shape) + [20])
+        return np.array(list(self.shape) + [26])
 
     def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""

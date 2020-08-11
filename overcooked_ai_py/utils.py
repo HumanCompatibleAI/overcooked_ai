@@ -1,9 +1,10 @@
-import io, json, pickle, pstats, cProfile
+import io, json, pickle, pstats, cProfile, os
 import numpy as np
 from numpy import nan
 from collections import defaultdict
 from pathlib import Path
 from collections.abc import Iterable
+from overcooked_ai_py.static import LAYOUTS_DIR
 
 # I/O
 
@@ -30,6 +31,7 @@ def load_dict_from_txt(filename):
 def save_as_json(data, filename):
     with open(fix_filetype(filename, ".json"), "w") as outfile:
         json.dump(data, outfile)
+    return filename
 
 def load_from_json(filename):
     with open(fix_filetype(filename, ".json"), "r") as json_file:
@@ -162,3 +164,6 @@ def profile(fnc):
         print(s.getvalue())
         return retval
     return inner
+
+def read_layout_dict(layout_name):
+    return load_dict_from_file(os.path.join(LAYOUTS_DIR, layout_name + ".layout"))
