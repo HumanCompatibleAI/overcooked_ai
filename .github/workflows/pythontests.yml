@@ -12,7 +12,7 @@ jobs:
     - name: Install dependencies
       run: python -m pip install --upgrade pip
     - name: Setup
-      run: pip install -e .
+      run: pip install .
     - name: Run tests
       run: |
         python testing/overcooked_test.py 
@@ -29,7 +29,7 @@ jobs:
   #   - name: Install dependencies
   #     run: python -m pip install --upgrade pip
   #   - name: Setup
-  #     run: pip install -e .
+  #     run: pip install .
   #   - name: Run tests
   #     run: |
   #       python -m unittest discover -s testing/ -p "*_test.py"
@@ -45,7 +45,7 @@ jobs:
     - name: Install dependencies
       run: python -m pip install --upgrade pip
     - name: Setup
-      run: pip install -e .
+      run: pip install .
     - name: Run tests
       run: |
         python testing/overcooked_test.py
@@ -62,7 +62,7 @@ jobs:
   #   - name: Install dependencies
   #     run: python -m pip install --upgrade pip
   #   - name: Setup
-  #     run: pip install -e .
+  #     run: pip install .
   #   - name: Run tests
   #     run: |
   #       python -m unittest discover -s testing/ -p "*_test.py"
