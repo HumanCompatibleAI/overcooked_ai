@@ -782,16 +782,13 @@ EVENT_TYPES = [
 
 POTENTIAL_CONSTANTS = {
     'default' : {
+        'min_coeff' : 0.7,
         'max_delivery_steps' : 10,
-        'max_pickup_steps' : 10,
+        'max_pickup_steps' : 20,
         'pot_onion_steps' : 10,
-        'pot_tomato_steps' : 10
-    },
-    'mdp_test_tomato' : {
-        'max_delivery_steps' : 4,
-        'max_pickup_steps' : 4,
-        'pot_onion_steps' : 5,
-        'pot_tomato_steps' : 6
+        'pot_tomato_steps' : 10,
+        'base_useful_counter_coeff' : 2,
+        'counter_coeff' : 1
     }
 }
 
@@ -1336,6 +1333,30 @@ class OvercookedGridworld(object):
     def get_counter_locations(self):
         return list(self.terrain_pos_dict['X'])
 
+    def get_useful_counter_locations(self):
+        """ Experimental """
+        useful_counters = []
+        if self.layout_name == 'counter_circuit':
+            useful_counters = [(((2, 2), (3, 2), (4, 2), (5, 2), (6, 2)))]
+        elif self.layout_name == 'cramped_corridor':
+            useful_counters = [(1, 2), (2, 2), (3, 2)]
+        assert set(useful_counters).issubset(set(self.get_counter_locations()))
+        return useful_counters
+
+    def get_counter_usefulness_coeff(self, state, counter_pos, mp, max_dist=20):
+        """ Experimental """
+        if not counter_pos in self.get_counter_locations():
+            raise ValueError("{} is not a valid counter position".format(counter_pos))
+        players = state.players
+        if not len(players) == 2:
+            raise ValueError("Useful counter coefficient calculation only works for 2 player MDPs")
+        over_counter_dist = max([mp.min_cost_to_feature(player.pos_and_or, counter_pos) for player in players])
+        around_counter_dist = min(mp.min_cost_to_feature(players[0].pos_and_or, players[1].pos), max_dist)
+
+        return around_counter_dist / over_counter_dist
+
+
+
     @property
     def num_pots(self):
         return len(self.get_pot_locations())
@@ -1395,6 +1416,8 @@ class OvercookedGridworld(object):
     def get_full_but_not_cooking_pots(self, pot_states):
         return pot_states['{}_items'.format(Recipe.MAX_NUM_INGREDIENTS)]
 
+    def get_non_full_pots(self, pot_states):
+        return self.get_empty_pots(pot_states) + self.get_partially_full_pots(pot_states)
 
     def get_full_pots(self, pot_states):
         return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states) + self.get_full_but_not_cooking_pots(pot_states)
@@ -2087,13 +2110,9 @@ class OvercookedGridworld(object):
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
+        min_coeff = potential_params['min_coeff']
 
-        # Base potential value is the geometric sum of making optimal soups infinitely
-        opt_recipe, discounted_opt_recipe_value = self.get_optimal_possible_recipe(state, None, discounted=True, potential_params=potential_params, return_value=True)
-        opt_recipe_value = self.get_recipe_value(state, opt_recipe)
-        discount = discounted_opt_recipe_value / opt_recipe_value
-        steady_state_value = (discount / (1 - discount)) * opt_recipe_value
-        potential = steady_state_value
+        potential = 0
 
         # Get list of all soups that have >0 ingredients, sorted based on value of best possible recipe 
         idle_soups = [state.get_object(pos) for pos in self.get_full_but_not_cooking_pots(pot_states)]
@@ -2104,7 +2123,7 @@ class OvercookedGridworld(object):
         # Default potential value is maximimal discount for last two steps applied to optimal recipe value
         cooking_soups = [state.get_object(pos) for pos in self.get_cooking_pots(pot_states)]
         done_soups = [state.get_object(pos) for pos in self.get_ready_pots(pot_states)]
-        non_idle_soup_vals = { soup : gamma**(potential_params['max_delivery_steps'] + max(potential_params['max_pickup_steps'], soup.cook_time - soup._cooking_tick)) * max(self.get_recipe_value(state, soup.recipe), 1) for soup in cooking_soups + done_soups }
+        non_idle_soup_vals = { soup : min_coeff**2 * gamma**(potential_params['max_delivery_steps'] + max(potential_params['max_pickup_steps'], soup.cook_time - soup._cooking_tick)) * max(self.get_recipe_value(state, soup.recipe), 1) for soup in cooking_soups + done_soups }
 
         # Get descriptive list of players based on different attributes
         # Note that these lists are mutually exclusive
@@ -2120,7 +2139,7 @@ class OvercookedGridworld(object):
         for player in players_holding_soups:
             # Even if delivery_dist is infinite, we still award potential (as an agent might need to pass the soup to other player first)
             delivery_dist = mp.min_cost_to_feature(player.pos_and_or, self.terrain_pos_dict['S'])
-            potential += gamma**min(delivery_dist, potential_params['max_delivery_steps']) * max(self.get_recipe_value(state, player.get_object().recipe), 1)
+            potential += min_coeff * gamma**min(delivery_dist, potential_params['max_delivery_steps']) * max(self.get_recipe_value(state, player.get_object().recipe), 1)
 
 
 
@@ -2142,7 +2161,7 @@ class OvercookedGridworld(object):
                 is_useful = int(pickup_dist < np.inf)
 
                 # Always assume worst-case discounting for step 4, and bump zero-valued soups to 1 as mentioned in docstring
-                pickup_soup_value = gamma**potential_params['max_delivery_steps'] * max(self.get_recipe_value(state, soup.recipe), 1)
+                pickup_soup_value = min_coeff**2 * gamma**potential_params['max_delivery_steps'] * max(self.get_recipe_value(state, soup.recipe), 1)
                 cook_time_remaining = soup.cook_time - soup._cooking_tick
                 discount = gamma**max(cook_time_remaining, min(pickup_dist, potential_params['max_pickup_steps']))
 
@@ -2179,7 +2198,7 @@ class OvercookedGridworld(object):
                 missing_ingredients.remove(ingredient)
 
             # Base discount for steps 3-4
-            discount = gamma**(max(potential_params['max_pickup_steps'], opt_recipe.time) + potential_params['max_delivery_steps'])
+            discount = min_coeff**2 * gamma**(max(potential_params['max_pickup_steps'], opt_recipe.time) + potential_params['max_delivery_steps'])
 
             # Add a multiplicative discount for each needed ingredient (this has the effect of giving more award to soups
             # that are closer to being completed)
@@ -2197,7 +2216,7 @@ class OvercookedGridworld(object):
                         closest_player = player
 
                 # Update discount to account for adding this missing ingredient (defaults to min_coeff if no pertinent players exist)
-                discount *= gamma**min(dist, potential_params['pot_{}_steps'.format(ingredient)])
+                discount *= min_coeff * gamma**min(dist, potential_params['pot_{}_steps'.format(ingredient)])
 
                 # Cross off this player's ingreident contribution so it can't be double-counted
                 if closest_player:
@@ -2213,7 +2232,7 @@ class OvercookedGridworld(object):
                 cook_dist = min([mp.min_cost_to_feature(player.pos_and_or, [soup.position]) for player in players_holding_nothing], default=np.inf)
                 discount *= gamma**min(cook_dist, potential_params['max_pickup_steps'])
 
-            potential += discount * max(self.get_recipe_value(state, opt_recipe), 1)
+            potential += min_coeff * discount * max(self.get_recipe_value(state, opt_recipe), 1)
 
 
         ### Step 1 Potential ###
@@ -2222,19 +2241,46 @@ class OvercookedGridworld(object):
         for player in players_holding_tomatoes:
             # will be inf if there exists no empty pot that is reachable
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
-            is_useful = int(dist < np.inf)
-            discount = gamma**(min(potential_params['pot_tomato_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
+
+            # Useful if there exists a pot this can go in
+            is_useful = int(bool(self.get_non_full_pots(pot_states)))
+            discount = min_coeff**9 * gamma**(min(potential_params['pot_tomato_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
             potential += discount * potential_params['tomato_value']
 
         # Add potential for each onion that is remaining after using others to complete optimal recipes if possible
         for player in players_holding_onions:
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
-            is_useful = int(dist < np.inf)
-            discount = gamma**(min(potential_params['pot_onion_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
+
+            # Useful if there exists a pot this can go in
+            is_useful = int(bool(self.get_non_full_pots(pot_states)))
+            discount = min_coeff**9 * gamma**(min(potential_params['pot_onion_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
             potential += discount * potential_params['onion_value']
+
+
+        ## Counters ##
+        for obj_pos, obj in state.objects:
+            # Reward any object on any counter
+            if obj_pos in self.get_counter_locations():
+                obj_val = 0
+                if obj.name == 'soup':
+                    obj_val = self.get_recipe_value(state, soup.recipe)
+                elif obj.name == 'tomato':
+                    obj_val = potential_params['tomato_value']
+                elif obj.name == 'onion':
+                    obj_val = potential_params['onion_value']
+                elif obj.name == 'dish':
+                    obj_val = max(non_idle_soup_vals.values(), default=0)
+
+                # Larger reward for objects on useful counters
+                if obj_pos in self.get_useful_counter_locations():
+                    usefulness_coeff = self.get_counter_usefulness_coeff(state, obj_pos, mp)
+                    usefulness_coeff *= potential_params['base_useful_counter_coeff']
+                    obj_val *= usefulness_coeff
+                potential += potential_params['counter_coeff'] * obj_val
 
         # At last
         return potential
+
 
     ##############
     # DEPRECATED #

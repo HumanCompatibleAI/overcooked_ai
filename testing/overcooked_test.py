@@ -478,7 +478,7 @@ class TestGridworld(unittest.TestCase):
         ## Useless pickups ##
         
         # pickup tomato
-        print("pickup tomato")
+        print("useless pickup tomato")
         actions = [Action.INTERACT, Direction.NORTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
@@ -486,17 +486,39 @@ class TestGridworld(unittest.TestCase):
             print("potential: ", self.base_mdp.potential_function(state, mp))
         val9 = self.base_mdp.potential_function(state, mp)
 
-        # pickup tomato
+        # pickup onion
+        print("pickup onion")
+        actions = [Direction.EAST, Direction.NORTH, Direction.EAST, Action.INTERACT]
+        for action in actions:
+            state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
+        val_inject_0 = self.base_mdp.potential_function(state, mp)
+
+        # Drop onion
+        actions = [Direction.NORTH, Action.INTERACT]
+        print("drop onion")
+        for action in actions:
+            state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
+        val_inject_1 = self.base_mdp.potential_function(state, mp)
+        
+
+        # Pickup tomato
         print("pickup tomato")
-        actions = [Direction.EAST, Action.INTERACT]
+        actions = [Direction.SOUTH, Direction.EAST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
             print(self.base_mdp.state_string(state))
             print("potential: ", self.base_mdp.potential_function(state, mp))
         val10 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLessEqual(val9, val8, "Extraneous pickup should not increase potential")
-        self.assertLessEqual(val10, val8, "Extraneous pickup should not increase potential")
+        self.assertLess(val9 - val8, val_inject_0 - val9, "Extraneous pickup should increase potential less than useful pickup")
+        print("DIFF ONE", val9-val8)
+        print('DIFF TWO', val_inject_0 - val9)
+        self.assertEqual(val_inject_1, val9, "Pickup-drop should be cycle")
+        self.assertLess(val_inject_1, val10, "extraneous pickup should still be worth something")
 
         ## Catastrophic soup failure ##
         
