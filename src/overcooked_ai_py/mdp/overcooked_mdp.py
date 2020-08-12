@@ -2265,7 +2265,7 @@ class OvercookedGridworld(object):
             if obj_pos in self.get_counter_locations():
                 obj_val = 0
                 if obj.name == 'soup':
-                    obj_val = self.get_recipe_value(state, soup.recipe)
+                    obj_val = self.get_recipe_value(state, obj.recipe)
                 elif obj.name == 'tomato':
                     obj_val = min_coeff**9 * potential_params['tomato_value']
                 elif obj.name == 'onion':
