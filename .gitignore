@@ -130,3 +130,6 @@ dmypy.json
 # Custom gitignore items:
 /overcooked_ai_py/agents/old/
 /overcooked_ai_py/mdp/old/
+
+# Vscode
+**/.vscode/

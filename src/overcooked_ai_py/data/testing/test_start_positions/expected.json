@@ -1,0 +1,1 @@
+{"players": [{"position": [1, 2], "orientation": [0, -1], "held_object": null}, {"position": [3, 1], "orientation": [0, -1], "held_object": null}], "objects": [], "bonus_orders": [{"ingredients": ["onion", "onion", "tomato"]}], "all_orders": [{"ingredients": ["onion"]}, {"ingredients": ["onion", "onion", "onion"]}, {"ingredients": ["onion", "onion", "tomato"]}]}
