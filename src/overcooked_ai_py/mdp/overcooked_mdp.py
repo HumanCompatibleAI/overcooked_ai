@@ -2100,7 +2100,7 @@ class OvercookedGridworld(object):
         Returns
             phi(state), the potential of the state
         """
-        if not hasattr(Recipe, '_tomato_value') or not hasattr(Recipe, '_onion_value'):
+        if not hasattr(Recipe, '_tomato_value') or not Recipe._tomato_value or not hasattr(Recipe, '_onion_value') or not Recipe._onion_value:
             raise ValueError("Potential function requires Recipe onion and tomato values to work properly")
 
         # Constants needed for potential function
