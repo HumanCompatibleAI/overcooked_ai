@@ -3,7 +3,7 @@ import copy
 import numpy as np
 INTERACT_TRANSITION_COST = 2
 
-INFINITY = 999999999
+INFINITY = np.inf
 
 import heapq
 

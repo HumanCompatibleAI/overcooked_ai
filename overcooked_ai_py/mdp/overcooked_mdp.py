@@ -1238,6 +1238,12 @@ class OvercookedGridworld(object):
                 pots_states_dict['empty'].append(pot_pos)
             else:
                 soup = state.get_object(pot_pos)
+                if soup.name != 'soup':
+                    print("TRUE THING IS", soup.name, "at", pot_pos)
+                    print(state.objects)
+                    print(state.players)
+                    print(self.state_string(state))
+                    print("--------")
                 if soup.is_ready:
                     pots_states_dict['ready'].append(pot_pos)
                 elif soup.is_cooking:
@@ -1609,12 +1615,8 @@ class OvercookedGridworld(object):
 
             # MAP LAYERS
             if horizon - overcooked_state.timestep < 40:
-                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
                 state_mask_dict["urgency"] = np.ones(self.shape)
 
-
-            # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
-            # state_mask_dict["urgency"] = np.ones(self.shape) * 40
 
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
@@ -1664,8 +1666,6 @@ class OvercookedGridworld(object):
                         state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
                         state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
                         state_mask_dict["soup_done"] += make_layer(obj.position, 1)
-                    # else:
-                    #     raise ValueError("Unrecognized soup")
 
                 elif obj.name == "dish":
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
