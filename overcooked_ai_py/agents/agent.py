@@ -108,8 +108,9 @@ class AgentPair(AgentGroup):
         assert self.n == 2
         self.a0, self.a1 = self.agents
 
-        if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-            print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
+        # Deprecated
+        # if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
+        #     print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
 
     def joint_action(self, state):
         if self.a0 is self.a1:
@@ -195,6 +196,7 @@ class AgentFromPolicy(Agent):
         self.policy.mdp = mdp
     
     def reset(self):
+        super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
 
 class RandomAgent(Agent):
@@ -265,93 +267,6 @@ class FixedPlanAgent(Agent):
     def reset(self):
         super().reset()
         self.i = 0
-
-
-class CoupledPlanningAgent(Agent):
-    """
-    An agent that uses a joint planner (mlp, a MediumLevelPlanner) to find near-optimal
-    plans. At each timestep the agent re-plans under the assumption that the other agent
-    is also a CoupledPlanningAgent, and then takes the first action in the plan.
-    """
-
-    def __init__(self, mlp, delivery_horizon=2, heuristic=None):
-        self.mlp = mlp
-        self.mlp.failures = 0
-        self.heuristic = heuristic if heuristic is not None else Heuristic(mlp.mp).simple_heuristic
-        self.delivery_horizon = delivery_horizon
-
-    def action(self, state):
-        try:
-            joint_action_plan = self.mlp.get_low_level_action_plan(state, self.heuristic, delivery_horizon=self.delivery_horizon, goal_info=True)
-        except TimeoutError:
-            print("COUPLED PLANNING FAILURE")
-            self.mlp.failures += 1
-            return Direction.ALL_DIRECTIONS[np.random.randint(4)]
-        return (joint_action_plan[0][self.agent_index], {}) if len(joint_action_plan) > 0 else (Action.STAY, {})
-
-
-class EmbeddedPlanningAgent(Agent):
-    """
-    An agent that uses A* search to find an optimal action based on a model of the other agent,
-    `other_agent`. This class approximates the other agent as being deterministic even though it
-    might be stochastic in order to perform the search.
-    """
-
-    def __init__(self, other_agent, mlp, env, delivery_horizon=2, logging_level=0):
-        """mlp is a MediumLevelPlanner"""
-        self.other_agent = other_agent
-        self.delivery_horizon = delivery_horizon
-        self.mlp = mlp
-        self.env = env
-        self.h_fn = Heuristic(mlp.mp).simple_heuristic
-        self.logging_level = logging_level
-
-    def action(self, state):
-        start_state = state.deepcopy()
-        order_list = start_state.order_list if start_state.order_list is not None else ["any", "any"]
-        start_state.order_list = order_list[:self.delivery_horizon]
-        other_agent_index = 1 - self.agent_index
-        initial_env_state = self.env.state
-        self.other_agent.env = self.env
-
-        expand_fn = lambda state: self.mlp.get_successor_states_fixed_other(state, self.other_agent, other_agent_index)
-        goal_fn = lambda state: len(state.order_list) == 0
-        heuristic_fn = lambda state: self.h_fn(state)
-
-        search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, max_iter_count=50000)
-
-        try:
-            ml_s_a_plan, cost = search_problem.A_star_graph_search(info=True)
-        except TimeoutError:
-            print("A* failed, taking random action")
-            idx = np.random.randint(5)
-            return Action.ALL_ACTIONS[idx]
-
-        # Check estimated cost of the plan equals
-        # the sum of the costs of each medium-level action
-        assert sum([len(item[0]) for item in ml_s_a_plan[1:]]) == cost
-
-        # In this case medium level actions are tuples of low level actions
-        # We just care about the first low level action of the first med level action
-        first_s_a = ml_s_a_plan[1]
-
-        # Print what the agent is expecting to happen
-        if self.logging_level >= 2:
-            self.env.state = start_state
-            for joint_a in first_s_a[0]:
-                print(self.env)
-                print(joint_a)
-                self.env.step(joint_a)
-            print(self.env)
-            print("======The End======")
-
-        self.env.state = initial_env_state
-
-        first_joint_action = first_s_a[0][0]
-        if self.logging_level >= 1:
-            print("expected joint action", first_joint_action)
-        action = first_joint_action[self.agent_index]
-        return action, {}
 
 
 class GreedyHumanModel(Agent):
@@ -507,17 +422,10 @@ class GreedyHumanModel(Agent):
         counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
         pot_states_dict = self.mlp.mdp.get_pot_states(state)
 
-        # NOTE: this most likely will fail in some tomato scenarios
-        curr_order = state.curr_order
 
         if not player.has_object():
-
-            if curr_order == 'any':
-                ready_soups = pot_states_dict['onion']['ready'] + pot_states_dict['tomato']['ready']
-                cooking_soups = pot_states_dict['onion']['cooking'] + pot_states_dict['tomato']['cooking']
-            else:
-                ready_soups = pot_states_dict[curr_order]['ready']
-                cooking_soups = pot_states_dict[curr_order]['cooking']
+            ready_soups = pot_states_dict['ready']
+            cooking_soups = pot_states_dict['cooking']
 
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
@@ -525,15 +433,14 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                next_order = None
-                if state.num_orders_remaining > 1:
-                    next_order = state.next_order
+                assert len(state.all_orders) == 1, "the current mid level planner only support 3-onion soup"
+                next_order = list(state.all_orders)[0]
 
-                if next_order == 'onion':
+                if 'onion' in next_order:
                     motion_goals = am.pickup_onion_actions(counter_objects)
-                elif next_order == 'tomato':
+                elif 'tomato' in next_order:
                     motion_goals = am.pickup_tomato_actions(counter_objects)
-                elif next_order is None or next_order == 'any':
+                else:
                     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
 
         else:
@@ -562,3 +469,92 @@ class GreedyHumanModel(Agent):
             assert len(motion_goals) != 0
 
         return motion_goals
+
+
+# Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
+# class CoupledPlanningAgent(Agent):
+#     """
+#     An agent that uses a joint planner (mlp, a MediumLevelPlanner) to find near-optimal
+#     plans. At each timestep the agent re-plans under the assumption that the other agent
+#     is also a CoupledPlanningAgent, and then takes the first action in the plan.
+#     """
+#
+#     def __init__(self, mlp, delivery_horizon=2, heuristic=None):
+#         self.mlp = mlp
+#         self.mlp.failures = 0
+#         self.heuristic = heuristic if heuristic is not None else Heuristic(mlp.mp).simple_heuristic
+#         self.delivery_horizon = delivery_horizon
+#
+#     def action(self, state):
+#         try:
+#             joint_action_plan = self.mlp.get_low_level_action_plan(state, self.heuristic, delivery_horizon=self.delivery_horizon, goal_info=True)
+#         except TimeoutError:
+#             print("COUPLED PLANNING FAILURE")
+#             self.mlp.failures += 1
+#             return Direction.ALL_DIRECTIONS[np.random.randint(4)]
+#         return (joint_action_plan[0][self.agent_index], {}) if len(joint_action_plan) > 0 else (Action.STAY, {})
+#
+#
+# class EmbeddedPlanningAgent(Agent):
+#     """
+#     An agent that uses A* search to find an optimal action based on a model of the other agent,
+#     `other_agent`. This class approximates the other agent as being deterministic even though it
+#     might be stochastic in order to perform the search.
+#     """
+#
+#     def __init__(self, other_agent, mlp, env, delivery_horizon=2, logging_level=0):
+#         """mlp is a MediumLevelPlanner"""
+#         self.other_agent = other_agent
+#         self.delivery_horizon = delivery_horizon
+#         self.mlp = mlp
+#         self.env = env
+#         self.h_fn = Heuristic(mlp.mp).simple_heuristic
+#         self.logging_level = logging_level
+#
+#     def action(self, state):
+#         start_state = state.deepcopy()
+#         order_list = start_state.order_list if start_state.order_list is not None else ["any", "any"]
+#         start_state.order_list = order_list[:self.delivery_horizon]
+#         other_agent_index = 1 - self.agent_index
+#         initial_env_state = self.env.state
+#         self.other_agent.env = self.env
+#
+#         expand_fn = lambda state: self.mlp.get_successor_states_fixed_other(state, self.other_agent, other_agent_index)
+#         goal_fn = lambda state: len(state.order_list) == 0
+#         heuristic_fn = lambda state: self.h_fn(state)
+#
+#         search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, max_iter_count=50000)
+#
+#         try:
+#             ml_s_a_plan, cost = search_problem.A_star_graph_search(info=True)
+#         except TimeoutError:
+#             print("A* failed, taking random action")
+#             idx = np.random.randint(5)
+#             return Action.ALL_ACTIONS[idx]
+#
+#         # Check estimated cost of the plan equals
+#         # the sum of the costs of each medium-level action
+#         assert sum([len(item[0]) for item in ml_s_a_plan[1:]]) == cost
+#
+#         # In this case medium level actions are tuples of low level actions
+#         # We just care about the first low level action of the first med level action
+#         first_s_a = ml_s_a_plan[1]
+#
+#         # Print what the agent is expecting to happen
+#         if self.logging_level >= 2:
+#             self.env.state = start_state
+#             for joint_a in first_s_a[0]:
+#                 print(self.env)
+#                 print(joint_a)
+#                 self.env.step(joint_a)
+#             print(self.env)
+#             print("======The End======")
+#
+#         self.env.state = initial_env_state
+#
+#         first_joint_action = first_s_a[0][0]
+#         if self.logging_level >= 1:
+#             print("expected joint action", first_joint_action)
+#         action = first_joint_action[self.agent_index]
+#         return action, {}
+#

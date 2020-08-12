@@ -1,14 +1,13 @@
 {
-    "grid":  """XXXPPXXX
-                X  2   X
-                D XXXX S
-                X  1   X
-                XXXOOXXX""",
+    "grid":  """XXPXX
+                X  2X
+                X1  O
+                XXDSX""",
     "start_bonus_orders": [],
     "start_all_orders" : [
         { "ingredients" : ["onion", "onion", "onion"]}
     ],
     "recipe_values" : [20],
-    "recipe_times" : [20],
+    "recipe_times" : [5],
     "rew_shaping_params": None
 }
