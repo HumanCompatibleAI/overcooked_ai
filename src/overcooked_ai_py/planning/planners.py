@@ -1002,39 +1002,40 @@ class MediumLevelPlanner(object):
         print("b")
         return full_joint_action_plan
 
-    def get_low_level_plan_from_ml_plan(self, start_state, ml_plan, heuristic_fn, debug=False, goal_info=False):
-        t = 0
-        full_joint_action_plan = []
-        curr_state = start_state
-        curr_motion_state = start_state.players_pos_and_or
-        prev_h = heuristic_fn(start_state, t, debug=False)
-
-        if len(ml_plan) > 0 and goal_info:
-            print("First motion goal: ", ml_plan[0][0])
-
-        if not clean and debug:
-            print("Start state")
-            OvercookedEnv.print_state(self.mdp, start_state)
-
-        for joint_motion_goal, goal_state in ml_plan:
-            joint_action_plan, end_motion_state, plan_costs = \
-                self.ml_action_manager.joint_motion_planner.get_low_level_action_plan(curr_motion_state, joint_motion_goal)
-            curr_plan_cost = min(plan_costs)
-            full_joint_action_plan.extend(joint_action_plan)
-            t += 1
-
-            if not clean and debug:
-                print(t)
-                OvercookedEnv.print_state(self.mdp, goal_state)
-
-            if not clean and SAFE_RUN:
-                s_prime, _ = OvercookedEnv.execute_plan(self.mdp, curr_state, joint_action_plan)
-                assert s_prime == goal_state
-
-            curr_h = heuristic_fn(goal_state, t, debug=False)
-            self.check_heuristic_consistency(curr_h, prev_h, curr_plan_cost)
-            curr_motion_state, prev_h, curr_state = end_motion_state, curr_h, goal_state
-        return full_joint_action_plan
+    # Deprecated due to Heuristic
+    # def get_low_level_plan_from_ml_plan(self, start_state, ml_plan, heuristic_fn, debug=False, goal_info=False):
+    #     t = 0
+    #     full_joint_action_plan = []
+    #     curr_state = start_state
+    #     curr_motion_state = start_state.players_pos_and_or
+    #     prev_h = heuristic_fn(start_state, t, debug=False)
+    #
+    #     if len(ml_plan) > 0 and goal_info:
+    #         print("First motion goal: ", ml_plan[0][0])
+    #
+    #     if not clean and debug:
+    #         print("Start state")
+    #         OvercookedEnv.print_state(self.mdp, start_state)
+    #
+    #     for joint_motion_goal, goal_state in ml_plan:
+    #         joint_action_plan, end_motion_state, plan_costs = \
+    #             self.ml_action_manager.joint_motion_planner.get_low_level_action_plan(curr_motion_state, joint_motion_goal)
+    #         curr_plan_cost = min(plan_costs)
+    #         full_joint_action_plan.extend(joint_action_plan)
+    #         t += 1
+    #
+    #         if not clean and debug:
+    #             print(t)
+    #             OvercookedEnv.print_state(self.mdp, goal_state)
+    #
+    #         if not clean and SAFE_RUN:
+    #             s_prime, _ = OvercookedEnv.execute_plan(self.mdp, curr_state, joint_action_plan)
+    #             assert s_prime == goal_state
+    #
+    #         curr_h = heuristic_fn(goal_state, t, debug=False)
+    #         self.check_heuristic_consistency(curr_h, prev_h, curr_plan_cost)
+    #         curr_motion_state, prev_h, curr_state = end_motion_state, curr_h, goal_state
+    #     return full_joint_action_plan
 
     def check_heuristic_consistency(self, curr_heuristic_val, prev_heuristic_val, actual_edge_cost):
         delta_h = curr_heuristic_val - prev_heuristic_val
@@ -1042,25 +1043,26 @@ class MediumLevelPlanner(object):
             "Heuristic was not consistent. \n Prev h: {}, Curr h: {}, Actual cost: {}, Δh: {}" \
             .format(prev_heuristic_val, curr_heuristic_val, actual_edge_cost, delta_h)
 
-    def get_ml_plan(self, start_state, h_fn, delivery_horizon=4, debug=False):
-        """
-        Solves A* Search problem to find optimal sequence of medium level actions
-        to reach the goal number of deliveries
-
-        Returns:
-            ml_plan (list): plan not including starting state in form
-                [(joint_action, successor_state), ..., (joint_action, goal_state)]
-            cost (int): A* Search cost
-        """
-        start_state = start_state.deepcopy()
-
-        expand_fn = lambda state: self.get_successor_states(state)
-        goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
-        heuristic_fn = lambda state: h_fn(state)
-
-        search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
-        ml_plan, cost = search_problem.A_star_graph_search(info=True)
-        return ml_plan[1:], cost
+    # Deprecated due to Heuristic
+    # def get_ml_plan(self, start_state, h_fn, delivery_horizon=4, debug=False):
+    #     """
+    #     Solves A* Search problem to find optimal sequence of medium level actions
+    #     to reach the goal number of deliveries
+    #
+    #     Returns:
+    #         ml_plan (list): plan not including starting state in form
+    #             [(joint_action, successor_state), ..., (joint_action, goal_state)]
+    #         cost (int): A* Search cost
+    #     """
+    #     start_state = start_state.deepcopy()
+    #
+    #     expand_fn = lambda state: self.get_successor_states(state)
+    #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
+    #     heuristic_fn = lambda state: h_fn(state)
+    #
+    #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
+    #     ml_plan, cost = search_problem.A_star_graph_search(info=True)
+    #     return ml_plan[1:], cost
 
     def get_successor_states(self, start_state):
         """Successor states for medium-level actions are defined as
@@ -1123,22 +1125,23 @@ class MediumLevelPlanner(object):
             successor_high_level_states.append((action_plan, end_state, cost))
         return successor_high_level_states
 
-    def get_embedded_low_level_action_plan(self, state, goal_pos_and_or, other_agent, other_agent_idx):
-        """Find action plan for a specific motion goal with A* considering the other agent"""
-        other_agent.set_agent_index(other_agent_idx)
-        agent_idx = 1 - other_agent_idx
-
-        expand_fn = lambda state: self.embedded_mdp_succ_fn(state, other_agent)
-        # FIXME
-        goal_fn = lambda state: state.players[agent_idx].pos_and_or == goal_pos_and_or or state.delivery_rew >= DELIVERY_REW_THRES
-        heuristic_fn = lambda state: sum(pos_distance(state.players[agent_idx].position, goal_pos_and_or[0]))
-
-        search_problem = SearchTree(state, goal_fn, expand_fn, heuristic_fn)
-        state_action_plan, cost = search_problem.A_star_graph_search(info=False)
-        action_plan, state_plan = zip(*state_action_plan)
-        action_plan = action_plan[1:]
-        end_state = state_plan[-1]
-        return action_plan, end_state, cost
+    # Deprecated
+    # def get_embedded_low_level_action_plan(self, state, goal_pos_and_or, other_agent, other_agent_idx):
+    #     """Find action plan for a specific motion goal with A* considering the other agent"""
+    #     other_agent.set_agent_index(other_agent_idx)
+    #     agent_idx = 1 - other_agent_idx
+    #
+    #     expand_fn = lambda state: self.embedded_mdp_succ_fn(state, other_agent)
+    #     # FIXME
+    #     goal_fn = lambda state: state.players[agent_idx].pos_and_or == goal_pos_and_or or state.delivery_rew >= DELIVERY_REW_THRES
+    #     heuristic_fn = lambda state: sum(pos_distance(state.players[agent_idx].position, goal_pos_and_or[0]))
+    #
+    #     search_problem = SearchTree(state, goal_fn, expand_fn, heuristic_fn)
+    #     state_action_plan, cost = search_problem.A_star_graph_search(info=False)
+    #     action_plan, state_plan = zip(*state_action_plan)
+    #     action_plan = action_plan[1:]
+    #     end_state = state_plan[-1]
+    #     return action_plan, end_state, cost
 
     def embedded_mdp_succ_fn(self, state, other_agent):
         if state.timestep > 400:
@@ -1346,15 +1349,16 @@ class HighLevelPlanner(object):
         assert total_cost == cost == len(full_joint_low_level_action_plan), "{} vs {} vs {}"\
             .format(total_cost, cost, len(full_joint_low_level_action_plan))
         return full_joint_low_level_action_plan, cost
-    
-    def get_hl_plan(self, start_state, h_fn, debug=False):
-        expand_fn = lambda state: self.get_successor_states(state)
-        goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
-        heuristic_fn = lambda state: h_fn(state)
 
-        search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
-        hl_plan, cost = search_problem.A_star_graph_search(info=True)
-        return hl_plan[1:], cost
+    # Deprecated due to Heuristic
+    # def get_hl_plan(self, start_state, h_fn, debug=False):
+    #     expand_fn = lambda state: self.get_successor_states(state)
+    #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
+    #     heuristic_fn = lambda state: h_fn(state)
+    #
+    #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
+    #     hl_plan, cost = search_problem.A_star_graph_search(info=True)
+    #     return hl_plan[1:], cost
 
     def _advance_motion_goal_indices(self, curr_plan_indices, plan_lengths):
         """Advance indices for agents current motion goals

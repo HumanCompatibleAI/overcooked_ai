@@ -76,8 +76,8 @@ class OvercookedEnv(object):
         self.mlp_params = mlp_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-        self.lst_len = 4
-        self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
+        # self.lst_len = 4
+        # self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
         self.reset()
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
@@ -245,8 +245,8 @@ class OvercookedEnv(object):
     def reset(self, regen_mdp=True):
         """Resets the environment. Does NOT reset the agent."""
         if regen_mdp:
-            self.mdp = random.choice(self.mdp_lst)
-            # self.mdp = self.mdp_generator_fn()
+            # self.mdp = random.choice(self.mdp_lst)
+            self.mdp = self.mdp_generator_fn()
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:

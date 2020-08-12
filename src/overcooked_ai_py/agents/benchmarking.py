@@ -52,7 +52,7 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, regen_mdp=regen_mdp)
 
-    # Depreciated. Need to amend Heuristic before reactivating CoupledPlanningAgent:
+    # Deprecated. Need to amend Heuristic before reactivating CoupledPlanningAgent:
     # def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
     #     a0 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
     #     a1 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
