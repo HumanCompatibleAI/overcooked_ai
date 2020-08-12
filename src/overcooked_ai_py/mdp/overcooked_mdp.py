@@ -787,8 +787,8 @@ POTENTIAL_CONSTANTS = {
         'max_pickup_steps' : 20,
         'pot_onion_steps' : 10,
         'pot_tomato_steps' : 10,
-        'base_useful_counter_coeff' : 2,
-        'counter_coeff' : 1
+        'useful_counter_coeff' : 2,
+        'non_useful_counter_coeff' : 0
     }
 }
 
@@ -1337,23 +1337,24 @@ class OvercookedGridworld(object):
         """ Experimental """
         useful_counters = []
         if self.layout_name == 'counter_circuit':
-            useful_counters = [(((2, 2), (3, 2), (4, 2), (5, 2), (6, 2)))]
+            useful_counters = [(2, 2), (3, 2), (4, 2), (5, 2), (6, 2)]
         elif self.layout_name == 'cramped_corridor':
             useful_counters = [(1, 2), (2, 2), (3, 2)]
         assert set(useful_counters).issubset(set(self.get_counter_locations()))
         return useful_counters
 
-    def get_counter_usefulness_coeff(self, state, counter_pos, mp, max_dist=20):
+    def get_counter_usefulness_coeff(self, state, counter_pos, mp, counter_discount=0.9, max_dist=20):
         """ Experimental """
         if not counter_pos in self.get_counter_locations():
             raise ValueError("{} is not a valid counter position".format(counter_pos))
         players = state.players
         if not len(players) == 2:
             raise ValueError("Useful counter coefficient calculation only works for 2 player MDPs")
-        over_counter_dist = max([mp.min_cost_to_feature(player.pos_and_or, counter_pos) for player in players])
-        around_counter_dist = min(mp.min_cost_to_feature(players[0].pos_and_or, players[1].pos), max_dist)
+        dists = [mp.min_cost_to_feature(player.pos_and_or, [counter_pos]) for player in players]
+        over_counter_dist = max(dists)
+        around_counter_dist = min(mp.get_gridworld_pos_distance(players[0].position, players[1].position), max_dist)
 
-        return around_counter_dist / over_counter_dist
+        return counter_discount**(over_counter_dist - around_counter_dist)
 
 
 
@@ -2050,7 +2051,7 @@ class OvercookedGridworld(object):
     # POTENTIAL REWARD SHAPING FN #
     ###############################
 
-    def potential_function(self, state, mp, gamma=0.99):
+    def potential_function(self, state, mp, gamma=0.99, potential_constants={}):
         """
         A potential function used for more principled reward shaping
         For details see "Policy invariance under reward transformations:
@@ -2103,11 +2104,12 @@ class OvercookedGridworld(object):
             raise ValueError("Potential function requires Recipe onion and tomato values to work properly")
 
         # Constants needed for potential function
+        constants = potential_constants if potential_constants else POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         potential_params = {
             'gamma' : gamma,
             'tomato_value' : Recipe._tomato_value,
             'onion_value' : Recipe._onion_value,
-            **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
+            **constants
         }
         pot_states = self.get_pot_states(state)
         min_coeff = potential_params['min_coeff']
@@ -2258,25 +2260,28 @@ class OvercookedGridworld(object):
 
 
         ## Counters ##
-        for obj_pos, obj in state.objects:
+        for obj_pos, obj in state.objects.items():
             # Reward any object on any counter
             if obj_pos in self.get_counter_locations():
                 obj_val = 0
                 if obj.name == 'soup':
                     obj_val = self.get_recipe_value(state, soup.recipe)
                 elif obj.name == 'tomato':
-                    obj_val = potential_params['tomato_value']
+                    obj_val = min_coeff**9 * potential_params['tomato_value']
                 elif obj.name == 'onion':
-                    obj_val = potential_params['onion_value']
+                    obj_val = min_coeff**9 * potential_params['onion_value']
                 elif obj.name == 'dish':
-                    obj_val = max(non_idle_soup_vals.values(), default=0)
+                    obj_val = min_coeff**2 * max(non_idle_soup_vals.values(), default=0)
 
                 # Larger reward for objects on useful counters
                 if obj_pos in self.get_useful_counter_locations():
                     usefulness_coeff = self.get_counter_usefulness_coeff(state, obj_pos, mp)
-                    usefulness_coeff *= potential_params['base_useful_counter_coeff']
+                    usefulness_coeff *= potential_params['useful_counter_coeff']
                     obj_val *= usefulness_coeff
-                potential += potential_params['counter_coeff'] * obj_val
+                # Smaller reward for objects on non-useful counters
+                else:
+                    obj_val *= potential_params['non_useful_counter_coeff']
+                potential += obj_val
 
         # At last
         return potential

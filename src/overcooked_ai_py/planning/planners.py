@@ -56,6 +56,52 @@ class MotionPlanner(object):
 
         self.all_plans = self._populate_all_plans()
 
+    @property
+    def params(self):
+        return { "counter_goals" : self.counter_goals }
+    
+    @classmethod
+    def from_pickle_or_compute(cls, mdp, mp_params, custom_filename=None, force_compute=False, info=True):
+        assert isinstance(mdp, OvercookedGridworld)
+
+        filename = custom_filename if custom_filename is not None else os.path.join(PLANNERS_DIR, mdp.layout_name + "_mp.pkl")
+
+        if force_compute:
+            return cls.compute_mp(filename, mdp, mp_params)
+        
+        try:
+            mp = cls.load(filename)
+
+            if mp.params != mp_params or mp.mdp != mdp:
+                print("Mlp with different params or mdp found, computing from scratch", flush=True)
+                return cls.compute_mp(filename, mdp, mp_params)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+            print("Recomputing planner due to:", e, flush=True)
+            return cls.compute_mp(filename, mdp, mp_params)
+
+        if info:
+            print("Loaded MotionPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)), flush=True)
+        return mp
+
+    @classmethod
+    def compute_mp(cls, filename, mdp, params):
+        print("Computing MotionPlanner to be saved in {}".format(filename))
+        start_time = time.time()
+        mp = cls(mdp, **params)
+        print("It took {} seconds to create mp".format(time.time() - start_time))
+        mp.save(filename)
+        return mp
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+
+    def save(self, path):
+        with open(path, 'wb') as f:
+            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+
     def get_plan(self, start_pos_and_or, goal_pos_and_or):
         """
         Returns pre-computed plan from initial agent position
