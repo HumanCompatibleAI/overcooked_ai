@@ -1,10 +1,12 @@
-import tempfile 
-import webbrowser 
+import tempfile, webbrowser, pkgutil, json, uuid
 from IPython.display import display, HTML
-import pkgutil
-from .. import visualization
-import json
 from string import Template
+from .. import visualization
+
+
+def load_visualization_file_as_str(filename):
+    return pkgutil.get_data(visualization.__name__, filename).decode()
+
 
 def run_html_in_web(html, prefix="overcooked_ai_visualization_"):
     with tempfile.NamedTemporaryFile('w', delete=False, prefix=prefix, 
@@ -18,13 +20,13 @@ def run_html_in_ipython(html):
     display(HTML(html))
 
 
-def create_chart_html(events_data, chart_settings=None):
+def create_chart_html(events_data, chart_settings=None, box_id=None):
     # all numerical values are pixels
     # not explicity stated below margins are not implemented
     default_chart_settings = {'height': 250, # height of whole chart container
         'width': 720,  # width of whole chart container
         'margin': {'top': 20, 'right': 60, 'bottom': 180, 'left': 40}, # margins of chart (not container) without legends
-        'hold_line_width': 3, # hold line is line between pickup and drop event that symbolizes holding item by the player
+        'hold_line_width': 3, # hold line is line between pickup and drop event that symbolizes holding object by the player
         'highlighted_hold_line_width': 6, # highlighting element is by hovering mouse over something associated with described object
         'object_line_width': 0, 'highlighted_object_line_width':3,
         'object_event_height': 10, 'object_event_width':16, # object event is triangle
@@ -40,13 +42,13 @@ def create_chart_html(events_data, chart_settings=None):
     settings = default_chart_settings.copy()
     settings.update(chart_settings or {})
 
-    visualization_path = visualization.__name__
+    box_id = box_id or "graph-div-" + str(uuid.uuid1())
 
-    js_text_template = Template(pkgutil.get_data(visualization_path, "event_chart.js").decode())
-    js_text = js_text_template.substitute({'data': json.dumps(events_data), 'box_id': '#graph-div', 
+    js_text_template = Template(load_visualization_file_as_str("event_chart.js"))
+    js_text = js_text_template.substitute({'data': json.dumps(events_data), 'box_id': "#"+box_id, 
         'settings': json.dumps(settings)})
 
-    html_template = Template(pkgutil.get_data(visualization_path, "chart.html").decode())
-    css_text = pkgutil.get_data(visualization_path, "style.css").decode()
+    html_template = Template(load_visualization_file_as_str("chart.html"))
+    css_text = load_visualization_file_as_str("style.css")
 
-    return html_template.substitute({'css_text': css_text, 'js_text': js_text})
+    return html_template.substitute({'css_text': css_text, 'js_text': js_text, 'box_id':box_id})

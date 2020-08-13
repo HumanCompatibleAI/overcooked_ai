@@ -1,81 +1,51 @@
 import numpy as np
-import itertools
+import itertools, copy
 from collections import defaultdict
-
+from overcooked_ai_py.utils import numpy_to_native
 def extract_events(trajectories, traj_idx=0, add_cumulative_events=True):
     """
     extracts events from trajectories for plots
     """
-    terrain = np.array(trajectories["mdp_params"][traj_idx]["terrain"]).T    
-    
-    def find_last_pickup(events, p):
+
+    def find_last_event(events, event_type, p, last_timestep=None):
         for event in reversed(events):
-            if event["player"] == p and event["action"] == "pickup":
+            if event.get("player") == p and event.get("action") == event_type \
+                    and (last_timestep is None or event["timestep"] < last_timestep):
                 return event
             
-    def front_of_player_pos(player):
-        return [player["position"][i] + player["orientation"][i]
-                                         for i in range(len(player["position"]))]
+    def holding_event(events, p, t, obj):
+        last_pickup_t = (find_last_event(events, "pickup", p, t) or {}).get("timestep")
 
-    def add_holding_event(events, p, t, held_object):
-        last_pickup_t = (find_last_pickup(events, p) or {}).get("timestep")
-        if last_pickup_t is None:
-            start_t = 0
-        else:
-            start_t = last_pickup_t
+        start_t = last_pickup_t or 0
         event = {
             "player": p,
             "start_timestep":start_t,
             "end_timestep":t,
             "action": "holding",
-            "item_name": held_object["name"],
-            "item_id": held_object["object_id"]
+            "object": obj
         }
-        events.append(event)
+        return event
 
-    def add_drop_item_event(events, player, p, t, dropped_obj, terrain):
-        player_pos = list(player["position"])
-        front_pos = front_of_player_pos(player)
-        front_terrain = terrain[tuple(front_pos)]
-        event = {
-            "player": p,
-            "timestep":t,
-            "action": "drop",
-            "item_name": dropped_obj["name"],
-            "front_terrain": front_terrain,
-            "front_pos": front_pos,
-            "player_pos": player_pos,
-            "item_id": dropped_obj["object_id"]
-            }
-        events.append(event)
-    
-    def add_pickup_item_event(events, player, p, t, picked_obj, terrain):
-        player_pos = list(player["position"])
-        front_pos = front_of_player_pos(player)
-        front_terrain = terrain[tuple(front_pos)]
-        event = {
-            "player": p,
-            "timestep":t,
-            "action": "pickup",
-            "item_name": picked_obj["name"],
-            "front_terrain": front_terrain,
-            "front_terrain_pos": front_pos,
-            "player_pos": player_pos,
-            "item_id": picked_obj["object_id"]
+    def get_holding_events(events, game_states):
+        holding_events = [holding_event(events, e.get("player"), e.get("timestep"), e.get("object")) 
+            for e in events if e.get("action") in ["drop", "potting", "delivery"]]
+        # check if object is held at end of the episode
+        for p, player in enumerate(game_states[-1].players):
+            if player.held_object:
+                holding_events.append(holding_event(events, p, len(game_states)-1, player.held_object.to_dict()))
+        return holding_events
 
-        }
-        events.append(event)
-    
+
     def get_cumulative_events(events, last_timestep):
         """
         Receives events for scatter plot and returns events for cumulative plot
         """
-        def add_cumulative_event(events, s, timestep, action, player=None, item=None):
+        def add_cumulative_event(events, s, timestep, action, player=None, obj=None):
             event = {"action": action,
                     "sum": s,
-                    "timestep": timestep}
+                    "timestep": timestep,}
             if player is not None: event["player"] = player
-            if item is not None: event["item"] = item
+            if obj is not None: event["object"] = obj
             events.append(event)
 
         cumulative_events = []
@@ -103,36 +73,16 @@ def extract_events(trajectories, traj_idx=0, add_cumulative_events=True):
         for p in set(map(lambda x: x["player"], events)):
             add_cumulative_event(cumulative_events, player_sums[p], last_timestep, a, p)
         return cumulative_events
-
-    game_states = [state.to_dict() for state in trajectories["ep_states"][traj_idx]]
-    events = []
+        
+    ep_states = trajectories["ep_states"][traj_idx]
+    events = copy.deepcopy(trajectories["ep_infos"][0][-1]["episode"]["events_list"])
     
-    for t, state in enumerate(game_states):
-        for p, player in enumerate(state["players"]):
-            held_object = player["held_object"] or {}
-            if (t+1 < len(game_states)):
-                held_object_next_t = game_states[t+1]["players"][p]["held_object"] or {}
-                if held_object:
-                    if held_object.get("name") != held_object_next_t.get("name"):
-                        add_drop_item_event(events, player, p, t, held_object, terrain)
-                        add_holding_event(events, p, t, held_object)
-                
-                if held_object_next_t and held_object.get("name") != held_object_next_t.get("name"):
-                    add_pickup_item_event(events, player, p, t, held_object_next_t, terrain)
-                    
-            else: #last timestep
-                if held_object:
-                    add_holding_event(events, p, t, held_object)
+    events += get_holding_events(events, ep_states)
     
     if add_cumulative_events:
-        events += get_cumulative_events(events, len(game_states))
+        events += get_cumulative_events(events, len(ep_states))
     
     # clearing possible numpy data types from data to allow json.dumps of the data
-    def numpy_to_native(x):
-        if isinstance(x, np.generic):
-            return x.item()
-        else:
-            return x
     events = [{k:numpy_to_native(v) for k,v in event.items()} for event in events]
     
     return events

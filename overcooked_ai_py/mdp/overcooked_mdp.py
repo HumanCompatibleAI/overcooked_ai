@@ -19,7 +19,7 @@ class Recipe:
     MAX_NUM_INGREDIENTS = 3
 
     ALL_RECIPES_CACHE = {}
-    
+
     _computed = False
     
     def __new__(cls, ingredients):
@@ -213,6 +213,7 @@ class ObjectState(object):
         """
         name (str): The name of the object
         position (int, int): Tuple for the current location of the object.
+        object_id(str): Id of the object
         """
         self.name = name
         self._position = tuple(position)
@@ -230,7 +231,7 @@ class ObjectState(object):
         return self.name in ['onion', 'tomato', 'dish']
 
     def deepcopy(self):
-        return ObjectState(self.name, self.position)
+        return ObjectState(self.name, self.position, self.object_id)
 
     def __eq__(self, other):
         return isinstance(other, ObjectState) and \
@@ -258,7 +259,7 @@ class ObjectState(object):
 
 
 class SoupState(ObjectState):
-    def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
+    def __init__(self, position, ingredients=[], cooking_tick=-1, object_id=None, **kwargs):
         """
         Represents a soup object. An object becomes a soup the instant it is placed in a pot. The
         soup's recipe is a list of ingredient names used to create it. A soup's recipe is undetermined
@@ -269,7 +270,7 @@ class SoupState(ObjectState):
         ingrdients (list(ObjectState)): Objects that have been used to cook this soup. Determiens @property recipe
         cooking (int): How long the soup has been cooking for. -1 means cooking hasn't started yet
         """
-        super(SoupState, self).__init__("soup", position)
+        super(SoupState, self).__init__("soup", position, object_id)
         self._ingredients = ingredients
         self._cooking_tick = cooking_tick
         self._recipe = None
@@ -384,7 +385,7 @@ class SoupState(ObjectState):
 
 
     def deepcopy(self):
-        return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick)
+        return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick, self.object_id)
     
     def to_dict(self):
         info_dict = super(SoupState, self).to_dict()
@@ -966,9 +967,9 @@ class OvercookedGridworld(object):
         shaped reward is given only for completion of subgoals 
         (not soup deliveries).
         """
-
-        events_infos = { event : [None] * self.num_players for event in EVENT_TYPES }
+        events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
         # phi_s = self.potential_function(state)
+        events_list = []
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -978,7 +979,7 @@ class OvercookedGridworld(object):
         new_state = state.deepcopy()
 
         # Resolve interacts first
-        sparse_reward_by_agent, shaped_reward_by_agent = self.resolve_interacts(new_state, joint_action, events_infos)
+        sparse_reward_by_agent, shaped_reward_by_agent = self.resolve_interacts(new_state, joint_action, events_infos, events_list)
 
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
@@ -995,12 +996,13 @@ class OvercookedGridworld(object):
         # phi_s_prime = self.potential_function(new_state)
         infos = {
             "event_infos": events_infos,
+            "events_list": events_list,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
         }
         return new_state, infos
 
-    def resolve_interacts(self, new_state, joint_action, events_infos):
+    def resolve_interacts(self, new_state, joint_action, events_infos, events_list):
         """
         Resolve any INTERACT actions, if present.
 
@@ -1027,25 +1029,25 @@ class OvercookedGridworld(object):
                     # Drop object on counter
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
-                    self.log_object_drop(events_infos, new_state, obj, pot_states, player_idx)
-
+                    self.log_object_drop(events_infos, events_list, new_state, obj, pot_states, player_idx)
+                    
                 elif not player.has_object() and new_state.has_object(i_pos):
                     # Pick up object from counter
                     obj = new_state.remove_object(i_pos)
                     player.set_object(obj)
-                    self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
-
+                    self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
+                    
             elif terrain_type == 'O' and player.held_object is None:
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
                 player.set_object(obj)
-                self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
-
+                self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
+            
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
                 obj = ObjectState('tomato', pos)
                 player.set_object(obj)
-                self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
+                self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
 
             elif terrain_type == 'D' and player.held_object is None:
                 # Give shaped reward if pickup is useful
@@ -1055,7 +1057,7 @@ class OvercookedGridworld(object):
                 # Perform dish pickup from dispenser
                 obj = ObjectState('dish', pos)
                 player.set_object(obj)
-                self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
+                self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
 
             elif terrain_type == 'P' and not player.has_object():
                 # Cooking soup
@@ -1070,7 +1072,7 @@ class OvercookedGridworld(object):
                     player.remove_object() # Remove the dish
                     obj = new_state.remove_object(i_pos) # Get soup
                     player.set_object(obj)
-                    self.log_object_pickup(events_infos, new_state, obj, pot_states, player_idx)
+                    self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
                     shaped_reward[player_idx] += self.reward_shaping_params["SOUP_PICKUP_REWARD"]
 
                 elif player.get_object().name in Recipe.ALL_INGREDIENTS:
@@ -1086,20 +1088,16 @@ class OvercookedGridworld(object):
                         old_soup = soup.deepcopy()
                         obj = player.remove_object()
                         soup.add_ingredient(obj)
+                        self.log_object_potting(events_infos, events_list, new_state, old_soup, soup, obj, player_idx)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
-
-                        # Log potting
-                        self.log_object_potting(events_infos, new_state, old_soup, soup, obj, player_idx)
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':
-
                     delivery_rew = self.deliver_soup(new_state, player, obj)
                     sparse_reward[player_idx] += delivery_rew
-
                     # Log soup delivery
-                    events_infos['soup_delivery'][player_idx] = True                        
+                    self.log_soup_delivery(events_infos, events_list, obj, player_idx)
 
         return sparse_reward, shaped_reward
 
@@ -1477,13 +1475,12 @@ class OvercookedGridworld(object):
     ################################
     # EVENT LOGGING HELPER METHODS #
     ################################
-    def log_object_potting(self, events_infos, state, old_soup, new_soup, obj, player_index):
+    def log_object_potting(self, events_infos, events_list, state, old_soup, new_soup, obj, player_index):
         """Player added an ingredient to a pot"""
-        obj_name = obj.name
-        obj_pickup_key = "potting_" + obj_name
+        obj_pickup_key = "potting_" + obj.name
         if obj_pickup_key not in events_infos:
             raise ValueError("Unknown event {}".format(obj_pickup_key))
-        events_infos[obj_pickup_key][player_index] = obj.object_id
+        events_infos[obj_pickup_key][player_index] = True
 
         POTTING_FNS = {
             "optimal" : self.is_potting_optimal,
@@ -1491,46 +1488,60 @@ class OvercookedGridworld(object):
             "viable" : self.is_potting_viable,
             "useless" : self.is_potting_useless
         }
+        outcomes = [outcome for outcome, outcome_fn in POTTING_FNS.items() if outcome_fn(state, old_soup, new_soup)]
+        for outcome in outcomes:
+            potting_key = "{}_{}_potting".format(outcome, obj.name)
+            events_infos[potting_key][player_index] = True
 
-        for outcome, outcome_fn in POTTING_FNS.items():
-            if outcome_fn(state, old_soup, new_soup):
-                potting_key = "{}_{}_potting".format(outcome, obj_name)
-                events_infos[potting_key][player_index] = obj.object_id
-
-    def log_object_pickup(self, events_infos, state, obj, pot_states, player_index):
+        events_list.append(dict(action="potting", player=player_index, object=obj.to_dict(), adjectives=outcomes))
+    
+    def log_object_pickup(self, events_infos, events_list, state, obj, pot_states, player_index):
         """Player picked an object up from a counter or a dispenser"""
-        obj_pickup_key = obj_name + "_pickup"
+        obj_pickup_key = obj.name + "_pickup"
         if obj_pickup_key not in events_infos:
             raise ValueError("Unknown event {}".format(obj_pickup_key))
-        events_infos[obj_pickup_key][player_index] = obj.object_id
+        events_infos[obj_pickup_key][player_index] = True
         
         USEFUL_PICKUP_FNS = {
             "tomato" : self.is_ingredient_pickup_useful,
             "onion": self.is_ingredient_pickup_useful,
             "dish": self.is_dish_pickup_useful
         }
-        if obj_name in USEFUL_PICKUP_FNS:
-            if USEFUL_PICKUP_FNS[obj_name](state, pot_states, player_index):
-                obj_useful_key = "useful_" + obj_name + "_pickup"
-                events_infos[obj_useful_key][player_index] = obj.object_id
 
-    def log_object_drop(self, events_infos, state, obj, pot_states, player_index):
+        if obj.name in USEFUL_PICKUP_FNS.keys() and USEFUL_PICKUP_FNS[obj.name](state, pot_states, player_index):
+            obj_useful_key = "useful_" + obj.name + "_pickup"
+            events_infos[obj_useful_key][player_index] = True
+            event_adjectives = ["useful"]
+        else:
+            event_adjectives = []
+
+        events_list.append(dict(action="pickup", player=player_index, object=obj.to_dict(), adjectives=event_adjectives))
+    
+    def log_object_drop(self, events_infos, events_list, state, obj, pot_states, player_index):
         """Player dropped the object on a counter"""
-        obj_name = obj.name
-        obj_drop_key = obj_name + "_drop"
+        obj_drop_key = obj.name + "_drop"
         if obj_drop_key not in events_infos:
             raise ValueError("Unknown event {}".format(obj_drop_key))
-        events_infos[obj_drop_key][player_index] = obj.object_id
+        events_infos[obj_drop_key][player_index] = True
         
         USEFUL_DROP_FNS = {
             "tomato" : self.is_ingredient_drop_useful,
             "onion": self.is_ingredient_drop_useful,
             "dish": self.is_dish_drop_useful
         }
-        if obj_name in USEFUL_DROP_FNS:
-            if USEFUL_DROP_FNS[obj_name](state, pot_states, player_index):
-                obj_useful_key = "useful_" + obj_name + "_drop"
-                events_infos[obj_useful_key][player_index] = obj.object_id
+
+        if obj.name in USEFUL_DROP_FNS.keys() and USEFUL_DROP_FNS[obj.name](state, pot_states, player_index):
+            obj_useful_key = "useful_" + obj.name + "_drop"
+            events_infos[obj_useful_key][player_index] = True
+            event_adjectives = ["useful"]
+        else:
+            event_adjectives = []
+
+        events_list.append(dict(action="drop", player=player_index, object=obj.to_dict(), adjectives=event_adjectives))
+    
+    def log_soup_delivery(self, events_infos, events_list, obj, player_index):
+        events_infos['soup_delivery'][player_index] = True
+        events_list.append(dict(action="delivery", player=player_index, object=obj.to_dict(), adjectives=[]))
 
     def is_dish_pickup_useful(self, state, pot_states, player_index=None):
         """
