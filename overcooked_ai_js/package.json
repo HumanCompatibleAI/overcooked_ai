@@ -21,7 +21,7 @@
     "babel-core": "^6.26.3",
     "babel-preset-env": "^1.7.0",
     "babelify": "^8.0.0",
-    "canvas": "^2.6.0",
+    "canvas": "^2.5.0",
     "jest": "^23.6.0",
     "jest-canvas-mock": "^2.1.0",
     "jest-expect-message": "^1.0.2",
