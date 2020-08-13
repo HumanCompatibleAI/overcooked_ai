@@ -21,8 +21,8 @@ force_compute_large = False
 force_compute = True
 DISPLAY = False
 
-simple_mdp = OvercookedGridworld.from_layout_name('cramped_room_o_1order', cook_time=5)
-large_mdp = OvercookedGridworld.from_layout_name('corridor', cook_time=5)
+simple_mdp = OvercookedGridworld.from_layout_name('cramped_room_o_1order')
+large_mdp = OvercookedGridworld.from_layout_name('corridor')
 
 
 class TestAgentEvaluator(unittest.TestCase):
@@ -82,7 +82,7 @@ class TestBasicAgents(unittest.TestCase):
 
 
     def test_two_greedy_human_open_map(self):
-        scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2', cook_time=5)
+        scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
         mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)        
         a0 = GreedyHumanModel(mlp)
         a1 = GreedyHumanModel(mlp)

@@ -247,6 +247,7 @@ class OvercookedEnv(object):
         if regen_mdp:
             # self.mdp = random.choice(self.mdp_lst)
             self.mdp = self.mdp_generator_fn()
+            self._mlp = None
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:
