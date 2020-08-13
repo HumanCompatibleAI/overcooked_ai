@@ -1,17 +1,22 @@
 import unittest, uuid, json
+import os
 from overcooked_ai_py.visualization.extract_events import extract_events
-from overcooked_ai_py.visualization.visualization_utils import create_chart_html, load_visualization_file_as_str
+from overcooked_ai_py.visualization.visualization_utils import create_chart_html
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.utils import load_from_json, NumpyArrayEncoder
+from utils import TESTING_DATA_DIR
+from overcooked_ai_py.mdp.overcooked_mdp import Recipe
 
 def jsonify(obj):
     return json.loads(json.dumps(obj, cls=NumpyArrayEncoder))
-    
+
 class TestVisualizations(unittest.TestCase):
     def setUp(self):
-        trajectory_json = json.loads(load_visualization_file_as_str("test_trajectory1.json"))
-        self.trajectory1 = AgentEvaluator.load_traj_from_json_obj(trajectory_json)
-        self.extracted_events1 = json.loads(load_visualization_file_as_str("extracted_events1.json"))
+        Recipe.configure({})
+        trajectory_path = os.path.join(TESTING_DATA_DIR, "test_visualizations", "trajectory.json")
+        events_path = os.path.join(TESTING_DATA_DIR, "test_visualizations", "expected_extracted_events.json")
+        self.trajectory1 = AgentEvaluator.load_traj_from_json(trajectory_path)
+        self.extracted_events1 = load_from_json(events_path)
 
     def test_event_extraction(self):
         # jsonify to not care about object types (i.e. list vs tuple), but its contents
@@ -28,3 +33,6 @@ class TestVisualizations(unittest.TestCase):
         self.assertTrue("#"+box_id in html)
         self.assertFalse("$" in html)
         self.assertTrue(json.dumps(self.extracted_events1) in html)
+
+if __name__ == '__main__':
+    unittest.main()
