@@ -2287,7 +2287,7 @@ class OvercookedGridworld(object):
                 elif obj.name == 'onion':
                     obj_val = min_coeff**9 * potential_params['onion_value']
                 elif obj.name == 'dish':
-                    obj_val = min_coeff**2 * max(non_idle_soup_vals.values(), default=0)
+                    obj_val = min_coeff**4 * max(non_idle_soup_vals.values(), default=0)
 
                 # Larger reward for objects on useful counters
                 if obj_pos in self.get_useful_counter_locations():
