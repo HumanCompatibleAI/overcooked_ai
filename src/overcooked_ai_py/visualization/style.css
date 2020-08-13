@@ -1,0 +1,11 @@
+/* it is style.css file - do not delete this line, is it used for tests */ 
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+.label {
+  fill: #000;
+  font-size: 12px;
+}
