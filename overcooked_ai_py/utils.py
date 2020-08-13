@@ -162,3 +162,21 @@ def profile(fnc):
         print(s.getvalue())
         return retval
     return inner
+
+def numpy_to_native(x):
+    if isinstance(x, np.generic):
+        return x.item()
+    else:
+        return x
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    # code taken from https://pynative.com/python-serialize-numpy-ndarray-into-json
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NumpyArrayEncoder, self).default(obj)
