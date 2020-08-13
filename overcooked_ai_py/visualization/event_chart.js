@@ -1,3 +1,4 @@
+//it is event_chart.js file - do not delete this line, is it used for tests
 require.config({
     paths: {
         d3: "https://d3js.org/d3.v5.min"
@@ -22,7 +23,7 @@ require(['d3'], function(d3) {
         var center_y = yScale(d.player)
 
         if (d.action == "pickup") { upward = true;}
-        else if (d.action == "drop") { upward = false;}
+        else if (["drop", "potting", "delivery"].includes(d.action)) { upward = false;}
         else {throw 'unknown action';}
 
         return triangle_points(center_x, center_y, triangle_width, triangle_height, upward);
@@ -33,7 +34,7 @@ require(['d3'], function(d3) {
     }
 
     function create_id_attribute(d) {
-        return "item-id"+d.item_id
+        return "object-id"+d.object.object_id
     }
     
     function render_event_chart(data, box_id="#graph-div", settings = 
@@ -105,17 +106,15 @@ require(['d3'], function(d3) {
         yAxisPlayers = d3.axisLeft(yScalePlayers);
         add_left_axis(svg, yAxisPlayers, "Players");
 
+        object_colours = ["silver", "red", "#F6C283", "blue"];
+        object_types = ["dish", "tomato", "onion", "soup"];
 
-        item_colours = ["silver", "red", "#F6C283", "blue"];
-        item_types = ["dish", "tomato", "onion", "soup"];
+        colorScaleObject = d3.scaleOrdinal()
+            .range(object_colours)
+            .domain(object_types);
 
-        colorScaleItem = d3.scaleOrdinal()
-            .range(item_colours)
-            .domain(item_types);
-
-        function highlight_item(svg, d)
+        function highlight_object(svg, d)
         {
-            
             svg.selectAll("#"+create_id_attribute(d))
             .filter(".data-point")
                 .style("stroke-width", settings.highlighted_object_line_width);
@@ -125,9 +124,8 @@ require(['d3'], function(d3) {
                 .style("stroke-width", settings.highlighted_hold_line_width);
         }
         
-        function unghlight_item(svg, d)
+        function unghlight_object(svg, d)
             {
-            
                 svg.selectAll(".data-point")
                 .filter("#"+create_id_attribute(d))
                     .style("stroke-width", settings.object_line_width);
@@ -145,23 +143,23 @@ require(['d3'], function(d3) {
         .attr("x2", d => xScaleTime(d.end_timestep))
             .attr("y1", d => yScalePlayers(d.player))
         .attr("y2", d => yScalePlayers(d.player))
-        .style("stroke", d => colorScaleItem(d.item_name))
+        .style("stroke", d => colorScaleObject(d.object.name))
         .style("stroke-width", settings.hold_line_width)
-            .on("mouseover", d => highlight_item(svg, d))
-            .on("mouseout", d => unghlight_item(svg, d));
+            .on("mouseover", d => highlight_object(svg, d))
+            .on("mouseout", d => unghlight_object(svg, d));
 
         svg.selectAll(".data-point")
-        .data(data.filter(d => ["drop", "pickup"].includes(d.action)))
+        .data(data.filter(d => ["drop", "pickup", "potting", "delivery"].includes(d.action)))
         .enter().append("polygon")
             .attr('id', create_id_attribute)
             .attr("class", "data-point")
             .attr("points", d => points_to_attr(triangle_points_from_data(d, 
                 xScaleTime, yScalePlayers, settings.object_event_width, settings.object_event_height)))
-            .attr("fill", d => colorScaleItem(d.item_name))
-            .style("stroke", d => colorScaleItem(d.item_name))
+            .attr("fill", d => colorScaleObject(d.object.name))
+            .style("stroke", d => colorScaleObject(d.object.name))
             .style("stroke-width", settings.object_line_width)
-            .on("mouseover", d => highlight_item(svg, d))
-            .on("mouseout", d => unghlight_item(svg, d));
+            .on("mouseover", d => highlight_object(svg, d))
+            .on("mouseout", d => unghlight_object(svg, d));
 
     if (settings.add_cumulative_data) {
 
@@ -206,37 +204,37 @@ require(['d3'], function(d3) {
         polygon_center_x = legends_width_so_far + settings.legend_points_width/2;
 
         legends = svg.append("g");
-        items_colour_legend = legends.append("g")
+        objects_colour_legend = legends.append("g")
             .attr("class", "legend");
 
-        items_colour_legend.append("text")
+        objects_colour_legend.append("text")
             .attr("class", "legend-title")
             .attr("x", legends_width_so_far)
             .attr("y", legend_header_y + settings.legend_title_size)
-            .text("Item colour")
+            .text("Object colour")
             .attr("text-anchor", "left")
             .style("alignment-baseline", "middle");
 
-        items_colour_legend.selectAll(".event-colour-legend-point")
-            .data(item_types)
+        objects_colour_legend.selectAll(".event-colour-legend-point")
+            .data(object_types)
             .enter()
             .append("polygon")
                 .attr("points", (d,i) => points_to_attr(triangle_points(polygon_center_x, 
                     first_polygon_center_y + i * legend_point_height_with_margin,
                     settings.legend_points_width, settings.legend_points_height, upward=true)))
-                .style("fill", d => colorScaleItem(d));
+                .style("fill", d => colorScaleObject(d));
 
-        items_colour_legend.selectAll(".event-colour-legend-text")
-            .data(item_types)
+        objects_colour_legend.selectAll(".event-colour-legend-text")
+            .data(object_types)
             .enter()
             .append("text")
                 .attr("x", legends_width_so_far + legend_text_offset_y)
                 .attr("y", (d,i) => legend_points_y + i*legend_point_height_with_margin + settings.legend_points_height/2)
-                .style("fill", d => colorScaleItem(d))
+                .style("fill", d => colorScaleObject(d))
                 .text(d => d)
                 .attr("text-anchor", "left")
                 .style("alignment-baseline", "middle");
-                
+        
         legends_width_so_far = legends.node().getBoundingClientRect().width + settings.legend_margin.right;
         polygon_center_x = legends_width_so_far + settings.legend_points_width/2;
 
@@ -274,7 +272,7 @@ require(['d3'], function(d3) {
                 first_polygon_center_y + 2 * legend_point_height_with_margin,
                 settings.legend_points_width, settings.legend_points_height, upward=false)));
 
-        event_types = ["pickup", "drop", "change item"];
+        event_types = ["pickup", "drop, potting or delivery", "change object"];
         event_type_legend.selectAll(".event-shape-legend-text")
                 .data(event_types)
                 .enter()
