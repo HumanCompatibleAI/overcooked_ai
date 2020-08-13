@@ -65,65 +65,6 @@ def extract_events(trajectories, traj_idx=0, add_cumulative_events=True):
 
         }
         events.append(event)
-        
-    def add_object_ids_to_game_states(game_states, id_key="object_id"):
-        """
-        Receives list of game states as dicts.
-        Adds id to every pickable object as long as they are not moving without player action.
-        This function is most likely temporary until object_id will be implemented in mdp code.
-        """
-        id_generator = itertools.count()
-        
-        def update_object_ids_of_state_objects(state, id_generator):
-            for item in state["objects"]:
-                if item.get(id_key) is None:
-                    if t == 0:
-                        item[id_key] = next(id_generator)
-                    else:
-                        object_id = (find_object_in_game_state(game_states[t-1],
-                                                item.get("name"), item.get("position"))
-                                                or {}).get(id_key)
-                        if object_id is None:
-                            object_id = next(id_generator)
-                        item[id_key] = object_id
-                        
-        def find_object_in_game_state(state, name, pos):
-            pos = tuple(pos)
-            for item in state["objects"]:
-                if item["name"] == name and tuple(item["position"]) == pos:
-                    return item
-        
-        def update_object_id_in_state(state, name, pos, obj_id):
-            found_obj = find_object_in_game_state(state, name, pos)
-            if found_obj:
-                found_obj[id_key] = obj_id
-                
-        def front_of_player_pos(player):
-            return [player["position"][i] + player["orientation"][i]
-                                            for i in range(len(player["position"]))]
-        
-        for t, state in enumerate(game_states):
-            update_object_ids_of_state_objects(state, id_generator)
-            for p, player in enumerate(state["players"]):
-                held_object = player["held_object"] or {}
-                if (t+1 < len(game_states)):
-                    front_pos = front_of_player_pos(player)
-                    held_object_next_t = game_states[t+1]["players"][p]["held_object"] or {}
-                    if held_object:
-                        if held_object.get(id_key) is None:
-                            held_object[id_key] = next(id_generator)
-                        if held_object.get("name") == held_object_next_t.get("name"):
-                            held_object_next_t[id_key] = held_object[id_key]
-                        else:
-                            # item drop event
-                            update_object_id_in_state(game_states[t+1], held_object["name"], front_pos, held_object["object_id"])
-                    
-                    # item pickup event
-                    if held_object_next_t and held_object.get("name") != held_object_next_t.get("name"):
-                        held_object_next_t[id_key] = (find_object_in_game_state(state, held_object_next_t["name"], front_pos) or {}).get("object_id")
-                        if held_object_next_t[id_key] is None:
-                            held_object_next_t[id_key] = next(id_generator)
-        return game_states
     
     def get_cumulative_events(events, last_timestep):
         """
@@ -164,7 +105,6 @@ def extract_events(trajectories, traj_idx=0, add_cumulative_events=True):
         return cumulative_events
 
     game_states = [state.to_dict() for state in trajectories["ep_states"][traj_idx]]
-    game_states = add_object_ids_to_game_states(game_states)
     events = []
     
     for t, state in enumerate(game_states):

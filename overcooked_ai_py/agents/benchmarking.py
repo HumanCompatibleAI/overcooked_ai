@@ -2,7 +2,7 @@ import json, copy
 import numpy as np
 from IPython.display import display
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, NumpyArrayEncoder
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
@@ -261,19 +261,24 @@ class AgentEvaluator(object):
         dict_traj['ep_dones'] = [list(lst) for lst in dict_traj['ep_dones']]
         dict_traj['ep_returns'] = [int(val) for val in dict_traj['ep_returns']]
         dict_traj['ep_lengths'] = [int(val) for val in dict_traj['ep_lengths']]
-
-        # NOTE: Currently saving to JSON does not support ep_infos (due to nested np.arrays) or metadata
-        del dict_traj['ep_infos']
+        # NOTE: Currently saving to JSON does not support metadata
+        dict_traj['ep_infos'] = json.loads(json.dumps(dict_traj['ep_infos'], cls=NumpyArrayEncoder))
         del dict_traj['metadatas']
         return dict_traj
 
     @staticmethod
     def load_traj_from_json(filename):
         traj_dict = load_from_json(filename)
+        return AgentEvaluator.load_traj_from_json_obj(traj_dict)
+
+    @staticmethod
+    def load_traj_from_json_obj(obj):
+        # currently ep_infos is not changed back to numpy arrays/tuples from lists
+        traj_dict = copy.deepcopy(obj)
         traj_dict["ep_states"] = [[OvercookedState.from_dict(ob) for ob in curr_ep_obs] for curr_ep_obs in traj_dict["ep_states"]]
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
-
+    
     ############################
     # TRAJ MANINPULATION UTILS #
     ############################
