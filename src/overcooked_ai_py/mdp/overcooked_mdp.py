@@ -778,6 +778,14 @@ EVENT_TYPES = [
     'catastrophic_tomato_potting',
     'useless_onion_potting',
     'useless_tomato_potting'
+
+    # Counter events
+    'useful_counter_onion_drop',
+    'useful_counter_tomato_drop',
+    'useful_counter_soup_drop',
+    'useful_counter_onion_pickup',
+    'useful_counter_tomato_pickup',
+    'useful_counter_soup_pickup'
 ]
 
 POTENTIAL_CONSTANTS = {
@@ -1081,7 +1089,7 @@ class OvercookedGridworld(object):
 
                 if player.has_object() and not new_state.has_object(i_pos):
                     obj_name = player.get_object().name
-                    self.log_object_drop(events_infos, new_state, obj_name, pot_states, player_idx)
+                    self.log_object_drop(events_infos, new_state, obj_name, pot_states, player_idx, i_pos)
 
                     # Drop object on counter
                     obj = player.remove_object()
@@ -1089,7 +1097,7 @@ class OvercookedGridworld(object):
                     
                 elif not player.has_object() and new_state.has_object(i_pos):
                     obj_name = new_state.get_object(i_pos).name
-                    self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx)
+                    self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx, i_pos)
 
                     # Pick up object from counter
                     obj = new_state.remove_object(i_pos)
@@ -1097,7 +1105,7 @@ class OvercookedGridworld(object):
                     
 
             elif terrain_type == 'O' and player.held_object is None:
-                self.log_object_pickup(events_infos, new_state, "onion", pot_states, player_idx)
+                self.log_object_pickup(events_infos, new_state, "onion", pot_states, player_idx, i_pos)
 
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
@@ -1108,7 +1116,7 @@ class OvercookedGridworld(object):
                 player.set_object(ObjectState('tomato', pos))
 
             elif terrain_type == 'D' and player.held_object is None:
-                self.log_object_pickup(events_infos, new_state, "dish", pot_states, player_idx)
+                self.log_object_pickup(events_infos, new_state, "dish", pot_states, player_idx, i_pos)
 
                 # Give shaped reward if pickup is useful
                 if self.is_dish_pickup_useful(new_state, pot_states):
@@ -1127,7 +1135,7 @@ class OvercookedGridworld(object):
             elif terrain_type == 'P' and player.has_object():
 
                 if player.get_object().name == 'dish' and self.soup_ready_at_location(new_state, i_pos):
-                    self.log_object_pickup(events_infos, new_state, "soup", pot_states, player_idx)
+                    self.log_object_pickup(events_infos, new_state, "soup", pot_states, player_idx, i_pos)
 
                     # Pick up soup
                     player.remove_object() # Remove the dish
@@ -1623,7 +1631,7 @@ class OvercookedGridworld(object):
                 events_infos[potting_key][player_index] = True
 
     
-    def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index):
+    def log_object_pickup(self, events_infos, state, obj_name, pot_states, player_index, i_pos):
         """Player picked an object up from a counter or a dispenser"""
         obj_pickup_key = obj_name + "_pickup"
         if obj_pickup_key not in events_infos:
@@ -1640,7 +1648,11 @@ class OvercookedGridworld(object):
                 obj_useful_key = "useful_" + obj_name + "_pickup"
                 events_infos[obj_useful_key][player_index] = True
 
-    def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index):
+        if i_pos in self.get_useful_counter_locations():
+            useful_counter_key = 'useful_counter_{}_pickup'.format(obj_name)
+            events_infos[useful_counter_key][player_index] = True
+
+    def log_object_drop(self, events_infos, state, obj_name, pot_states, player_index, i_pos):
         """Player dropped the object on a counter"""
         obj_drop_key = obj_name + "_drop"
         if obj_drop_key not in events_infos:
@@ -1656,6 +1668,10 @@ class OvercookedGridworld(object):
             if USEFUL_DROP_FNS[obj_name](state, pot_states, player_index):
                 obj_useful_key = "useful_" + obj_name + "_drop"
                 events_infos[obj_useful_key][player_index] = True
+
+        if i_pos in self.get_useful_counter_locations():
+            useful_counter_key = 'useful_counter_{}_drop'.format(obj_name)
+            events_infos[useful_counter_key][player_index] = True
 
     def is_dish_pickup_useful(self, state, pot_states, player_index=None):
         """
