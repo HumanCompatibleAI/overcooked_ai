@@ -42,15 +42,15 @@ class AgentEvaluator(object):
 
         self.force_compute = force_compute
 
-    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, regen_mdp=True):
+    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, native_eval=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, regen_mdp=regen_mdp)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    def evaluate_human_model_pair(self, num_games=1, display=False, regen_mdp=True):
+    def evaluate_human_model_pair(self, num_games=1, display=False, native_eval=False):
         a0 = GreedyHumanModel(self.env.mlp)
         a1 = GreedyHumanModel(self.env.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, regen_mdp=regen_mdp)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
     # Deprecated. Need to amend Heuristic before reactivating CoupledPlanningAgent:
     # def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
@@ -73,17 +73,23 @@ class AgentEvaluator(object):
     #     agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
     #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
 
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True, regen_mdp=True):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True, native_eval=False):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
-        idx = 0
 
-        horizon_env = self.env.copy()
-        horizon_env.horizon = self.env.horizon if game_length is None else game_length
-        horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
-        horizon_env.reset(regen_mdp)
-        return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+        # native eval: using self.env in evaluation instead of creating a copy
+        # this is particulally helpful with variable MDP, where we want to make sure
+        # the mdp used in evaluation is the same as the native self.env.mdp
+        if native_eval:
+            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info,
+                                         metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+        else:
+            horizon_env = self.env.copy()
+            horizon_env.horizon = self.env.horizon if game_length is None else game_length
+            horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
+            horizon_env.reset()
+            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""

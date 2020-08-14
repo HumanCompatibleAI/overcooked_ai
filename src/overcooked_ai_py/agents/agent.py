@@ -336,7 +336,9 @@ class GreedyHumanModel(Agent):
                     new_state, _ = self.mlp.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
-
+                # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
+                if len(unblocking_joint_actions) == 0:
+                    unblocking_joint_actions.append([Action.STAY, Action.STAY])
                 chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
                     self.agent_index]
                 action_probs = self.a_probs_from_action(chosen_action)

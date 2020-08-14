@@ -970,7 +970,6 @@ class MediumLevelPlanner(object):
         mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
         print("It took {} seconds to create mlp".format(time.time() - start_time))
         mlp.ml_action_manager.save_to_file(final_filepath)
-        print("MMMMMMMADE IT")
         return mlp
 
     def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):

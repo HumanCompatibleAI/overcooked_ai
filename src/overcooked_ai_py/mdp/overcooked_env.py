@@ -328,7 +328,7 @@ class OvercookedEnv(object):
             if display: print(self)
             if done: break
         successor_state = self.state
-        self.reset()
+        self.reset(False)
         return successor_state, done
 
     def run_agents(self, agent_pair, include_final_state=False, display=False, display_until=np.Inf):
@@ -404,7 +404,7 @@ class OvercookedEnv(object):
             trajectories["env_params"].append(self.env_params)
             trajectories["metadatas"].append(metadata_fn(rollout_info))
 
-            self.reset()
+            self.reset(False)
             agent_pair.reset()
 
             if info:

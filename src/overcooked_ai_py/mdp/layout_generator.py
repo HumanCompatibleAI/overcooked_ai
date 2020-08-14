@@ -181,6 +181,7 @@ class LayoutGenerator(object):
         padded_grid = self.embed_grid(grid)
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
+        print("QQQQQQQQ", mdp_grid, base_param)
         return OvercookedGridworld.from_grid(mdp_grid, base_param)
 
     def padded_grid_to_layout_grid(self, padded_grid, start_positions, display=False):
