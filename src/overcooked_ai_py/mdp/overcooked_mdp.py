@@ -777,7 +777,7 @@ EVENT_TYPES = [
     'catastrophic_onion_potting',
     'catastrophic_tomato_potting',
     'useless_onion_potting',
-    'useless_tomato_potting'
+    'useless_tomato_potting',
 
     # Counter events
     'useful_counter_onion_drop',
@@ -785,7 +785,9 @@ EVENT_TYPES = [
     'useful_counter_soup_drop',
     'useful_counter_onion_pickup',
     'useful_counter_tomato_pickup',
-    'useful_counter_soup_pickup'
+    'useful_counter_soup_pickup',
+    'useful_counter_dish_drop',
+    'useful_counter_dish_pickup'
 ]
 
 POTENTIAL_CONSTANTS = {
@@ -1031,6 +1033,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
+
         # phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
@@ -1160,8 +1163,6 @@ class OvercookedGridworld(object):
 
                         # Log potting
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
-                        if obj.name == Recipe.ONION:
-                            events_infos['potting_onion'][player_idx] = True
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
@@ -1671,7 +1672,14 @@ class OvercookedGridworld(object):
 
         if i_pos in self.get_useful_counter_locations():
             useful_counter_key = 'useful_counter_{}_drop'.format(obj_name)
-            events_infos[useful_counter_key][player_index] = True
+            try:
+                events_infos[useful_counter_key][player_index] = True
+            except Exception as e:
+                print(e)
+                print(useful_counter_key)
+                print(events_infos)
+                print(useful_counter_key in events_infos)
+                raise ValueError("uh oh")
 
     def is_dish_pickup_useful(self, state, pot_states, player_index=None):
         """
@@ -1734,13 +1742,13 @@ class OvercookedGridworld(object):
 
     def is_potting_optimal(self, state, old_soup, new_soup):
         """
-        True if the highest valued soup possible is the same before and after the potting
+        True if the highest valued soup possible is the same before and after the potting (and is non-zero)
         """
         old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
         new_recipe = Recipe(new_soup.ingredients)
         old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))
         new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
-        return old_val == new_val
+        return old_val == new_val and old_val > 0
 
     def is_potting_viable(self, state, old_soup, new_soup):
         """
@@ -2143,6 +2151,7 @@ class OvercookedGridworld(object):
         done_soups = [state.get_object(pos) for pos in self.get_ready_pots(pot_states)]
         non_idle_soup_vals = { soup : min_coeff**2 * gamma**(potential_params['max_delivery_steps'] + max(potential_params['max_pickup_steps'], soup.cook_time - soup._cooking_tick)) * max(self.get_recipe_value(state, soup.recipe), 1) for soup in cooking_soups + done_soups }
 
+
         # Get descriptive list of players based on different attributes
         # Note that these lists are mutually exclusive
         players_holding_soups = [player for player in state.players if player.has_object() and player.get_object().name == 'soup']
@@ -2274,14 +2283,12 @@ class OvercookedGridworld(object):
             discount = min_coeff**9 * gamma**(min(potential_params['pot_onion_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
             potential += discount * potential_params['onion_value']
 
-
         ## Counters ##
         for obj_pos, obj in state.objects.items():
             # Reward any object on any counter
             if obj_pos in self.get_counter_locations():
-                obj_val = 0
                 if obj.name == 'soup':
-                    obj_val = self.get_recipe_value(state, obj.recipe)
+                    obj_val == min_coeff * gamma**potential_params['max_delivery_steps'] * self.get_recipe_value(state, obj.recipe)
                 elif obj.name == 'tomato':
                     obj_val = min_coeff**9 * potential_params['tomato_value']
                 elif obj.name == 'onion':
@@ -2294,8 +2301,8 @@ class OvercookedGridworld(object):
                     usefulness_coeff = self.get_counter_usefulness_coeff(state, obj_pos, mp)
                     usefulness_coeff *= potential_params['useful_counter_coeff']
                     obj_val *= usefulness_coeff
-                # Smaller reward for objects on non-useful counters
-                else:
+                # Smaller reward for non-soups on non-useful counters (soups always get rewarded for being on counters)
+                elif obj.name != 'soup':
                     obj_val *= potential_params['non_useful_counter_coeff']
                 potential += obj_val
 
