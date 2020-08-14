@@ -73,7 +73,7 @@ python -m unittest -s testing/ -p "*_test.py"
 - `agent.py`: location of agent classes
 - `benchmarking.py`: sample trajectories of agents (both trained and planners) and load various models
 
-`planning`:
+`planning/`:
 - `planners.py`: near-optimal agent planning logic
 - `search.py`: A* search and shortest path logic
 
