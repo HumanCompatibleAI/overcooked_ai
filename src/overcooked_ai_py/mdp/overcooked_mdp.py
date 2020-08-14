@@ -2287,8 +2287,9 @@ class OvercookedGridworld(object):
         for obj_pos, obj in state.objects.items():
             # Reward any object on any counter
             if obj_pos in self.get_counter_locations():
+                obj_val = 0
                 if obj.name == 'soup':
-                    obj_val == min_coeff * gamma**potential_params['max_delivery_steps'] * self.get_recipe_value(state, obj.recipe)
+                    obj_val = min_coeff * gamma**potential_params['max_delivery_steps'] * self.get_recipe_value(state, obj.recipe)
                 elif obj.name == 'tomato':
                     obj_val = min_coeff**9 * potential_params['tomato_value']
                 elif obj.name == 'onion':
