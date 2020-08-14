@@ -232,6 +232,34 @@ class Recipe:
 
         if 'onion_value' in conf:
             cls._onion_value = conf['onion_value']
+    
+    @classmethod
+    def generate_random_recipes(cls, n=1, min_size=2, max_size=3, ingredients=None, recipes=None, unique=True):
+        """
+        n (int): how many recipes generate
+        min_size (int): min generated recipe size
+        max_size (int): max generated recipe size
+        ingredients (list(str)): list of ingredients used for generating recipes (default is cls.ALL_INGREDIENTS)
+        recipes (list(Recipe)): list of recipes to choose from (default is cls.ALL_RECIPES)
+        unique (bool): if all recipes are unique (without repeats)
+        """
+        if recipes is None: recipes = cls.ALL_RECIPES
+
+        ingredients = set(ingredients or cls.ALL_INGREDIENTS)
+        choice_replace = not(unique)
+
+        assert 1 <= min_size <= max_size <= cls.MAX_NUM_INGREDIENTS
+        assert all(ingredient in cls.ALL_INGREDIENTS for ingredient in ingredients)
+
+        def valid_size(r):
+            return min_size <= len(r.ingredients) <= max_size
+
+        def valid_ingredients(r):
+            return all(i in ingredients for i in r.ingredients)
+        
+        relevant_recipes = [r for r in recipes if valid_size(r) and valid_ingredients(r)]
+        assert choice_replace or (n <= len(relevant_recipes))
+        return np.random.choice(relevant_recipes, n, replace=choice_replace)
 
     @classmethod
     def from_dict(cls, obj_dict):
