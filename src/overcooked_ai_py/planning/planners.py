@@ -1142,10 +1142,6 @@ class MediumLevelPlanner(object):
     #     return action_plan, end_state, cost
 
     def embedded_mdp_succ_fn(self, state, other_agent):
-        if state.timestep > 400:
-            print("caught")
-            return []
-
         other_agent_action, _ = other_agent.action(state)
 
         successors = []

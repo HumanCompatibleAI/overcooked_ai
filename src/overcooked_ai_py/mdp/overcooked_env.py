@@ -12,6 +12,9 @@ DEFAULT_ENV_PARAMS = {
 
 MAX_HORIZON = 1e10
 
+# if this is a positive integer, we are sampling from a finite list of mdp.
+# Otherwise, we are using the mdp_fn to generate a new MDP every single time
+LST_LEN = -1
 
 class OvercookedEnv(object):
     """
@@ -70,14 +73,19 @@ class OvercookedEnv(object):
                                             "If trying to instantiate directly from a OvercookedGridworld " \
                                             "instance, use the OvercookedEnv.from_mdp method"
         self.variable_mdp = _variable_mdp
-        self.mdp_generator_fn = mdp_generator_fn
+        # infinite case
+        if LST_LEN == -1:
+            self.mdp_generator_fn = mdp_generator_fn
+        # finite MDP LST case
+        else:
+            self.mdp_lst = [mdp_generator_fn() for _ in range(LST_LEN)]
+            self.mdp_generator_fn = lambda : random.choice(self.mdp_lst)
         self.horizon = horizon
         self._mlp = None
         self.mlp_params = mlp_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-        # self.lst_len = 4
-        # self.mdp_lst = [self.mdp_generator_fn() for _ in range(self.lst_len)]
+
         self.reset()
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
@@ -243,9 +251,12 @@ class OvercookedEnv(object):
         return self.mdp.featurize_state(state, self.horizon, self.mlp)
 
     def reset(self, regen_mdp=True):
-        """Resets the environment. Does NOT reset the agent."""
+        """
+        Resets the environment. Does NOT reset the agent.
+        The optional regen_mdp argument gives the option of not re-generating mdp on the reset,
+        which is particularly helpful with reproducing results on variable mdp
+        """
         if regen_mdp:
-            # self.mdp = random.choice(self.mdp_lst)
             self.mdp = self.mdp_generator_fn()
             self._mlp = None
         if self.start_state_fn is None:
@@ -404,7 +415,8 @@ class OvercookedEnv(object):
             trajectories["env_params"].append(self.env_params)
             trajectories["metadatas"].append(metadata_fn(rollout_info))
 
-            self.reset(False)
+            # we do not need to regenerate MDP if we are getting a series of rollout using the same mdp
+            self.reset(regen_mdp=False)
             agent_pair.reset()
 
             if info:

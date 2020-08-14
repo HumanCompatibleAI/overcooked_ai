@@ -882,6 +882,10 @@ class OvercookedGridworld(object):
         layout_grid = [[c for c in row] for row in layout_grid]
         OvercookedGridworld._assert_valid_grid(layout_grid)
 
+        if "layout_name" not in mdp_config:
+            layout_name = "|".join(["".join(line) for line in layout_grid])
+            mdp_config["layout_name"] = layout_name
+
         player_positions = [None] * 9
         for y, row in enumerate(layout_grid):
             for x, c in enumerate(row):
@@ -898,10 +902,6 @@ class OvercookedGridworld(object):
         # After removing player positions from grid we have a terrain mtx
         mdp_config["terrain"] = layout_grid
         mdp_config["start_player_positions"] = player_positions
-        if "layout_name" not in mdp_config:
-            layout_name = "|".join(["".join(line) for line in layout_grid])
-            # print(layout_name)
-            mdp_config["layout_name"] = layout_name
 
         for k, v in params_to_overwrite.items():
             curr_val = mdp_config.get(k, None)
@@ -1032,7 +1032,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action, ignore_info=False):
+    def get_state_transition(self, state, joint_action):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -1224,8 +1224,8 @@ class OvercookedGridworld(object):
         assert soup.name == 'soup', "Tried to deliver something that wasn't soup"
         assert soup.is_ready, "Tried to deliever soup that isn't ready"
         player.remove_object()
-        return self.get_recipe_value(state, soup.recipe)
 
+        return self.get_recipe_value(state, soup.recipe)
 
 
     def resolve_movement(self, state, joint_action):
@@ -1357,12 +1357,6 @@ class OvercookedGridworld(object):
     def num_pots(self):
         return len(self.get_pot_locations())
 
-    def max_recipe_value(self, state):
-        max_reg_order = max([self.get_recipe_value(state, reg_r) for reg_r in state.all_orders])
-        max_bonus_order = 0 if len(state.bonus_orders) == 0 \
-            else self.order_bonus * max([self.get_recipe_value(state, bonus_r) for bonus_r in state.bonus_orders])
-        return max(max_reg_order, max_bonus_order)
-
     def get_pot_states(self, state):
         """Returns dict with structure:
         {
@@ -1379,12 +1373,7 @@ class OvercookedGridworld(object):
                 pots_states_dict['empty'].append(pot_pos)
             else:
                 soup = state.get_object(pot_pos)
-                if soup.name != 'soup':
-                    print("TRUE THING IS", soup.name, "at", pot_pos)
-                    print(state.objects)
-                    print(state.players)
-                    print(self.state_string(state))
-                    print("--------")
+                assert soup.name == 'soup', "soup at " + pot_pos + " is not a soup but a " + soup.name
                 if soup.is_ready:
                     pots_states_dict['ready'].append(pot_pos)
                 elif soup.is_cooking:
@@ -1430,31 +1419,6 @@ class OvercookedGridworld(object):
 
     def get_partially_full_pots(self, pot_states):
         return list(set().union(*[pot_states['{}_items'.format(i)] for i in range(1, Recipe.MAX_NUM_INGREDIENTS)]))
-
-    def get_pot_need_ingredient_poss(self, state, ingredient):
-        """
-        get the list of pot position that need a particular ingredient
-        """
-        assert ingredient in Recipe.ALL_INGREDIENTS, "%s is not a valid ingredient" % ingredient
-        # use set operation to save time
-        res = set([])
-        for pot_pos in self.get_pot_locations():
-            if not state.has_object(pot_pos):
-                s_ct = Counter()
-            else:
-                soup = state.get_object(pot_pos)
-                # if the soupe is idling, we could still add ingredients to it
-                if soup.is_idle:
-                    s_ct = Counter(soup.ingredients)
-                # if the soup is cooking or done, nothing could be done
-                else: continue
-            for order_ct in self.all_orders_ct:
-                # ingredients need to be needed
-                if ingredient in order_ct - s_ct:
-                    res.add(pot_pos)
-                    continue
-        return res
-
 
     def soup_ready_at_location(self, state, pos):
         if not state.has_object(pos):
@@ -1970,7 +1934,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, horizon, mlp):
+    def featurize_state(self, overcooked_state, mlp):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
