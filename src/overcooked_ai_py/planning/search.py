@@ -217,8 +217,19 @@ class Graph(object):
                 smallest_dist = curr_dist
 
         if best_index is None:
-            raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
-                                    + "This could be caused by using another layout's planner on this layout")
+            # !!! Big changes here: pending review
+            # Basically, for some of the variable mdp, it is possible for an agent to be "trapped" and
+            # unable to go from one joint state to another joint state
+            # X S X O X         X S X O X
+            # D 1 X   X         D 2 X   X
+            # X     2 P   --->  X     1 P
+            # X X X X X         X X X X X
+            # This is actually an absolutely impossible transition
+
+            # Override the error for now and return an empty list
+            # raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
+            #                        + "This could be caused by using another layout's planner on this layout")
+            return [start_index]
 
         return [start_index] + self._get_node_index_path(best_index, goal_index)
 

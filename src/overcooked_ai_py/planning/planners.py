@@ -379,6 +379,9 @@ class JointMotionPlanner(object):
             dummy_start_jm_state = tuple((pos, dummy_orientation) for pos in starting_positions)
             plan_key = (dummy_start_jm_state, goal_jm_state)
 
+        if plan_key not in self.all_plans:
+            num_player = len(goal_jm_state)
+            return [], None, [np.inf] * num_player
         joint_action_plan, end_jm_state, plan_lengths = self.all_plans[plan_key]
         return joint_action_plan, end_jm_state, plan_lengths
 
@@ -408,7 +411,10 @@ class JointMotionPlanner(object):
             if not self.is_valid_jm_start_goal_pair(joint_start_state, joint_goal_state):
                 continue
 
+            # Note: we might fail to get the plan, just due to the nature of the layouts
             joint_action_list, end_statuses, plan_lengths = self._obtain_plan(joint_start_state, joint_goal_state)
+            if end_statuses is None:
+                continue
             plan_key = (joint_start_state, joint_goal_state)
             all_plans[plan_key] = (joint_action_list, end_statuses, plan_lengths)
         return all_plans
@@ -588,6 +594,10 @@ class JointMotionPlanner(object):
         start_positions = list(zip(*joint_start_state))[0]
         goal_positions = list(zip(*joint_goal_state))[0]
         joint_positions_node_path = self.joint_graph_problem.get_node_path(start_positions, goal_positions)[1:]
+        if len(joint_positions_node_path) == 0:
+            # The cost will be infinite if there is no path
+            num_player = len(goal_positions)
+            return [], None, [np.inf] * num_player
         joint_actions_list, end_pos_and_orientations, finishing_times = self.joint_action_plan_from_positions(joint_positions_node_path, joint_start_state, joint_goal_state)
         return joint_actions_list, end_pos_and_orientations, finishing_times
 
