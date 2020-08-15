@@ -104,7 +104,6 @@ class LayoutGenerator(object):
         mdp_params_schedule_fn: the schedule for varying mdp params
         """
         # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
-        print("mdp_params_schedule_fn", mdp_params_schedule_fn)
         if outer_shape is None:
             assert type(mdp_params) is dict and "layout_name" in mdp_params
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
