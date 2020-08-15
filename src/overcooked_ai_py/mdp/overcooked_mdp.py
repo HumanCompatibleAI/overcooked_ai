@@ -856,7 +856,6 @@ class OvercookedGridworld(object):
         One can overwrite the default mdp configuration using partial_mdp_config.
         """
         params_to_overwrite = params_to_overwrite.copy()
-        # print("layout name", layout_name)
         base_layout_params = read_layout_dict(layout_name)
 
         grid = base_layout_params['grid']

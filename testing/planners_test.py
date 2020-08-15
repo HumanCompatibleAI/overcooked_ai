@@ -1,11 +1,11 @@
 import unittest, time, pickle
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, SoupState, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 large_mdp_tests = False
-force_compute = False
+force_compute = True
 force_compute_large = False
 
 n, s = Direction.NORTH, Direction.SOUTH
@@ -70,9 +70,9 @@ if large_mdp_tests:
     action_manger_filename = "corridor_am.pkl"
     ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
         large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
-
-    hlam = HighLevelActionManager(ml_planner_large)
-    hlp = HighLevelPlanner(hlam)
+    # Deprecated.
+    # hlam = HighLevelActionManager(ml_planner_large)
+    # hlp = HighLevelPlanner(hlam)
 
 
 def done_soup_obj(soup_loc, num_onion_inside=3):

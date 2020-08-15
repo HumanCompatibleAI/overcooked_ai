@@ -4,14 +4,13 @@ clean = True
 import itertools, os, tqdm
 import numpy as np
 import pickle, time
-from overcooked_ai_py.utils import pos_distance, manhattan_distance
-from overcooked_ai_py.planning.search import SearchTree, Graph
+from overcooked_ai_py.utils import manhattan_distance
+from overcooked_ai_py.planning.search import Graph
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
 if not clean:
     from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
-from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
 # Run planning logic with additional checks and
@@ -978,91 +977,6 @@ class MediumLevelPlanner(object):
         mlp.ml_action_manager.save_to_file(final_filepath)
         return mlp
 
-    # Deprecated due to Heuristic
-    # def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
-    #     """
-    #     Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
-    #
-    #     Args:
-    #         state (OvercookedState): starting state
-    #         h_fn: heuristic function
-    #
-    #     Returns:
-    #         full_joint_action_plan (list): joint actions to reach goal
-    #     """
-    #     start_state = start_state.deepcopy()
-    #     ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
-    #
-    #     full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
-    #         start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
-    #     )
-    #     assert cost == len(full_joint_action_plan), "A* cost {} but full joint action plan cost {}".format(cost, len(full_joint_action_plan))
-    #
-    #     if debug: print("Found plan with cost {}".format(cost))
-    #     return full_joint_action_plan
-
-    # Deprecated due to Heuristic
-    # def get_low_level_plan_from_ml_plan(self, start_state, ml_plan, heuristic_fn, debug=False, goal_info=False):
-    #     t = 0
-    #     full_joint_action_plan = []
-    #     curr_state = start_state
-    #     curr_motion_state = start_state.players_pos_and_or
-    #     prev_h = heuristic_fn(start_state, t, debug=False)
-    #
-    #     if len(ml_plan) > 0 and goal_info:
-    #         print("First motion goal: ", ml_plan[0][0])
-    #
-    #     if not clean and debug:
-    #         print("Start state")
-    #         OvercookedEnv.print_state(self.mdp, start_state)
-    #
-    #     for joint_motion_goal, goal_state in ml_plan:
-    #         joint_action_plan, end_motion_state, plan_costs = \
-    #             self.ml_action_manager.joint_motion_planner.get_low_level_action_plan(curr_motion_state, joint_motion_goal)
-    #         curr_plan_cost = min(plan_costs)
-    #         full_joint_action_plan.extend(joint_action_plan)
-    #         t += 1
-    #
-    #         if not clean and debug:
-    #             print(t)
-    #             OvercookedEnv.print_state(self.mdp, goal_state)
-    #
-    #         if not clean and SAFE_RUN:
-    #             s_prime, _ = OvercookedEnv.execute_plan(self.mdp, curr_state, joint_action_plan)
-    #             assert s_prime == goal_state
-    #
-    #         curr_h = heuristic_fn(goal_state, t, debug=False)
-    #         self.check_heuristic_consistency(curr_h, prev_h, curr_plan_cost)
-    #         curr_motion_state, prev_h, curr_state = end_motion_state, curr_h, goal_state
-    #     return full_joint_action_plan
-
-    def check_heuristic_consistency(self, curr_heuristic_val, prev_heuristic_val, actual_edge_cost):
-        delta_h = curr_heuristic_val - prev_heuristic_val
-        assert actual_edge_cost >= delta_h, \
-            "Heuristic was not consistent. \n Prev h: {}, Curr h: {}, Actual cost: {}, Δh: {}" \
-            .format(prev_heuristic_val, curr_heuristic_val, actual_edge_cost, delta_h)
-
-    # Deprecated due to Heuristic
-    # def get_ml_plan(self, start_state, h_fn, delivery_horizon=4, debug=False):
-    #     """
-    #     Solves A* Search problem to find optimal sequence of medium level actions
-    #     to reach the goal number of deliveries
-    #
-    #     Returns:
-    #         ml_plan (list): plan not including starting state in form
-    #             [(joint_action, successor_state), ..., (joint_action, goal_state)]
-    #         cost (int): A* Search cost
-    #     """
-    #     start_state = start_state.deepcopy()
-    #
-    #     expand_fn = lambda state: self.get_successor_states(state)
-    #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
-    #     heuristic_fn = lambda state: h_fn(state)
-    #
-    #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
-    #     ml_plan, cost = search_problem.A_star_graph_search(info=True)
-    #     return ml_plan[1:], cost
-
     def get_successor_states(self, start_state):
         """Successor states for medium-level actions are defined as
         the first state in the corresponding motion plan in which
@@ -1124,6 +1038,117 @@ class MediumLevelPlanner(object):
             successor_high_level_states.append((action_plan, end_state, cost))
         return successor_high_level_states
 
+    # Deprecated. because no longer used
+    # def check_heuristic_consistency(self, curr_heuristic_val, prev_heuristic_val, actual_edge_cost):
+    #     delta_h = curr_heuristic_val - prev_heuristic_val
+    #     assert actual_edge_cost >= delta_h, \
+    #         "Heuristic was not consistent. \n Prev h: {}, Curr h: {}, Actual cost: {}, Δh: {}" \
+    #         .format(prev_heuristic_val, curr_heuristic_val, actual_edge_cost, delta_h)
+    #
+    # def embedded_mdp_succ_fn(self, state, other_agent):
+    #     other_agent_action, _ = other_agent.action(state)
+    #
+    #     successors = []
+    #     for a in Action.ALL_ACTIONS:
+    #         successor_state, joint_action = self.embedded_mdp_step(state, a, other_agent_action, other_agent.agent_index)
+    #         cost = 1
+    #         successors.append((joint_action, successor_state, cost))
+    #     return successors
+    #
+    # def embedded_mdp_step(self, state, action, other_agent_action, other_agent_index):
+    #     if other_agent_index == 0:
+    #         joint_action = (other_agent_action, action)
+    #     else:
+    #         joint_action = (action, other_agent_action)
+    #     if not self.mdp.is_terminal(state):
+    #         results, _ = self.mdp.get_state_transition(state, joint_action)
+    #         successor_state = results
+    #     else:
+    #         print("Tried to find successor of terminal")
+    #         assert False, "state {} \t action {}".format(state, action)
+    #         successor_state = state
+    #     return successor_state, joint_action
+
+    # Deprecated due to Heuristic
+    # def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
+    #     """
+    #     Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
+    #
+    #     Args:
+    #         state (OvercookedState): starting state
+    #         h_fn: heuristic function
+    #
+    #     Returns:
+    #         full_joint_action_plan (list): joint actions to reach goal
+    #     """
+    #     start_state = start_state.deepcopy()
+    #     ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
+    #
+    #     full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
+    #         start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
+    #     )
+    #     assert cost == len(full_joint_action_plan), "A* cost {} but full joint action plan cost {}".format(cost, len(full_joint_action_plan))
+    #
+    #     if debug: print("Found plan with cost {}".format(cost))
+    #     return full_joint_action_plan
+
+    # Deprecated due to Heuristic
+    # def get_low_level_plan_from_ml_plan(self, start_state, ml_plan, heuristic_fn, debug=False, goal_info=False):
+    #     t = 0
+    #     full_joint_action_plan = []
+    #     curr_state = start_state
+    #     curr_motion_state = start_state.players_pos_and_or
+    #     prev_h = heuristic_fn(start_state, t, debug=False)
+    #
+    #     if len(ml_plan) > 0 and goal_info:
+    #         print("First motion goal: ", ml_plan[0][0])
+    #
+    #     if not clean and debug:
+    #         print("Start state")
+    #         OvercookedEnv.print_state(self.mdp, start_state)
+    #
+    #     for joint_motion_goal, goal_state in ml_plan:
+    #         joint_action_plan, end_motion_state, plan_costs = \
+    #             self.ml_action_manager.joint_motion_planner.get_low_level_action_plan(curr_motion_state, joint_motion_goal)
+    #         curr_plan_cost = min(plan_costs)
+    #         full_joint_action_plan.extend(joint_action_plan)
+    #         t += 1
+    #
+    #         if not clean and debug:
+    #             print(t)
+    #             OvercookedEnv.print_state(self.mdp, goal_state)
+    #
+    #         if not clean and SAFE_RUN:
+    #             s_prime, _ = OvercookedEnv.execute_plan(self.mdp, curr_state, joint_action_plan)
+    #             assert s_prime == goal_state
+    #
+    #         curr_h = heuristic_fn(goal_state, t, debug=False)
+    #         self.check_heuristic_consistency(curr_h, prev_h, curr_plan_cost)
+    #         curr_motion_state, prev_h, curr_state = end_motion_state, curr_h, goal_state
+    #     return full_joint_action_plan
+
+
+    # Deprecated due to Heuristic
+    # def get_ml_plan(self, start_state, h_fn, delivery_horizon=4, debug=False):
+    #     """
+    #     Solves A* Search problem to find optimal sequence of medium level actions
+    #     to reach the goal number of deliveries
+    #
+    #     Returns:
+    #         ml_plan (list): plan not including starting state in form
+    #             [(joint_action, successor_state), ..., (joint_action, goal_state)]
+    #         cost (int): A* Search cost
+    #     """
+    #     start_state = start_state.deepcopy()
+    #
+    #     expand_fn = lambda state: self.get_successor_states(state)
+    #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
+    #     heuristic_fn = lambda state: h_fn(state)
+    #
+    #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
+    #     ml_plan, cost = search_problem.A_star_graph_search(info=True)
+    #     return ml_plan[1:], cost
+
     # Deprecated
     # def get_embedded_low_level_action_plan(self, state, goal_pos_and_or, other_agent, other_agent_idx):
     #     """Find action plan for a specific motion goal with A* considering the other agent"""
@@ -1142,495 +1167,473 @@ class MediumLevelPlanner(object):
     #     end_state = state_plan[-1]
     #     return action_plan, end_state, cost
 
-    def embedded_mdp_succ_fn(self, state, other_agent):
-        other_agent_action, _ = other_agent.action(state)
 
-        successors = []
-        for a in Action.ALL_ACTIONS:
-            successor_state, joint_action = self.embedded_mdp_step(state, a, other_agent_action, other_agent.agent_index)
-            cost = 1
-            successors.append((joint_action, successor_state, cost))
-        return successors
 
-    def embedded_mdp_step(self, state, action, other_agent_action, other_agent_index):
-        if other_agent_index == 0:
-            joint_action = (other_agent_action, action)
-        else:
-            joint_action = (action, other_agent_action)
-        if not self.mdp.is_terminal(state):
-            results, _ = self.mdp.get_state_transition(state, joint_action)
-            successor_state = results
-        else:
-            print("Tried to find successor of terminal")
-            assert False, "state {} \t action {}".format(state, action)
-            successor_state = state
-        return successor_state, joint_action
-
-
-class HighLevelAction:
-    """A high level action is given by a set of subsequent motion goals"""
-
-    def __init__(self, motion_goals):
-        self.motion_goals = motion_goals
-    
-    def _check_valid(self):
-        for goal in self.motion_goals:
-            assert len(goal) == 2
-            pos, orient = goal
-            assert orient in Direction.ALL_DIRECTIONS
-            assert type(pos) is tuple
-            assert len(pos) == 2
-
-    def __getitem__(self, i):
-        """Get ith motion goal of the HL Action"""
-        return self.motion_goals[i]
-
-
-class HighLevelActionManager(object):
-    """
-    Manager for high level actions. Determines available high level actions 
-    for each state and player.
-    """
-
-    def __init__(self, medium_level_planner):
-        self.mdp = medium_level_planner.mdp
-        
-        self.wait_allowed = medium_level_planner.params['wait_allowed']
-        self.counter_drop = medium_level_planner.params["counter_drop"]
-        self.counter_pickup = medium_level_planner.params["counter_pickup"]
-        
-        self.mlp = medium_level_planner
-        self.ml_action_manager = medium_level_planner.ml_action_manager
-        self.mp = medium_level_planner.mp
-
-    def joint_hl_actions(self, state):
-        hl_actions_a0, hl_actions_a1 = tuple(self.get_high_level_actions(state, player) for player in state.players)
-        joint_hl_actions = list(itertools.product(hl_actions_a0, hl_actions_a1))
-
-        assert self.mlp.params["same_motion_goals"]
-        valid_joint_hl_actions = joint_hl_actions
-
-        if len(valid_joint_hl_actions) == 0:
-            print("WARNING: found a state without high level successors")
-        return valid_joint_hl_actions
-
-    def get_high_level_actions(self, state, player):
-        player_hl_actions = []
-        counter_pickup_objects = self.mdp.get_counter_objects_dict(state, self.counter_pickup)
-        if player.has_object():
-            place_obj_ml_actions = self.ml_action_manager.get_medium_level_actions(state, player)
-
-            # HACK to prevent some states not having successors due to lack of waiting actions
-            if len(place_obj_ml_actions) == 0:
-                place_obj_ml_actions = self.ml_action_manager.get_medium_level_actions(state, player, waiting_substitute=True)
-
-            place_obj_hl_actions = [HighLevelAction([ml_action]) for ml_action in place_obj_ml_actions]
-            player_hl_actions.extend(place_obj_hl_actions)
-        else:
-            pot_states_dict = self.mdp.get_pot_states(state)
-            player_hl_actions.extend(self.get_onion_and_put_in_pot(state, counter_pickup_objects, pot_states_dict))
-            player_hl_actions.extend(self.get_tomato_and_put_in_pot(state, counter_pickup_objects, pot_states_dict))
-            player_hl_actions.extend(self.get_dish_and_soup_and_serve(state, counter_pickup_objects, pot_states_dict))
-            player_hl_actions.extend(self.start_cooking(state, pot_states_dict))
-        return player_hl_actions
-
-    def get_dish_and_soup_and_serve(self, state, counter_objects, pot_states_dict):
-        """Get all sequences of medium-level actions (hl actions) that involve a player getting a dish, 
-        going to a pot and picking up a soup, and delivering the soup."""
-        dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(counter_objects)
-        pickup_soup_actions = self.ml_action_manager.pickup_soup_with_dish_actions(pot_states_dict)
-        deliver_soup_actions = self.ml_action_manager.deliver_soup_actions()
-        hl_level_actions = list(itertools.product(dish_pickup_actions, pickup_soup_actions, deliver_soup_actions))
-        return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
-
-    def get_onion_and_put_in_pot(self, state, counter_objects, pot_states_dict):
-        """Get all sequences of medium-level actions (hl actions) that involve a player getting an onion
-        from a dispenser and placing it in a pot."""
-        onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(counter_objects)
-        put_in_pot_actions = self.ml_action_manager.put_onion_in_pot_actions(pot_states_dict)
-        hl_level_actions = list(itertools.product(onion_pickup_actions, put_in_pot_actions))
-        return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
-
-    def get_tomato_and_put_in_pot(self, state, counter_objects, pot_states_dict):
-        """Get all sequences of medium-level actions (hl actions) that involve a player getting an tomato
-        from a dispenser and placing it in a pot."""
-        tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(counter_objects)
-        put_in_pot_actions = self.ml_action_manager.put_tomato_in_pot_actions(pot_states_dict)
-        hl_level_actions = list(itertools.product(tomato_pickup_actions, put_in_pot_actions))
-        return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
-
-    def start_cooking(self, state, pot_states_dict):
-        """Go to a pot that is not empty and start cooking. Currently, because high level action requires 2 goals,
-        we are going to repeat the same goal twice"""
-        start_cooking = self.ml_action_manager.start_cooking_actions(pot_states_dict)
-        hl_level_actions = [(pot, pot) for pot in start_cooking]
-        return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
-
-
-
-class HighLevelPlanner(object):
-    """A planner that computes optimal plans for two agents to 
-    deliver a certain number of dishes in an OvercookedGridworld
-    using high level actions in the corresponding A* search problems
-    """
-
-    def __init__(self, hl_action_manager):
-        self.hl_action_manager = hl_action_manager
-        self.mlp = self.hl_action_manager.mlp
-        self.jmp = self.mlp.ml_action_manager.joint_motion_planner
-        self.mp = self.jmp.motion_planner
-        self.mdp = self.mlp.mdp
-
-    def get_successor_states(self, start_state):
-        """Determines successor states for high-level actions"""
-        successor_states = []
-
-        if self.mdp.is_terminal(start_state):
-            return successor_states
-
-        for joint_hl_action in self.hl_action_manager.joint_hl_actions(start_state):
-            _, end_state, hl_action_cost = self.perform_hl_action(joint_hl_action, start_state)
-
-            successor_states.append((joint_hl_action, end_state, hl_action_cost))
-        return successor_states
-
-    def perform_hl_action(self, joint_hl_action, curr_state):
-        """Determines the end state for a high level action, and the corresponding low level action plan and cost.
-        Will return Nones if a pot exploded throughout the execution of the action"""
-        full_plan = []
-        motion_goal_indices = (0, 0)
-        total_cost = 0
-        while not self.at_least_one_finished_hl_action(joint_hl_action, motion_goal_indices):
-            curr_jm_goal = tuple(joint_hl_action[i].motion_goals[motion_goal_indices[i]] for i in range(2))
-            joint_motion_action_plans, end_pos_and_ors, plan_costs = \
-                self.jmp.get_low_level_action_plan(curr_state.players_pos_and_or, curr_jm_goal)
-            curr_state = self.jmp.derive_state(curr_state, end_pos_and_ors, joint_motion_action_plans)
-            motion_goal_indices = self._advance_motion_goal_indices(motion_goal_indices, plan_costs)
-            total_cost += min(plan_costs)
-            full_plan.extend(joint_motion_action_plans)
-        return full_plan, curr_state, total_cost
-
-    def at_least_one_finished_hl_action(self, joint_hl_action, motion_goal_indices):
-        """Returns whether either agent has reached the end of the motion goal list it was supposed
-        to perform to finish it's high level action"""
-        return any([len(joint_hl_action[i].motion_goals) == motion_goal_indices[i] for i in range(2)])
-
-    def get_low_level_action_plan(self, start_state, h_fn, debug=False):
-        """
-        Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
-        by performaing an A* search in high-level action space
-        
-        Args:
-            state (OvercookedState): starting state
-
-        Returns:
-            full_joint_action_plan (list): joint actions to reach goal
-            cost (int): a cost in number of timesteps to reach the goal
-        """
-        full_joint_low_level_action_plan = []
-        hl_plan, cost = self.get_hl_plan(start_state, h_fn)
-        curr_state = start_state
-        prev_h = h_fn(start_state, debug=False)
-        total_cost = 0
-        for joint_hl_action, curr_goal_state in hl_plan:
-            assert all([type(a) is HighLevelAction for a in joint_hl_action])
-            hl_action_plan, curr_state, hl_action_cost = self.perform_hl_action(joint_hl_action, curr_state)
-            full_joint_low_level_action_plan.extend(hl_action_plan)
-            total_cost += hl_action_cost
-            assert curr_state == curr_goal_state
-
-            curr_h = h_fn(curr_state, debug=False)
-            self.mlp.check_heuristic_consistency(curr_h, prev_h, total_cost)
-            prev_h = curr_h
-        assert total_cost == cost == len(full_joint_low_level_action_plan), "{} vs {} vs {}"\
-            .format(total_cost, cost, len(full_joint_low_level_action_plan))
-        return full_joint_low_level_action_plan, cost
-
-    # Deprecated due to Heuristic
-    # def get_hl_plan(self, start_state, h_fn, debug=False):
-    #     expand_fn = lambda state: self.get_successor_states(state)
-    #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
-    #     heuristic_fn = lambda state: h_fn(state)
-    #
-    #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
-    #     hl_plan, cost = search_problem.A_star_graph_search(info=True)
-    #     return hl_plan[1:], cost
-
-    def _advance_motion_goal_indices(self, curr_plan_indices, plan_lengths):
-        """Advance indices for agents current motion goals
-        based on who finished their motion goal this round"""
-        idx0, idx1 = curr_plan_indices
-        if plan_lengths[0] == plan_lengths[1]:
-            return idx0 + 1, idx1 + 1
-
-        who_finished = np.argmin(plan_lengths)
-        if who_finished == 0:
-            return idx0 + 1, idx1
-        elif who_finished == 1:
-            return idx0, idx1 + 1
-
-
-class Heuristic(object):
-
-    def __init__(self, mp):
-        self.motion_planner = mp
-        self.mdp = mp.mdp
-        self.heuristic_cost_dict = self._calculate_heuristic_costs()
-    
-    def hard_heuristic(self, state, goal_deliveries, time=0, debug=False):
-        # NOTE: does not support tomatoes – currently deprecated as harder heuristic
-        # does not seem worth the additional computational time
-
-        """
-        From a state, we can calculate exactly how many:
-        - soup deliveries we need
-        - dishes to pots we need
-        - onion to pots we need
-
-        We then determine if there are any soups/dishes/onions
-        in transit (on counters or on players) than can be 
-        brought to their destinations faster than starting off from
-        a dispenser of the same type. If so, we consider fulfilling
-        all demand from these positions. 
-
-        After all in-transit objects are considered, we consider the
-        costs required to fulfill all the rest of the demand, that is 
-        given by:
-        - pot-delivery trips
-        - dish-pot trips
-        - onion-pot trips
-        
-        The total cost is obtained by determining an optimistic time 
-        cost for each of these trip types
-        """
-        forward_cost = 0
-
-        # Obtaining useful quantities
-        objects_dict = state.unowned_objects_by_type
-        player_objects = state.player_objects_by_type
-        pot_states_dict = self.mdp.get_pot_states(state)
-        min_pot_delivery_cost = self.heuristic_cost_dict['pot-delivery']
-        min_dish_to_pot_cost = self.heuristic_cost_dict['dish-pot']
-        min_onion_to_pot_cost = self.heuristic_cost_dict['onion-pot']
-
-        pot_locations = self.mdp.get_pot_locations()
-        full_soups_in_pots = pot_states_dict['cooking'] + pot_states_dict['ready']
-        partially_full_soups = self.mdp.get_partially_full_pots(pot_states_dict)
-        num_onions_in_partially_full_pots = sum([state.get_object(loc).state[1] for loc in partially_full_soups])
-
-        # Calculating costs
-        num_deliveries_to_go = goal_deliveries - state.num_delivered
-
-        # SOUP COSTS
-        total_num_soups_needed = max([0, num_deliveries_to_go])
-        
-        soups_on_counters = [soup_obj for soup_obj in objects_dict['soup'] if soup_obj.position not in pot_locations]
-        soups_in_transit = player_objects['soup'] + soups_on_counters
-        soup_delivery_locations = self.mdp.get_serving_locations()
-        
-        num_soups_better_than_pot, total_better_than_pot_soup_cost = \
-            self.get_costs_better_than_dispenser(soups_in_transit, soup_delivery_locations, min_pot_delivery_cost, total_num_soups_needed, state)
-        
-        min_pot_to_delivery_trips = max([0, total_num_soups_needed - num_soups_better_than_pot])
-        pot_to_delivery_costs = min_pot_delivery_cost * min_pot_to_delivery_trips
-
-        forward_cost += total_better_than_pot_soup_cost
-        forward_cost += pot_to_delivery_costs
-
-        # DISH COSTS
-        total_num_dishes_needed = max([0, min_pot_to_delivery_trips])
-        dishes_on_counters = objects_dict['dish']
-        dishes_in_transit = player_objects['dish'] + dishes_on_counters
-        
-        num_dishes_better_than_disp, total_better_than_disp_dish_cost = \
-            self.get_costs_better_than_dispenser(dishes_in_transit, pot_locations, min_dish_to_pot_cost, total_num_dishes_needed, state)
-
-        min_dish_to_pot_trips = max([0, min_pot_to_delivery_trips - num_dishes_better_than_disp])
-        dish_to_pot_costs = min_dish_to_pot_cost * min_dish_to_pot_trips
-
-        forward_cost += total_better_than_disp_dish_cost
-        forward_cost += dish_to_pot_costs
-
-        # START COOKING COSTS, each to be filled pots will require 1 INTERACT to start cooking
-        num_pots_to_be_filled = min_pot_to_delivery_trips - len(full_soups_in_pots)
-        """Note that this is still assuming every soup requires 3 ingredients"""
-        forward_cost += num_pots_to_be_filled
-
-        # ONION COSTS
-        total_num_onions_needed = num_pots_to_be_filled * 3 - num_onions_in_partially_full_pots
-        onions_on_counters = objects_dict['onion']
-        onions_in_transit = player_objects['onion'] + onions_on_counters
-
-        num_onions_better_than_disp, total_better_than_disp_onion_cost = \
-            self.get_costs_better_than_dispenser(onions_in_transit, pot_locations, min_onion_to_pot_cost, total_num_onions_needed, state)
-
-        min_onion_to_pot_trips = max([0, total_num_onions_needed - num_onions_better_than_disp])
-        onion_to_pot_costs = min_onion_to_pot_cost * min_onion_to_pot_trips
-        
-        forward_cost += total_better_than_disp_onion_cost
-        forward_cost += onion_to_pot_costs
-
-        # Going to closest feature costs
-        # NOTE: as implemented makes heuristic inconsistent
-        # for player in state.players:
-        #     if not player.has_object():
-        #         counter_objects = soups_on_counters + dishes_on_counters + onions_on_counters
-        #         possible_features = counter_objects + pot_locations + self.mdp.get_dish_dispenser_locations() + self.mdp.get_onion_dispenser_locations()
-        #         forward_cost += self.action_manager.min_cost_to_feature(player.pos_and_or, possible_features)
-
-        heuristic_cost = forward_cost / 2
-        
-        if not clean and debug:
-            env = OvercookedEnv.from_mdp(self.mdp)
-            env.state = state
-            print("\n" + "#"*35)
-            print("Current state: (ml timestep {})\n".format(time))
-
-            print("# in transit: \t\t Soups {} \t Dishes {} \t Onions {}".format(
-                len(soups_in_transit), len(dishes_in_transit), len(onions_in_transit)
-            ))
-
-            # NOTE Possible improvement: consider cost of dish delivery too when considering if a
-            # transit soup is better than dispenser equivalent
-            print("# better than disp: \t Soups {} \t Dishes {} \t Onions {}".format(
-                num_soups_better_than_pot, num_dishes_better_than_disp, num_onions_better_than_disp
-            ))
-
-            print("# of trips: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
-                min_pot_to_delivery_trips, min_dish_to_pot_trips, min_onion_to_pot_trips
-            ))
-
-            print("Trip costs: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
-                pot_to_delivery_costs, dish_to_pot_costs, onion_to_pot_costs
-            ))
-
-            print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
-
-        return heuristic_cost
-
-    def get_costs_better_than_dispenser(self, possible_objects, target_locations, baseline_cost, num_needed, state):
-        """
-        Computes the number of objects whose minimum cost to any of the target locations is smaller than
-        the baseline cost (clipping it if greater than the number needed). It also calculates a lower
-        bound on the cost of using such objects.
-        """
-        costs_from_transit_locations = []
-        for obj in possible_objects:
-            obj_pos = obj.position
-            if obj_pos in state.player_positions:
-                # If object is being carried by a player
-                player = [p for p in state.players if p.position == obj_pos][0]
-                # NOTE: not sure if this -1 is justified.
-                # Made things work better in practice for greedy heuristic based agents.
-                # For now this function is just used from there. Consider removing later if
-                # greedy heuristic agents end up not being used.
-                min_cost = self.motion_planner.min_cost_to_feature(player.pos_and_or, target_locations) - 1
-            else:
-                # If object is on a counter
-                min_cost = self.motion_planner.min_cost_between_features([obj_pos], target_locations)
-            costs_from_transit_locations.append(min_cost)
-        
-        costs_better_than_dispenser = [cost for cost in costs_from_transit_locations if cost <= baseline_cost]
-        better_than_dispenser_total_cost = sum(np.sort(costs_better_than_dispenser)[:num_needed])
-        return len(costs_better_than_dispenser), better_than_dispenser_total_cost
-
-    def _calculate_heuristic_costs(self, debug=False):
-        """Pre-computes the costs between common trip types for this mdp"""
-        pot_locations = self.mdp.get_pot_locations()
-        delivery_locations = self.mdp.get_serving_locations()
-        dish_locations = self.mdp.get_dish_dispenser_locations()
-        onion_locations = self.mdp.get_onion_dispenser_locations()
-        tomato_locations = self.mdp.get_tomato_dispenser_locations()
-
-        heuristic_cost_dict = {
-            'pot-delivery': self.motion_planner.min_cost_between_features(pot_locations, delivery_locations, manhattan_if_fail=True),
-            'pot-cooking': 20, # this assume cooking time is always 20 timesteps
-            'dish-pot': self.motion_planner.min_cost_between_features(dish_locations, pot_locations, manhattan_if_fail=True)
-        }
-
-        onion_pot_cost = self.motion_planner.min_cost_between_features(onion_locations, pot_locations, manhattan_if_fail=True)
-        tomato_pot_cost = self.motion_planner.min_cost_between_features(tomato_locations, pot_locations, manhattan_if_fail=True)
-
-        if debug: print("Heuristic cost dict", heuristic_cost_dict)
-        assert onion_pot_cost != np.inf or tomato_pot_cost != np.inf
-        if onion_pot_cost != np.inf:
-            heuristic_cost_dict['onion-pot'] = onion_pot_cost
-        if tomato_pot_cost != np.inf:
-            heuristic_cost_dict['tomato-pot'] = tomato_pot_cost
-        
-        return heuristic_cost_dict
-
-    # Deprecated. This is out of date with the current MDP, but is no longer needed, so deprecated
-    # def simple_heuristic(self, state, time=0, debug=False):
-    #     """Simpler heuristic that tends to run faster than current one"""
-    #     # NOTE: State should be modified to have an order list w.r.t. which
-    #     # one can calculate the heuristic
-    #
-    #     objects_dict = state.unowned_objects_by_type
-    #     player_objects = state.player_objects_by_type
-    #     pot_states_scores_dict = self.mdp.get_pot_states_scores(state)
-    #     max_recipe_value = self.mdp.max_recipe_value(state)
-    #     num_deliveries_to_go = (DELIVERY_REW_THRES - state.delivery_rew)//max_recipe_value
-    #     num_full_soups_in_pots = sum(pot_states_scores_dict['cooking'] + pot_states_scores_dict['ready'])//max_recipe_value
-    #
-    #     pot_states_dict = self.mdp.get_pot_states(state)
-    #     partially_full_soups = self.mdp.get_partially_full_pots(pot_states_dict)
-    #     num_items_in_partially_full_pots = sum([len(state.get_object(loc).ingredients) for loc in partially_full_soups])
-    #
-    #     soups_in_transit = player_objects['soup']
-    #     dishes_in_transit = objects_dict['dish'] + player_objects['dish']
-    #     onions_in_transit = objects_dict['onion'] + player_objects['onion']
-    #     tomatoes_in_transit = objects_dict['tomato'] + player_objects['tomato']
-    #
-    #     num_pot_to_delivery = max([0, num_deliveries_to_go - len(soups_in_transit)])
-    #     num_dish_to_pot = max([0, num_pot_to_delivery - len(dishes_in_transit)])
-    #
-    #     # FIXME: the following logic might need to be discussed, when incoporating tomatoes
-    #     num_pots_to_be_filled = num_pot_to_delivery - num_full_soups_in_pots
-    #     num_onions_needed_for_pots = num_pots_to_be_filled * 3 - len(onions_in_transit) - num_items_in_partially_full_pots
-    #     num_tomatoes_needed_for_pots = 0
-    #     num_onion_to_pot = max([0, num_onions_needed_for_pots])
-    #     num_tomato_to_pot = max([0, num_tomatoes_needed_for_pots])
-    #
-    #     pot_to_delivery_costs = (self.heuristic_cost_dict['pot-delivery'] + self.heuristic_cost_dict['pot-cooking']) \
-    #                             * num_pot_to_delivery
-    #     dish_to_pot_costs = self.heuristic_cost_dict['dish-pot'] * num_dish_to_pot
-    #
-    #     items_to_pot_costs = []
-    #     # FIXME: might want to change this for anything beyond 3-onion soup
-    #     if 'onion-pot' in self.heuristic_cost_dict.keys():
-    #         onion_to_pot_costs = self.heuristic_cost_dict['onion-pot'] * num_onion_to_pot
-    #         items_to_pot_costs.append(onion_to_pot_costs)
-    #     if 'tomato-pot' in self.heuristic_cost_dict.keys():
-    #         tomato_to_pot_costs = self.heuristic_cost_dict['tomato-pot'] * num_tomato_to_pot
-    #         items_to_pot_costs.append(tomato_to_pot_costs)
-    #
-    #     # NOTE: doesn't take into account that a combination of the two might actually be more advantageous.
-    #     # Might cause heuristic to be inadmissable in some edge cases.
-    #     # FIXME: only onion for now
-    #     items_to_pot_cost = onion_to_pot_costs
-    #
-    #     # num_pot_to_delivery added to account for the additional "INTERACT" to start soup cooking
-    #     heuristic_cost = (pot_to_delivery_costs + dish_to_pot_costs + num_pot_to_delivery + items_to_pot_cost) / 2
-    #
-    #     if not clean and debug:
-    #         env = OvercookedEnv.from_mdp(self.mdp)
-    #         env.state = state
-    #         print("\n" + "#" * 35)
-    #         print("Current state: (ml timestep {})\n".format(time))
-    #
-    #         print("# in transit: \t\t Soups {} \t Dishes {} \t Onions {}".format(
-    #             len(soups_in_transit), len(dishes_in_transit), len(onions_in_transit)
-    #         ))
-    #
-    #         print("Trip costs: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
-    #             pot_to_delivery_costs, dish_to_pot_costs, onion_to_pot_costs
-    #         ))
-    #
-    #         print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
-    #     if heuristic_cost < 15:
-    #         print(heuristic_cost, (pot_to_delivery_costs, dish_to_pot_costs, num_pot_to_delivery, items_to_pot_cost))
-    #         print(self.mdp.state_string(state))
-    #     return heuristic_cost
+# Deprecated.
+# class HighLevelAction:
+#     """A high level action is given by a set of subsequent motion goals"""
+#
+#     def __init__(self, motion_goals):
+#         self.motion_goals = motion_goals
+#
+#     def _check_valid(self):
+#         for goal in self.motion_goals:
+#             assert len(goal) == 2
+#             pos, orient = goal
+#             assert orient in Direction.ALL_DIRECTIONS
+#             assert type(pos) is tuple
+#             assert len(pos) == 2
+#
+#     def __getitem__(self, i):
+#         """Get ith motion goal of the HL Action"""
+#         return self.motion_goals[i]
+#
+#
+# class HighLevelActionManager(object):
+#     """
+#     Manager for high level actions. Determines available high level actions
+#     for each state and player.
+#     """
+#
+#     def __init__(self, medium_level_planner):
+#         self.mdp = medium_level_planner.mdp
+#
+#         self.wait_allowed = medium_level_planner.params['wait_allowed']
+#         self.counter_drop = medium_level_planner.params["counter_drop"]
+#         self.counter_pickup = medium_level_planner.params["counter_pickup"]
+#
+#         self.mlp = medium_level_planner
+#         self.ml_action_manager = medium_level_planner.ml_action_manager
+#         self.mp = medium_level_planner.mp
+#
+#     def joint_hl_actions(self, state):
+#         hl_actions_a0, hl_actions_a1 = tuple(self.get_high_level_actions(state, player) for player in state.players)
+#         joint_hl_actions = list(itertools.product(hl_actions_a0, hl_actions_a1))
+#
+#         assert self.mlp.params["same_motion_goals"]
+#         valid_joint_hl_actions = joint_hl_actions
+#
+#         if len(valid_joint_hl_actions) == 0:
+#             print("WARNING: found a state without high level successors")
+#         return valid_joint_hl_actions
+#
+#     def get_high_level_actions(self, state, player):
+#         player_hl_actions = []
+#         counter_pickup_objects = self.mdp.get_counter_objects_dict(state, self.counter_pickup)
+#         if player.has_object():
+#             place_obj_ml_actions = self.ml_action_manager.get_medium_level_actions(state, player)
+#
+#             # HACK to prevent some states not having successors due to lack of waiting actions
+#             if len(place_obj_ml_actions) == 0:
+#                 place_obj_ml_actions = self.ml_action_manager.get_medium_level_actions(state, player, waiting_substitute=True)
+#
+#             place_obj_hl_actions = [HighLevelAction([ml_action]) for ml_action in place_obj_ml_actions]
+#             player_hl_actions.extend(place_obj_hl_actions)
+#         else:
+#             pot_states_dict = self.mdp.get_pot_states(state)
+#             player_hl_actions.extend(self.get_onion_and_put_in_pot(state, counter_pickup_objects, pot_states_dict))
+#             player_hl_actions.extend(self.get_tomato_and_put_in_pot(state, counter_pickup_objects, pot_states_dict))
+#             player_hl_actions.extend(self.get_dish_and_soup_and_serve(state, counter_pickup_objects, pot_states_dict))
+#             player_hl_actions.extend(self.start_cooking(state, pot_states_dict))
+#         return player_hl_actions
+#
+#     def get_dish_and_soup_and_serve(self, state, counter_objects, pot_states_dict):
+#         """Get all sequences of medium-level actions (hl actions) that involve a player getting a dish,
+#         going to a pot and picking up a soup, and delivering the soup."""
+#         dish_pickup_actions = self.ml_action_manager.pickup_dish_actions(counter_objects)
+#         pickup_soup_actions = self.ml_action_manager.pickup_soup_with_dish_actions(pot_states_dict)
+#         deliver_soup_actions = self.ml_action_manager.deliver_soup_actions()
+#         hl_level_actions = list(itertools.product(dish_pickup_actions, pickup_soup_actions, deliver_soup_actions))
+#         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
+#
+#     def get_onion_and_put_in_pot(self, state, counter_objects, pot_states_dict):
+#         """Get all sequences of medium-level actions (hl actions) that involve a player getting an onion
+#         from a dispenser and placing it in a pot."""
+#         onion_pickup_actions = self.ml_action_manager.pickup_onion_actions(counter_objects)
+#         put_in_pot_actions = self.ml_action_manager.put_onion_in_pot_actions(pot_states_dict)
+#         hl_level_actions = list(itertools.product(onion_pickup_actions, put_in_pot_actions))
+#         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
+#
+#     def get_tomato_and_put_in_pot(self, state, counter_objects, pot_states_dict):
+#         """Get all sequences of medium-level actions (hl actions) that involve a player getting an tomato
+#         from a dispenser and placing it in a pot."""
+#         tomato_pickup_actions = self.ml_action_manager.pickup_tomato_actions(counter_objects)
+#         put_in_pot_actions = self.ml_action_manager.put_tomato_in_pot_actions(pot_states_dict)
+#         hl_level_actions = list(itertools.product(tomato_pickup_actions, put_in_pot_actions))
+#         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
+#
+#     def start_cooking(self, state, pot_states_dict):
+#         """Go to a pot that is not empty and start cooking. Currently, because high level action requires 2 goals,
+#         we are going to repeat the same goal twice"""
+#         start_cooking = self.ml_action_manager.start_cooking_actions(pot_states_dict)
+#         hl_level_actions = [(pot, pot) for pot in start_cooking]
+#         return [HighLevelAction(hl_action_list) for hl_action_list in hl_level_actions]
+#
+#
+#
+# class HighLevelPlanner(object):
+#     """A planner that computes optimal plans for two agents to
+#     deliver a certain number of dishes in an OvercookedGridworld
+#     using high level actions in the corresponding A* search problems
+#     """
+#
+#     def __init__(self, hl_action_manager):
+#         self.hl_action_manager = hl_action_manager
+#         self.mlp = self.hl_action_manager.mlp
+#         self.jmp = self.mlp.ml_action_manager.joint_motion_planner
+#         self.mp = self.jmp.motion_planner
+#         self.mdp = self.mlp.mdp
+#
+#     def get_successor_states(self, start_state):
+#         """Determines successor states for high-level actions"""
+#         successor_states = []
+#
+#         if self.mdp.is_terminal(start_state):
+#             return successor_states
+#
+#         for joint_hl_action in self.hl_action_manager.joint_hl_actions(start_state):
+#             _, end_state, hl_action_cost = self.perform_hl_action(joint_hl_action, start_state)
+#
+#             successor_states.append((joint_hl_action, end_state, hl_action_cost))
+#         return successor_states
+#
+#     def perform_hl_action(self, joint_hl_action, curr_state):
+#         """Determines the end state for a high level action, and the corresponding low level action plan and cost.
+#         Will return Nones if a pot exploded throughout the execution of the action"""
+#         full_plan = []
+#         motion_goal_indices = (0, 0)
+#         total_cost = 0
+#         while not self.at_least_one_finished_hl_action(joint_hl_action, motion_goal_indices):
+#             curr_jm_goal = tuple(joint_hl_action[i].motion_goals[motion_goal_indices[i]] for i in range(2))
+#             joint_motion_action_plans, end_pos_and_ors, plan_costs = \
+#                 self.jmp.get_low_level_action_plan(curr_state.players_pos_and_or, curr_jm_goal)
+#             curr_state = self.jmp.derive_state(curr_state, end_pos_and_ors, joint_motion_action_plans)
+#             motion_goal_indices = self._advance_motion_goal_indices(motion_goal_indices, plan_costs)
+#             total_cost += min(plan_costs)
+#             full_plan.extend(joint_motion_action_plans)
+#         return full_plan, curr_state, total_cost
+#
+#     def at_least_one_finished_hl_action(self, joint_hl_action, motion_goal_indices):
+#         """Returns whether either agent has reached the end of the motion goal list it was supposed
+#         to perform to finish it's high level action"""
+#         return any([len(joint_hl_action[i].motion_goals) == motion_goal_indices[i] for i in range(2)])
+#
+#     def get_low_level_action_plan(self, start_state, h_fn, debug=False):
+#         """
+#         Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
+#         by performaing an A* search in high-level action space
+#
+#         Args:
+#             state (OvercookedState): starting state
+#
+#         Returns:
+#             full_joint_action_plan (list): joint actions to reach goal
+#             cost (int): a cost in number of timesteps to reach the goal
+#         """
+#         full_joint_low_level_action_plan = []
+#         hl_plan, cost = self.get_hl_plan(start_state, h_fn)
+#         curr_state = start_state
+#         prev_h = h_fn(start_state, debug=False)
+#         total_cost = 0
+#         for joint_hl_action, curr_goal_state in hl_plan:
+#             assert all([type(a) is HighLevelAction for a in joint_hl_action])
+#             hl_action_plan, curr_state, hl_action_cost = self.perform_hl_action(joint_hl_action, curr_state)
+#             full_joint_low_level_action_plan.extend(hl_action_plan)
+#             total_cost += hl_action_cost
+#             assert curr_state == curr_goal_state
+#
+#             curr_h = h_fn(curr_state, debug=False)
+#             self.mlp.check_heuristic_consistency(curr_h, prev_h, total_cost)
+#             prev_h = curr_h
+#         assert total_cost == cost == len(full_joint_low_level_action_plan), "{} vs {} vs {}"\
+#             .format(total_cost, cost, len(full_joint_low_level_action_plan))
+#         return full_joint_low_level_action_plan, cost
+#
+#     # Deprecated due to Heuristic
+#     # def get_hl_plan(self, start_state, h_fn, debug=False):
+#     #     expand_fn = lambda state: self.get_successor_states(state)
+#     #     goal_fn = lambda state: state.delivery_rew >= DELIVERY_REW_THRES
+#     #     heuristic_fn = lambda state: h_fn(state)
+#     #
+#     #     search_problem = SearchTree(start_state, goal_fn, expand_fn, heuristic_fn, debug=debug)
+#     #     hl_plan, cost = search_problem.A_star_graph_search(info=True)
+#     #     return hl_plan[1:], cost
+#
+#     def _advance_motion_goal_indices(self, curr_plan_indices, plan_lengths):
+#         """Advance indices for agents current motion goals
+#         based on who finished their motion goal this round"""
+#         idx0, idx1 = curr_plan_indices
+#         if plan_lengths[0] == plan_lengths[1]:
+#             return idx0 + 1, idx1 + 1
+#
+#         who_finished = np.argmin(plan_lengths)
+#         if who_finished == 0:
+#             return idx0 + 1, idx1
+#         elif who_finished == 1:
+#             return idx0, idx1 + 1
+
+# # Deprecated.
+# class Heuristic(object):
+#
+#     def __init__(self, mp):
+#         self.motion_planner = mp
+#         self.mdp = mp.mdp
+#         self.heuristic_cost_dict = self._calculate_heuristic_costs()
+#
+#     def hard_heuristic(self, state, goal_deliveries, time=0, debug=False):
+#         # NOTE: does not support tomatoes – currently deprecated as harder heuristic
+#         # does not seem worth the additional computational time
+#
+#         """
+#         From a state, we can calculate exactly how many:
+#         - soup deliveries we need
+#         - dishes to pots we need
+#         - onion to pots we need
+#
+#         We then determine if there are any soups/dishes/onions
+#         in transit (on counters or on players) than can be
+#         brought to their destinations faster than starting off from
+#         a dispenser of the same type. If so, we consider fulfilling
+#         all demand from these positions.
+#
+#         After all in-transit objects are considered, we consider the
+#         costs required to fulfill all the rest of the demand, that is
+#         given by:
+#         - pot-delivery trips
+#         - dish-pot trips
+#         - onion-pot trips
+#
+#         The total cost is obtained by determining an optimistic time
+#         cost for each of these trip types
+#         """
+#         forward_cost = 0
+#
+#         # Obtaining useful quantities
+#         objects_dict = state.unowned_objects_by_type
+#         player_objects = state.player_objects_by_type
+#         pot_states_dict = self.mdp.get_pot_states(state)
+#         min_pot_delivery_cost = self.heuristic_cost_dict['pot-delivery']
+#         min_dish_to_pot_cost = self.heuristic_cost_dict['dish-pot']
+#         min_onion_to_pot_cost = self.heuristic_cost_dict['onion-pot']
+#
+#         pot_locations = self.mdp.get_pot_locations()
+#         full_soups_in_pots = pot_states_dict['cooking'] + pot_states_dict['ready']
+#         partially_full_soups = self.mdp.get_partially_full_pots(pot_states_dict)
+#         num_onions_in_partially_full_pots = sum([state.get_object(loc).state[1] for loc in partially_full_soups])
+#
+#         # Calculating costs
+#         num_deliveries_to_go = goal_deliveries - state.num_delivered
+#
+#         # SOUP COSTS
+#         total_num_soups_needed = max([0, num_deliveries_to_go])
+#
+#         soups_on_counters = [soup_obj for soup_obj in objects_dict['soup'] if soup_obj.position not in pot_locations]
+#         soups_in_transit = player_objects['soup'] + soups_on_counters
+#         soup_delivery_locations = self.mdp.get_serving_locations()
+#
+#         num_soups_better_than_pot, total_better_than_pot_soup_cost = \
+#             self.get_costs_better_than_dispenser(soups_in_transit, soup_delivery_locations, min_pot_delivery_cost, total_num_soups_needed, state)
+#
+#         min_pot_to_delivery_trips = max([0, total_num_soups_needed - num_soups_better_than_pot])
+#         pot_to_delivery_costs = min_pot_delivery_cost * min_pot_to_delivery_trips
+#
+#         forward_cost += total_better_than_pot_soup_cost
+#         forward_cost += pot_to_delivery_costs
+#
+#         # DISH COSTS
+#         total_num_dishes_needed = max([0, min_pot_to_delivery_trips])
+#         dishes_on_counters = objects_dict['dish']
+#         dishes_in_transit = player_objects['dish'] + dishes_on_counters
+#
+#         num_dishes_better_than_disp, total_better_than_disp_dish_cost = \
+#             self.get_costs_better_than_dispenser(dishes_in_transit, pot_locations, min_dish_to_pot_cost, total_num_dishes_needed, state)
+#
+#         min_dish_to_pot_trips = max([0, min_pot_to_delivery_trips - num_dishes_better_than_disp])
+#         dish_to_pot_costs = min_dish_to_pot_cost * min_dish_to_pot_trips
+#
+#         forward_cost += total_better_than_disp_dish_cost
+#         forward_cost += dish_to_pot_costs
+#
+#         # START COOKING COSTS, each to be filled pots will require 1 INTERACT to start cooking
+#         num_pots_to_be_filled = min_pot_to_delivery_trips - len(full_soups_in_pots)
+#         """Note that this is still assuming every soup requires 3 ingredients"""
+#         forward_cost += num_pots_to_be_filled
+#
+#         # ONION COSTS
+#         total_num_onions_needed = num_pots_to_be_filled * 3 - num_onions_in_partially_full_pots
+#         onions_on_counters = objects_dict['onion']
+#         onions_in_transit = player_objects['onion'] + onions_on_counters
+#
+#         num_onions_better_than_disp, total_better_than_disp_onion_cost = \
+#             self.get_costs_better_than_dispenser(onions_in_transit, pot_locations, min_onion_to_pot_cost, total_num_onions_needed, state)
+#
+#         min_onion_to_pot_trips = max([0, total_num_onions_needed - num_onions_better_than_disp])
+#         onion_to_pot_costs = min_onion_to_pot_cost * min_onion_to_pot_trips
+#
+#         forward_cost += total_better_than_disp_onion_cost
+#         forward_cost += onion_to_pot_costs
+#
+#         # Going to closest feature costs
+#         # NOTE: as implemented makes heuristic inconsistent
+#         # for player in state.players:
+#         #     if not player.has_object():
+#         #         counter_objects = soups_on_counters + dishes_on_counters + onions_on_counters
+#         #         possible_features = counter_objects + pot_locations + self.mdp.get_dish_dispenser_locations() + self.mdp.get_onion_dispenser_locations()
+#         #         forward_cost += self.action_manager.min_cost_to_feature(player.pos_and_or, possible_features)
+#
+#         heuristic_cost = forward_cost / 2
+#
+#         if not clean and debug:
+#             env = OvercookedEnv.from_mdp(self.mdp)
+#             env.state = state
+#             print("\n" + "#"*35)
+#             print("Current state: (ml timestep {})\n".format(time))
+#
+#             print("# in transit: \t\t Soups {} \t Dishes {} \t Onions {}".format(
+#                 len(soups_in_transit), len(dishes_in_transit), len(onions_in_transit)
+#             ))
+#
+#             # NOTE Possible improvement: consider cost of dish delivery too when considering if a
+#             # transit soup is better than dispenser equivalent
+#             print("# better than disp: \t Soups {} \t Dishes {} \t Onions {}".format(
+#                 num_soups_better_than_pot, num_dishes_better_than_disp, num_onions_better_than_disp
+#             ))
+#
+#             print("# of trips: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
+#                 min_pot_to_delivery_trips, min_dish_to_pot_trips, min_onion_to_pot_trips
+#             ))
+#
+#             print("Trip costs: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
+#                 pot_to_delivery_costs, dish_to_pot_costs, onion_to_pot_costs
+#             ))
+#
+#             print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
+#
+#         return heuristic_cost
+#
+#     def get_costs_better_than_dispenser(self, possible_objects, target_locations, baseline_cost, num_needed, state):
+#         """
+#         Computes the number of objects whose minimum cost to any of the target locations is smaller than
+#         the baseline cost (clipping it if greater than the number needed). It also calculates a lower
+#         bound on the cost of using such objects.
+#         """
+#         costs_from_transit_locations = []
+#         for obj in possible_objects:
+#             obj_pos = obj.position
+#             if obj_pos in state.player_positions:
+#                 # If object is being carried by a player
+#                 player = [p for p in state.players if p.position == obj_pos][0]
+#                 # NOTE: not sure if this -1 is justified.
+#                 # Made things work better in practice for greedy heuristic based agents.
+#                 # For now this function is just used from there. Consider removing later if
+#                 # greedy heuristic agents end up not being used.
+#                 min_cost = self.motion_planner.min_cost_to_feature(player.pos_and_or, target_locations) - 1
+#             else:
+#                 # If object is on a counter
+#                 min_cost = self.motion_planner.min_cost_between_features([obj_pos], target_locations)
+#             costs_from_transit_locations.append(min_cost)
+#
+#         costs_better_than_dispenser = [cost for cost in costs_from_transit_locations if cost <= baseline_cost]
+#         better_than_dispenser_total_cost = sum(np.sort(costs_better_than_dispenser)[:num_needed])
+#         return len(costs_better_than_dispenser), better_than_dispenser_total_cost
+#
+#     def _calculate_heuristic_costs(self, debug=False):
+#         """Pre-computes the costs between common trip types for this mdp"""
+#         pot_locations = self.mdp.get_pot_locations()
+#         delivery_locations = self.mdp.get_serving_locations()
+#         dish_locations = self.mdp.get_dish_dispenser_locations()
+#         onion_locations = self.mdp.get_onion_dispenser_locations()
+#         tomato_locations = self.mdp.get_tomato_dispenser_locations()
+#
+#         heuristic_cost_dict = {
+#             'pot-delivery': self.motion_planner.min_cost_between_features(pot_locations, delivery_locations, manhattan_if_fail=True),
+#             'pot-cooking': 20, # this assume cooking time is always 20 timesteps
+#             'dish-pot': self.motion_planner.min_cost_between_features(dish_locations, pot_locations, manhattan_if_fail=True)
+#         }
+#
+#         onion_pot_cost = self.motion_planner.min_cost_between_features(onion_locations, pot_locations, manhattan_if_fail=True)
+#         tomato_pot_cost = self.motion_planner.min_cost_between_features(tomato_locations, pot_locations, manhattan_if_fail=True)
+#
+#         if debug: print("Heuristic cost dict", heuristic_cost_dict)
+#         assert onion_pot_cost != np.inf or tomato_pot_cost != np.inf
+#         if onion_pot_cost != np.inf:
+#             heuristic_cost_dict['onion-pot'] = onion_pot_cost
+#         if tomato_pot_cost != np.inf:
+#             heuristic_cost_dict['tomato-pot'] = tomato_pot_cost
+#
+#         return heuristic_cost_dict
+#
+#     # Deprecated. This is out of date with the current MDP, but is no longer needed, so deprecated
+#     def simple_heuristic(self, state, time=0, debug=False):
+#         """Simpler heuristic that tends to run faster than current one"""
+#         # NOTE: State should be modified to have an order list w.r.t. which
+#         # one can calculate the heuristic
+#
+#         objects_dict = state.unowned_objects_by_type
+#         player_objects = state.player_objects_by_type
+#         pot_states_scores_dict = self.mdp.get_pot_states_scores(state)
+#         max_recipe_value = self.mdp.max_recipe_value(state)
+#         num_deliveries_to_go = (DELIVERY_REW_THRES - state.delivery_rew)//max_recipe_value
+#         num_full_soups_in_pots = sum(pot_states_scores_dict['cooking'] + pot_states_scores_dict['ready'])//max_recipe_value
+#
+#         pot_states_dict = self.mdp.get_pot_states(state)
+#         partially_full_soups = self.mdp.get_partially_full_pots(pot_states_dict)
+#         num_items_in_partially_full_pots = sum([len(state.get_object(loc).ingredients) for loc in partially_full_soups])
+#
+#         soups_in_transit = player_objects['soup']
+#         dishes_in_transit = objects_dict['dish'] + player_objects['dish']
+#         onions_in_transit = objects_dict['onion'] + player_objects['onion']
+#         tomatoes_in_transit = objects_dict['tomato'] + player_objects['tomato']
+#
+#         num_pot_to_delivery = max([0, num_deliveries_to_go - len(soups_in_transit)])
+#         num_dish_to_pot = max([0, num_pot_to_delivery - len(dishes_in_transit)])
+#
+#         # FIXME: the following logic might need to be discussed, when incoporating tomatoes
+#         num_pots_to_be_filled = num_pot_to_delivery - num_full_soups_in_pots
+#         num_onions_needed_for_pots = num_pots_to_be_filled * 3 - len(onions_in_transit) - num_items_in_partially_full_pots
+#         num_tomatoes_needed_for_pots = 0
+#         num_onion_to_pot = max([0, num_onions_needed_for_pots])
+#         num_tomato_to_pot = max([0, num_tomatoes_needed_for_pots])
+#
+#         pot_to_delivery_costs = (self.heuristic_cost_dict['pot-delivery'] + self.heuristic_cost_dict['pot-cooking']) \
+#                                 * num_pot_to_delivery
+#         dish_to_pot_costs = self.heuristic_cost_dict['dish-pot'] * num_dish_to_pot
+#
+#         items_to_pot_costs = []
+#         # FIXME: might want to change this for anything beyond 3-onion soup
+#         if 'onion-pot' in self.heuristic_cost_dict.keys():
+#             onion_to_pot_costs = self.heuristic_cost_dict['onion-pot'] * num_onion_to_pot
+#             items_to_pot_costs.append(onion_to_pot_costs)
+#         if 'tomato-pot' in self.heuristic_cost_dict.keys():
+#             tomato_to_pot_costs = self.heuristic_cost_dict['tomato-pot'] * num_tomato_to_pot
+#             items_to_pot_costs.append(tomato_to_pot_costs)
+#
+#         # NOTE: doesn't take into account that a combination of the two might actually be more advantageous.
+#         # Might cause heuristic to be inadmissable in some edge cases.
+#         # FIXME: only onion for now
+#         items_to_pot_cost = onion_to_pot_costs
+#
+#         # num_pot_to_delivery added to account for the additional "INTERACT" to start soup cooking
+#         heuristic_cost = (pot_to_delivery_costs + dish_to_pot_costs + num_pot_to_delivery + items_to_pot_cost) / 2
+#
+#         if not clean and debug:
+#             env = OvercookedEnv.from_mdp(self.mdp)
+#             env.state = state
+#             print("\n" + "#" * 35)
+#             print("Current state: (ml timestep {})\n".format(time))
+#
+#             print("# in transit: \t\t Soups {} \t Dishes {} \t Onions {}".format(
+#                 len(soups_in_transit), len(dishes_in_transit), len(onions_in_transit)
+#             ))
+#
+#             print("Trip costs: \t\t pot-del {} \t dish-pot {} \t onion-pot {}".format(
+#                 pot_to_delivery_costs, dish_to_pot_costs, onion_to_pot_costs
+#             ))
+#
+#             print(str(env) + "HEURISTIC: {}".format(heuristic_cost))
+#         if heuristic_cost < 15:
+#             print(heuristic_cost, (pot_to_delivery_costs, dish_to_pot_costs, num_pot_to_delivery, items_to_pot_cost))
+#             print(self.mdp.state_string(state))
+#         return heuristic_cost
 
 

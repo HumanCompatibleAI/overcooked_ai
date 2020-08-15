@@ -1,9 +1,7 @@
 import itertools, math, copy
 import numpy as np
 
-from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.planning.planners import Heuristic
-from overcooked_ai_py.planning.search import SearchTree
+from overcooked_ai_py.mdp.actions import Action
 
 
 class Agent(object):

@@ -85,7 +85,6 @@ class OvercookedEnv(object):
         self.mlp_params = mlp_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-
         self.reset()
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
