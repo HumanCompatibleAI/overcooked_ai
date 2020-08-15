@@ -1,7 +1,7 @@
 # this denotes whether we are running the clean version of planners
 clean = True
 
-import itertools, os, tqdm
+import itertools, os
 import numpy as np
 import pickle, time
 from overcooked_ai_py.utils import manhattan_distance
@@ -138,7 +138,6 @@ class MotionPlanner(object):
         
         Args:
             start_motion_state (tuple): starting positions and orientations
-            positions_plan (list): positions path followed by agent
             goal_motion_state (tuple): goal positions and orientations
         """
         assert self.is_valid_motion_start_goal_pair(start_motion_state, goal_motion_state)
@@ -582,7 +581,7 @@ class JointMotionPlanner(object):
         
         Args:
             joint_start_state: pair of start (pos, or)
-            goal_statuses: pair of goal (pos, or)
+            joint_goal_state: pair of goal (pos, or)
         """
         assert self.is_valid_joint_motion_pair(joint_start_state, joint_goal_state), joint_goal_state
         # Solve shortest-path graph problem
@@ -730,9 +729,7 @@ class MediumLevelActionManager(object):
     
     Args:
         mdp (OvercookedGridWorld): gridworld of interest
-        start_orientations (bool): whether the JointMotionPlanner should store plans for 
-                                   all starting positions & orientations or just for unique 
-                                   starting positions
+        params (dictionary): parameters for the medium level action manager
     """
 
     def __init__(self, mdp, params):
@@ -1004,39 +1001,40 @@ class MediumLevelPlanner(object):
             if not clean and SAFE_RUN:
                 assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
                 s_prime, _ = OvercookedEnv.execute_plan(self.mdp, start_state, joint_motion_action_plans, display=False)
-                assert end_state == s_prime,  [OvercookedEnv.print_state(self.mdp, s_prime), OvercookedEnv.print_state(self.mdp, end_state)]
+                assert end_state == s_prime,  [self.mdp.state_string(s_prime), self.mdp.state_string(end_state)]
 
             successor_states.append((goal_jm_state, end_state, min(plan_costs)))
         return successor_states
 
-    def get_successor_states_fixed_other(self, start_state, other_agent, other_agent_idx):
-        """
-        Get the successor states of a given start state, assuming that the other agent is fixed and will act according to the passed in model
-        """
-        if self.mdp.is_terminal(start_state):
-            return []
-
-        player = start_state.players[1 - other_agent_idx]
-        ml_actions = self.ml_action_manager.get_medium_level_actions(start_state, player)
-
-        if len(ml_actions) == 0:
-            ml_actions = self.ml_action_manager.get_medium_level_actions(start_state, player, waiting_substitute=True)
-
-        successor_high_level_states = []
-        for ml_action in ml_actions:
-            action_plan, end_state, cost = self.get_embedded_low_level_action_plan(start_state, ml_action, other_agent, other_agent_idx)
-
-            if not self.mdp.is_terminal(end_state):
-                # Adding interact action and deriving last state
-                other_agent_action, _ = other_agent.action(end_state)
-                last_joint_action = (Action.INTERACT, other_agent_action) if other_agent_idx == 1 else (other_agent_action, Action.INTERACT)
-                action_plan = action_plan + (last_joint_action,)
-                cost = cost + 1
-
-                end_state, _ = self.embedded_mdp_step(end_state, Action.INTERACT, other_agent_action, other_agent.agent_index)
-
-            successor_high_level_states.append((action_plan, end_state, cost))
-        return successor_high_level_states
+    # Deprecated.
+    # def get_successor_states_fixed_other(self, start_state, other_agent, other_agent_idx):
+    #     """
+    #     Get the successor states of a given start state, assuming that the other agent is fixed and will act according to the passed in model
+    #     """
+    #     if self.mdp.is_terminal(start_state):
+    #         return []
+    #
+    #     player = start_state.players[1 - other_agent_idx]
+    #     ml_actions = self.ml_action_manager.get_medium_level_actions(start_state, player)
+    #
+    #     if len(ml_actions) == 0:
+    #         ml_actions = self.ml_action_manager.get_medium_level_actions(start_state, player, waiting_substitute=True)
+    #
+    #     successor_high_level_states = []
+    #     for ml_action in ml_actions:
+    #         action_plan, end_state, cost = self.get_embedded_low_level_action_plan(start_state, ml_action, other_agent, other_agent_idx)
+    #
+    #         if not self.mdp.is_terminal(end_state):
+    #             # Adding interact action and deriving last state
+    #             other_agent_action, _ = other_agent.action(end_state)
+    #             last_joint_action = (Action.INTERACT, other_agent_action) if other_agent_idx == 1 else (other_agent_action, Action.INTERACT)
+    #             action_plan = action_plan + (last_joint_action,)
+    #             cost = cost + 1
+    #
+    #             end_state, _ = self.embedded_mdp_step(end_state, Action.INTERACT, other_agent_action, other_agent.agent_index)
+    #
+    #         successor_high_level_states.append((action_plan, end_state, cost))
+    #     return successor_high_level_states
 
     # Deprecated. because no longer used
     # def check_heuristic_consistency(self, curr_heuristic_val, prev_heuristic_val, actual_edge_cost):
