@@ -284,7 +284,7 @@ class TestGridworld(unittest.TestCase):
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
-        mdp = OvercookedGridworld.from_layout_name('corridor')
+        mdp = OvercookedGridworld.from_layout_name('corridor_original')
         expected_start_state = OvercookedState(
             [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {})
         actual_start_state = mdp.get_standard_start_state()
@@ -819,8 +819,17 @@ class TestOvercookedEnvironment(unittest.TestCase):
             OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
 
     def test_random_layout(self):
-        mdp_gen_params = {"prop_feats": (1, 1)}
-        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
+        mdp_gen_params = {"inner_shape": (5, 4),
+                            "prop_empty": 0.8,
+                            "prop_feats": 0.2,
+                            "start_all_orders" : [
+                                { "ingredients" : ["onion", "onion", "onion"]}
+                            ],
+                            "recipe_values" : [20],
+                            "recipe_times" : [20],
+                            "display": False
+                          }
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params, outer_shape=(5, 4))
         env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         start_terrain = env.mdp.terrain_mtx
 
@@ -829,14 +838,25 @@ class TestOvercookedEnvironment(unittest.TestCase):
             curr_terrain = env.mdp.terrain_mtx
             self.assertFalse(np.array_equal(start_terrain, curr_terrain))
 
-        mdp_gen_params = {"mdp_choices": ['cramped_room', 'asymmetric_advantages']}
-        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
+        mdp_gen_params = {"layout_name": 'cramped_room'}
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params)
         env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         
         layouts_seen = []
-        for _ in range(10):
+        for _ in range(5):
             layouts_seen.append(env.mdp.terrain_mtx)
             env.reset()
+
+        all_same_layout = all([np.array_equal(env.mdp.terrain_mtx, terrain) for terrain in layouts_seen])
+        self.assertTrue(all_same_layout)
+
+        mdp_gen_params = {"layout_name": 'asymmetric_advantages'}
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params)
+        env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
+        for _ in range(5):
+            layouts_seen.append(env.mdp.terrain_mtx)
+            env.reset()
+
         all_same_layout = all([np.array_equal(env.mdp.terrain_mtx, terrain) for terrain in layouts_seen])
         self.assertFalse(all_same_layout)
         

@@ -18,10 +18,6 @@ from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_D
 # computation to prevent or identify possible minor errors
 SAFE_RUN = False
 
-MAX_HORIZON = 1e10
-
-DELIVERY_REW_THRES = 20
-
 NO_COUNTERS_PARAMS = {
         'start_orientations': False,
         'wait_allowed': False,
@@ -775,7 +771,6 @@ class MediumLevelActionManager(object):
         return valid_joint_ml_actions
 
     def is_valid_ml_action(self, state, ml_action):
-        #?????
         return self.joint_motion_planner.is_valid_jm_start_goal_pair(state.players_pos_and_or, ml_action)
 
     def get_medium_level_actions(self, state, player, waiting_substitute=False):
@@ -784,6 +779,7 @@ class MediumLevelActionManager(object):
         
         Args:
             state (OvercookedState): current state
+            player (PlayerState): the player's current state
             waiting_substitute (bool): add a substitute action that takes the place of 
                                        a waiting action (going to closest feature)
         
@@ -982,33 +978,28 @@ class MediumLevelPlanner(object):
         mlp.ml_action_manager.save_to_file(final_filepath)
         return mlp
 
-    def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
-        """
-        Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
-
-        Args:
-            state (OvercookedState): starting state
-            h_fn: heuristic function
-
-        Returns:
-            full_joint_action_plan (list): joint actions to reach goal
-        """
-        print("b")
-        start_state = start_state.deepcopy()
-        print("b")
-        ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
-
-        print("b")
-        full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
-            start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
-        )
-        print("b")
-        assert cost == len(full_joint_action_plan), "A* cost {} but full joint action plan cost {}".format(cost, len(full_joint_action_plan))
-
-        print("b")
-        if debug: print("Found plan with cost {}".format(cost))
-        print("b")
-        return full_joint_action_plan
+    # Deprecated due to Heuristic
+    # def get_low_level_action_plan(self, start_state, h_fn, delivery_horizon=4, debug=False, goal_info=False):
+    #     """
+    #     Get a plan of joint-actions executable in the environment that will lead to a goal number of deliveries
+    #
+    #     Args:
+    #         state (OvercookedState): starting state
+    #         h_fn: heuristic function
+    #
+    #     Returns:
+    #         full_joint_action_plan (list): joint actions to reach goal
+    #     """
+    #     start_state = start_state.deepcopy()
+    #     ml_plan, cost = self.get_ml_plan(start_state, h_fn, delivery_horizon=delivery_horizon, debug=debug)
+    #
+    #     full_joint_action_plan = self.get_low_level_plan_from_ml_plan(
+    #         start_state, ml_plan, h_fn, debug=debug, goal_info=goal_info
+    #     )
+    #     assert cost == len(full_joint_action_plan), "A* cost {} but full joint action plan cost {}".format(cost, len(full_joint_action_plan))
+    #
+    #     if debug: print("Found plan with cost {}".format(cost))
+    #     return full_joint_action_plan
 
     # Deprecated due to Heuristic
     # def get_low_level_plan_from_ml_plan(self, start_state, ml_plan, heuristic_fn, debug=False, goal_info=False):
@@ -1174,6 +1165,7 @@ class MediumLevelPlanner(object):
             assert False, "state {} \t action {}".format(state, action)
             successor_state = state
         return successor_state, joint_action
+
 
 class HighLevelAction:
     """A high level action is given by a set of subsequent motion goals"""

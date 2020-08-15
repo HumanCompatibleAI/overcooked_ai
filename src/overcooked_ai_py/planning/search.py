@@ -229,6 +229,9 @@ class Graph(object):
             # Override the error for now and return an empty list
             # raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
             #                        + "This could be caused by using another layout's planner on this layout")
+
+            # here, we are returning a list with just the start_index, so that
+            # after taking the plan, the upstream will be left with nothing, enabling detection of this edge case
             return [start_index]
 
         return [start_index] + self._get_node_index_path(best_index, goal_index)

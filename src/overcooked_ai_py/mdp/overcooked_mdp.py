@@ -1846,8 +1846,6 @@ class OvercookedGridworld(object):
             if horizon - overcooked_state.timestep < 40:
                 state_mask_dict["urgency"] = np.ones(self.shape)
 
-            state_mask_dict["soup_cook_time_remaining"] = np.ones(self.shape) * 400
-
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
 

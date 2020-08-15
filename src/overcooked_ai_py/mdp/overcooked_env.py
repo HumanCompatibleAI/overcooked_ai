@@ -182,13 +182,15 @@ class OvercookedEnv(object):
 
         if fname is None:
             print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
-                    self.t,
+                    self.state.timestep,
                     tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                     r_t,
                     env_info["shaped_r_by_agent"],
                     action_probs,
-                    self.mdp.potential_function(self.state),
-                    0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
+                    "",
+                    # self.mdp.potential_function(self.state, self.mlp.mp),
+                    "",
+                    # 0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
                     self
                 )
             )
@@ -196,13 +198,15 @@ class OvercookedEnv(object):
             f = open(fname, 'a')
             print(
                 "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
-                    self.t,
+                    self.state.timestep,
                     tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                     r_t,
                     env_info["shaped_r_by_agent"],
                     action_probs,
-                    self.mdp.potential_function(self.state),
-                    0.99 * env_info["phi_s_prime"] - env_info["phi_s"],  # Assuming gamma 0.99
+                    "",
+                    # self.mdp.potential_function(self.state, self.mlp.mp),
+                    "",
+                    # 0.99 * env_info["phi_s_prime"] - env_info["phi_s"],  # Assuming gamma 0.99
                     self
                 ), file=f
             )
