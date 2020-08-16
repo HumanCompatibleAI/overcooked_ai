@@ -1,0 +1,12 @@
+codecov:
+    token: ad628ad1-efe8-4182-9069-571939ecdba5
+    require_ci_to_pass: yes
+    max_report_age: off
+
+coverage:
+    precision: 2
+    round: down
+    range: "70...100"
+    
+fixes:
+    - "src/::"
