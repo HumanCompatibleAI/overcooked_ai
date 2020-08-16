@@ -46,13 +46,17 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install coverage
-        pip install codecov
     - name: Setup
       run: pip install .
     - name: Run tests and generate coverage report
       run: |
         coverage run testing/overcooked_test.py
-        codecov
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        flags: no-planners
+        name: codecov-report
+        fail_ci_if_error: true
   ## This should be uncommented once the planners are updated
   # ubuntu_full_tests:
   #   runs-on: ubuntu-latest
