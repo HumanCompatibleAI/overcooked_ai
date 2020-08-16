@@ -1,5 +1,5 @@
 codecov:
-    token: ad628ad1-efe8-4182-9069-571939ecdba5
+    token: 0989df3c-1c7e-4011-818e-e98ca33b1241
     require_ci_to_pass: yes
     max_report_age: off
 
