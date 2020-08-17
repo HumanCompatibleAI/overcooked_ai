@@ -12,10 +12,6 @@ DEFAULT_ENV_PARAMS = {
 
 MAX_HORIZON = 1e10
 
-# if this is a positive integer, we are sampling from a finite list of mdp.
-# Otherwise, we are using the mdp_fn to generate a new MDP every single time
-LST_LEN = -1
-
 class OvercookedEnv(object):
     """
     An environment wrapper for the OvercookedGridworld Markov Decision Process.
@@ -56,15 +52,14 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, _variable_mdp=True):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
         horizon (int):                  Number of steps before the environment returns done=True
         mlp_params (dict):              params for MediumLevelPlanner
         info_level (int):               Change amount of logging
-        _variable_mdp (bool):           This input should be ignored in nearly all cases. Should automatically keep 
-                                        track of whether the mdp changes or is constant across episodes.
+        num_mdp (int):                  the number of mdp if we are using a list of mdps
 
         TODO: Potentially make changes based on this discussion
         https://github.com/HumanCompatibleAI/overcooked_ai/pull/22#discussion_r416786847
@@ -72,14 +67,9 @@ class OvercookedEnv(object):
         assert callable(mdp_generator_fn),  "OvercookedEnv takes in a OvercookedGridworld generator function. " \
                                             "If trying to instantiate directly from a OvercookedGridworld " \
                                             "instance, use the OvercookedEnv.from_mdp method"
-        self.variable_mdp = _variable_mdp
-        # infinite case
-        if LST_LEN == -1:
-            self.mdp_generator_fn = mdp_generator_fn
-        # finite MDP LST case
-        else:
-            self.mdp_lst = [mdp_generator_fn() for _ in range(LST_LEN)]
-            self.mdp_generator_fn = lambda : random.choice(self.mdp_lst)
+        self.num_mdp = num_mdp
+        self.variable_mdp = num_mdp == 1
+        self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
         self._mlp = None
         self.mlp_params = mlp_params
@@ -100,16 +90,12 @@ class OvercookedEnv(object):
         return self._mlp
 
     @staticmethod
-    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, _variable_mdp=False):
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1):
         """
         Create an OvercookedEnv directly from a OvercookedGridworld mdp
         rather than a mdp generating function.
         """
         assert isinstance(mdp, OvercookedGridworld)
-        assert _variable_mdp is False, \
-            "from_mdp should not be called with _variable_mdp=True. If you performed this call, " \
-            "most likely there is an inconsistency in the an env_params dictionary that you were " \
-            "trying to use to create the Environment."
         mdp_generator_fn = lambda: mdp
         return OvercookedEnv(
             mdp_generator_fn=mdp_generator_fn,
@@ -117,7 +103,7 @@ class OvercookedEnv(object):
             horizon=horizon,
             mlp_params=mlp_params,
             info_level=info_level,
-            _variable_mdp=_variable_mdp
+            num_mdp=1
         )
 
 
@@ -146,7 +132,7 @@ class OvercookedEnv(object):
             start_state_fn=self.start_state_fn,
             horizon=self.horizon,
             info_level=self.info_level,
-            _variable_mdp=self.variable_mdp
+            num_mdp=self.num_mdp
         )
 
 

@@ -39,8 +39,17 @@ class AgentEvaluator(object):
             self.mdp_fn = lambda: mdp
             self.env = OvercookedEnv.from_mdp(mdp, **env_params)
         else:
-            self.mdp_fn = mdp_fn
-            self.env = OvercookedEnv(self.mdp_fn, **env_params)
+            print("ENV PARAM", env_params)
+            # infinite mdp
+            if 'num_mdp' not in env_params or env_params['num_mdp'] == -1:
+                self.mdp_fn = mdp_fn
+                self.env = OvercookedEnv(self.mdp_fn, **env_params)
+            else:
+                num_mdp = env_params['num_mdp']
+                assert num_mdp > 0, "invalid number of mdp"
+                self.mdp_lst = [mdp_fn() for _ in range(num_mdp)]
+                self.mdp_fn = lambda : np.random.choice(self.mdp_lst)
+                self.env = OvercookedEnv(self.mdp_fn, **env_params)
 
         self.force_compute = force_compute
 

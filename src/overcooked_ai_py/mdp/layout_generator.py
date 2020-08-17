@@ -67,8 +67,11 @@ class MDPParamsGenerator(object):
         """
         assert params_schedule_fn != None or mdp_params_always != None, \
             "one of params_schedule_fn and mdp_params_always must be not Null"
-        self.mdp_params_always = mdp_params_always
-        self.params_schedule_fn = params_schedule_fn
+        if mdp_params_always != None:
+            self.mdp_param_always = mdp_params_always
+            self.params_schedule_fn = lambda x: self.mdp_param_always
+        else:
+            self.params_schedule_fn = params_schedule_fn
 
     def generate(self, outside_information={}):
         """
@@ -76,8 +79,6 @@ class MDPParamsGenerator(object):
         outside_information (dict): passing in outside information
         """
         assert type(outside_information) is dict
-        if self.mdp_params_always != None:
-            return self.mdp_params_always
         mdp_params = self.params_schedule_fn(outside_information)
         return mdp_params
 
