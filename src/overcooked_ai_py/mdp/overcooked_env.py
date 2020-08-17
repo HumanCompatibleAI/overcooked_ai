@@ -12,6 +12,8 @@ DEFAULT_ENV_PARAMS = {
 
 MAX_HORIZON = 1e10
 
+DISPLAY_PHI = False
+
 class OvercookedEnv(object):
     """
     An environment wrapper for the OvercookedGridworld Markov Decision Process.
@@ -163,16 +165,22 @@ class OvercookedEnv(object):
 
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs[0]] for player_action_probs in action_probs ]
 
-        output_string = "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+
+        if DISPLAY_PHI:
+            state_potential_str = "\nState potential = " + str(self.mdp.potential_function(self.state, self.mlp.mp)) + "\t"
+            potential_diff_str = "Δ potential = " + str(0.99 * env_info["phi_s_prime"] - env_info["phi_s"]) + "\n" # Assuming gamma 0.99
+        else:
+            state_potential_str = ""
+            potential_diff_str = ""
+
+        output_string = "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {} {} {} \n{}\n".format(
                     self.state.timestep,
                     tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                     r_t,
                     env_info["shaped_r_by_agent"],
                     action_probs,
-                    "",
-                    # self.mdp.potential_function(self.state, self.mlp.mp),
-                    "",
-                    # 0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
+                    state_potential_str,
+                    potential_diff_str,
                     self)
 
         if fname is None:

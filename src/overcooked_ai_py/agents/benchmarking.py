@@ -39,7 +39,6 @@ class AgentEvaluator(object):
             self.mdp_fn = lambda: mdp
             self.env = OvercookedEnv.from_mdp(mdp, **env_params)
         else:
-            print("ENV PARAM", env_params)
             # infinite mdp
             if 'num_mdp' not in env_params or env_params['num_mdp'] == -1:
                 self.mdp_fn = mdp_fn
