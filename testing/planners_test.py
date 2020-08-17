@@ -1,7 +1,7 @@
 import unittest, time, pickle
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, Heuristic, HighLevelActionManager, HighLevelPlanner
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
 from overcooked_ai_py.mdp.actions import Direction, Action
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, OvercookedState
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, SoupState, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 
 large_mdp_tests = False
@@ -13,16 +13,15 @@ e, w = Direction.EAST, Direction.WEST
 stay, interact = Action.STAY, Action.INTERACT
 P, Obj = PlayerState, ObjectState
 
-
 # Simple MDP Setup
-simple_mdp = OvercookedGridworld.from_layout_name('simple_tomato', start_order_list=['any'], cook_time=5)
+simple_mdp = OvercookedGridworld.from_layout_name('simple_o')
 
 base_params = {
     'start_orientations': False,
     'wait_allowed': False,
     'counter_goals': simple_mdp.terrain_pos_dict['X'],
     'counter_drop': simple_mdp.terrain_pos_dict['X'][1:2],
-    'counter_pickup': [],
+    'counter_pickup': simple_mdp.terrain_pos_dict['X'],
     'same_motion_goals': True
 }
 action_manger_filename = "simple_1_am.pkl"
@@ -35,7 +34,7 @@ base_params_start_or = {
     'wait_allowed': False,
     'counter_goals': simple_mdp.terrain_pos_dict['X'],
     'counter_drop': [],
-    'counter_pickup': [],
+    'counter_pickup': simple_mdp.terrain_pos_dict['X'],
     'same_motion_goals': False
 }
 action_manger_filename = "simple_2_am.pkl"
@@ -71,9 +70,29 @@ if large_mdp_tests:
     action_manger_filename = "corridor_am.pkl"
     ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
         large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
+    # Deprecated.
+    # hlam = HighLevelActionManager(ml_planner_large)
+    # hlp = HighLevelPlanner(hlam)
 
-    hlam = HighLevelActionManager(ml_planner_large)
-    hlp = HighLevelPlanner(hlam)
+
+def done_soup_obj(soup_loc, num_onion_inside=3):
+    return soup_obj(soup_loc, num_onion_inside, 20)
+
+
+def idle_soup_obj(soup_loc, num_onion_inside):
+    return soup_obj(soup_loc, num_onion_inside, -1)
+
+
+def cooking_soup_obj(soup_loc, num_onion_inside=3, cooking_tick=0):
+    assert cooking_tick >= 0
+    assert num_onion_inside >= 0
+    return soup_obj(soup_loc, num_onion_inside, cooking_tick)
+
+
+def soup_obj(soup_loc, num_onion_inside, cooking_tick):
+    ingredient_obj_lst = [Obj('onion', soup_loc)] * num_onion_inside
+    return SoupState(soup_loc, ingredient_obj_lst, cooking_tick)
+
 
 class TestMotionPlanner(unittest.TestCase):
 
@@ -320,143 +339,336 @@ class TestJointMotionPlanner(unittest.TestCase):
         if min_t is not None: self.assertEqual(len(action_plan), min_t)
         if times is not None: self.assertEqual(plan_lengths, times)
 
-
-class TestMediumLevelPlanner(unittest.TestCase):
-
+# Rewritten because the previous test depended on Heuristic, and Heuristic has been deprecated
+class TestMediumLevelPlannerSimple(unittest.TestCase):
     def test_simple_mdp_without_start_orientations(self):
         print("Simple - no start orientations (& shared motion goals)")
         mlp = ml_planner_simple
-        self.simple_mpd_already_done(mlp)
-        self.simple_mdp_get_and_serve_soup(mlp)
-        self.simple_mdp_get_onion_then_serve(mlp)
-        self.simple_mdp_one_delivery_from_start(mlp)
-        self.simple_mdp_two_deliveries(mlp)
+        self.simple_mpd_empty_hands(mlp)
+        self.simple_mdp_deliver_soup(mlp)
+        self.simple_mdp_pickup_counter_soup(mlp)
+        self.simple_mdp_pickup_counter_dish(mlp)
+        self.simple_mdp_pickup_counter_onion(mlp)
+        self.simple_mdp_drop_useless_dish_with_soup_idle(mlp)
+        self.simple_mdp_pickup_soup(mlp)
+        self.simple_mdp_pickup_dish(mlp)
+        self.simple_mdp_start_good_soup_cooking(mlp)
+        self.simple_mdp_start_bad_soup_cooking(mlp)
+        self.simple_mdp_start_1_onion_soup_cooking(mlp)
+        self.simple_mdp_drop_useless_onion_good_soup(mlp)
+        self.simple_mdp_drop_useless_onion_bad_soup(mlp)
+        self.simple_mdp_add_3rd_onion(mlp)
+        self.simple_mdp_add_2nd_onion(mlp)
+        self.simple_mdp_drop_useless_dish(mlp)
 
     def test_simple_mdp_with_start_orientations(self):
         print("Simple - with start orientations (no shared motion goals)")
         mlp = or_ml_planner_simple
-        self.simple_mpd_already_done(mlp)
-        self.simple_mdp_get_and_serve_soup(mlp)
-        self.simple_mdp_get_onion_then_serve(mlp)
-        self.simple_mdp_one_delivery_from_start(mlp)
-        self.simple_mdp_two_deliveries(mlp)
+        self.simple_mpd_empty_hands(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_deliver_soup(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_soup(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_dish(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_onion(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_dish_with_soup_idle(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_soup(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_dish(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_start_good_soup_cooking(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_start_bad_soup_cooking(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_start_1_onion_soup_cooking(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_onion_good_soup(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_onion_bad_soup(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_add_3rd_onion(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_add_2nd_onion(mlp, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_dish(mlp, counter_drop_forbidden=True)
 
-    def test_large_mdp(self):
-        if large_mdp_tests:
-            print("Corridor - shared motion goals")
-            mlp = ml_planner_large
-            self.large_mdp_get_and_serve_soup(mlp)
-            self.large_mdp_get_onion_then_serve(mlp)
-            self.large_mdp_one_delivery_from_start(mlp)
-            self.large_mdp_two_deliveries_from_start(mlp)
+    ONION_PICKUP = ((3, 2), (1, 0))
+    DISH_PICKUP = ((2, 2), (0, 1))
+    COUNTER_DROP = ((1, 1), (0, -1))
+    COUNTER_PICKUP = ((1, 2), (-1, 0))
+    POT_INTERACT = ((2, 1), (00, -1))
+    SOUP_DELIVER = ((3, 2), (0, 1))
 
-    def test_large_mdp_no_shared(self):
-        if large_mdp_tests:
-            print("Corridor - no shared motion goals")
-            mlp = ml_planner_large_no_shared
-            self.large_mdp_get_and_serve_soup(mlp)
-            self.large_mdp_get_onion_then_serve(mlp)
-            self.large_mdp_one_delivery_from_start(mlp)
-            self.large_mdp_two_deliveries_from_start(mlp)
-
-    def simple_mpd_already_done(self, planner):
+    def simple_mpd_empty_hands(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {}, order_list=[])
-        self.check_full_plan(s, planner)
+            {},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP]
+                                     )
 
-    def simple_mdp_get_and_serve_soup(self, planner):
+    def simple_mdp_deliver_soup(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, done_soup_obj((2, 1)))],
+            {},
+            all_orders=simple_mdp.start_all_orders)
+
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.SOUP_DELIVER]
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.COUNTER_DROP, self.SOUP_DELIVER]
+                                         )
+
+    def simple_mdp_pickup_counter_soup(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 3, 5))},
-            order_list=['onion'])
-        self.check_full_plan(s, planner, debug=False)
+            {(0, 2): done_soup_obj((0, 2))},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP]
+                                     )
 
-    def simple_mdp_get_onion_then_serve(self, planner):
+
+    def simple_mdp_pickup_counter_dish(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {(2, 0): Obj('soup', (2, 0), ('onion', 2, 5))},
-            order_list=['onion'])
-        self.check_full_plan(s, planner)
+            {(0, 2): Obj('dish', (0, 2))},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP]
+                                     )
 
-    def simple_mdp_one_delivery_from_start(self, planner):
+    def simple_mdp_pickup_counter_onion(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {}, order_list=['onion'])
-        self.check_full_plan(s, planner)
+            {(0, 2): Obj('onion', (0, 2))},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP]
+                                     )
 
-    def simple_mdp_two_deliveries(self, planner):
+
+    def simple_mdp_drop_useless_dish_with_soup_idle(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('dish', (2, 1)))],
+            {(2, 0): idle_soup_obj((2, 0), 3)},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         []
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.COUNTER_DROP]
+                                         )
+
+
+    def simple_mdp_pickup_soup(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('dish', (2, 1)))],
+            {(2, 0): done_soup_obj((2, 0))},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.POT_INTERACT]
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.COUNTER_DROP, self.POT_INTERACT]
+                                         )
+
+    def simple_mdp_pickup_dish(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {}, order_list=['onion', 'any'])
-        self.check_full_plan(s, planner, debug=False)
+            {(2, 0): done_soup_obj((2, 0))},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP]
+                                     )
 
-    def large_mdp_get_and_serve_soup(self, planner):
-        s = OvercookedState(
-            [P((8, 1), n),
-             P((11, 4), n, Obj('dish', (11, 4)))],
-            {(8, 8): Obj('soup', (8, 8), ('tomato', 3, 1))},
-            order_list=['any'])
-        self.check_full_plan(s, planner, debug=False)
-
-    def large_mdp_get_onion_then_serve(self, planner):
+    def simple_mdp_start_good_soup_cooking(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {(8, 8): Obj('soup', (8, 8), ('onion', 2, 5))},
-            order_list=['onion'])
-        self.check_full_plan(s, planner, debug=False)
-    
-    def large_mdp_one_delivery_from_start(self, planner):
-        s = OvercookedState(
-            [P((2, 2), n),
-             P((2, 1), n)],
-            {}, order_list=['any'])
-        self.check_full_plan(s, planner, debug=False)
+            {(2, 0): idle_soup_obj((2, 0), 3)},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT]
+                                     )
 
-    def large_mdp_two_deliveries_from_start(self, planner):
+    def simple_mdp_start_bad_soup_cooking(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
              P((2, 1), n)],
-            {}, order_list=['onion', 'any'])
-        self.check_full_plan(s, planner, debug=False)
+            {(2, 0): idle_soup_obj((2, 0), 2)},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT]
+                                     )
+
+    def simple_mdp_start_1_onion_soup_cooking(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n)],
+            {(2, 0): idle_soup_obj((2, 0), 1)},
+            all_orders=simple_mdp.start_all_orders)
+        self.check_ml_action_manager(s, planner,
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                     [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT]
+                                     )
+
+    def simple_mdp_drop_useless_onion_good_soup(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('onion', (2, 1)))],
+            {(2, 0): done_soup_obj((2, 0))},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         []
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.COUNTER_DROP]
+                                         )
+
+    def simple_mdp_drop_useless_onion_bad_soup(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('onion', (2, 1)))],
+            {(2, 0): done_soup_obj((2, 0), 2)},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         []
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP],
+                                         [self.COUNTER_DROP]
+                                         )
+
+    def simple_mdp_add_3rd_onion(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('onion', (2, 1)))],
+            {(2, 0): idle_soup_obj((2, 0), 2)},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.POT_INTERACT]
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.COUNTER_DROP, self.POT_INTERACT]
+                                         )
+
+    def simple_mdp_add_2nd_onion(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('onion', (2, 1)))],
+            {(2, 0): idle_soup_obj((2, 0), 1)},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.POT_INTERACT]
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.COUNTER_DROP, self.POT_INTERACT]
+                                         )
+
+    def simple_mdp_drop_useless_dish(self, planner, counter_drop_forbidden=False):
+        s = OvercookedState(
+            [P((2, 2), n),
+             P((2, 1), n, Obj('dish', (2, 1)))],
+            {(2, 0): idle_soup_obj((2, 0), 1)},
+            all_orders=simple_mdp.start_all_orders)
+        if counter_drop_forbidden:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.POT_INTERACT]
+                                         )
+        else:
+            self.check_ml_action_manager(s, planner,
+                                         [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
+                                         [self.COUNTER_DROP, self.POT_INTERACT]
+                                         )
+
+
+    def check_ml_action_manager(self, state, planner, expected_mla_0, expected_mla_1, debug=False):
+        """
+        args:
+            state (OvercookedState): an overcooked state
+            planner (MediumLevelPlanner): the planer whose action manager will be tested
+
+        This function checks if all the mid-level actions make sense for each player state inside STATE
+        """
+        player_0, player_1 = state.players
+        am = planner.ml_action_manager
+
+        mla_0 = am.get_medium_level_actions(state, player_0)
+        mla_1 = am.get_medium_level_actions(state, player_1)
+
+
+        if debug:
+            print("Player 0 mla", mla_0)
+            print("Player 1 mla", mla_1)
+            print(am.mdp.state_string(state))
+
+        self.assertEqual(set(mla_0), set(expected_mla_0),
+                         "player 0's ml_action should be " + str(expected_mla_0) +
+                         " but get " + str(mla_0))
+        self.assertEqual(set(mla_1), set(expected_mla_1),
+                         "player 0's ml_action should be " + str(expected_mla_1) +
+                         " but get " + str(mla_1))
+
         
-    def check_full_plan(self, start_state, planner, debug=False):
-        heuristic = Heuristic(planner.mp)
-        joint_action_plan = planner.get_low_level_action_plan(start_state, heuristic.simple_heuristic, debug=debug, goal_info=debug)
-        env = OvercookedEnv.from_mdp(planner.mdp, horizon=1000)
-        resulting_state, _ = env.execute_plan(start_state, joint_action_plan, display=False)
-        self.assertEqual(len(resulting_state.order_list), 0)
-        
-
-class TestHighLevelPlanner(unittest.TestCase):
-    """The HighLevelPlanner class has been mostly discontinued"""
-    
-    def test_basic_hl_planning(self):
-        if large_mdp_tests:
-            s = OvercookedState(
-                [P((2, 2), n),
-                P((2, 1), n)],
-                {}, order_list=[])
-            h = Heuristic(hlp.mp)
-            hlp.get_hl_plan(s, h.simple_heuristic)
-
-            s = OvercookedState(
-                [P((2, 2), n),
-                P((2, 1), n)],
-                {}, order_list=['any', 'any', 'any'])
-            
-            hlp.get_low_level_action_plan(s, h.simple_heuristic)
-        # hlp.get_low_level_action_plan(s, h.hard_heuristic)
-
-        # heuristic = Heuristic(ml_planner_large.mp)
-        # ml_planner_large.get_low_level_action_plan(s, heuristic.simple_heuristic)
-        # ml_planner_large.get_low_level_action_plan(s, heuristic.hard_heuristic)
+# # Deprecated. because of Heuristic
+# class TestHighLevelPlanner(unittest.TestCase):
+#     """The HighLevelPlanner class has been mostly discontinued"""
+#
+#     def test_basic_hl_planning(self):
+#         if large_mdp_tests:
+#             s = OvercookedState(
+#                 [P((2, 2), n),
+#                 P((2, 1), n)],
+#                 {}, order_list=[])
+#             h = Heuristic(hlp.mp)
+#             hlp.get_hl_plan(s, h.simple_heuristic)
+#
+#             s = OvercookedState(
+#                 [P((2, 2), n),
+#                 P((2, 1), n)],
+#                 {}, order_list=['any', 'any', 'any'])
+#
+#             hlp.get_low_level_action_plan(s, h.simple_heuristic)
+#         # hlp.get_low_level_action_plan(s, h.hard_heuristic)
+#
+#         # heuristic = Heuristic(ml_planner_large.mp)
+#         # ml_planner_large.get_low_level_action_plan(s, heuristic.simple_heuristic)
+#         # ml_planner_large.get_low_level_action_plan(s, heuristic.hard_heuristic)
 
 if __name__ == '__main__':
     unittest.main()

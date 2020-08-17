@@ -3,11 +3,12 @@ import numpy as np
 from IPython.display import display
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
-from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
+from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
-from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
+from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.planning.planners import MediumLevelPlanner
 
 
 class AgentEvaluator(object):
@@ -20,83 +21,65 @@ class AgentEvaluator(object):
     pickleable. We should think about possible improvements/what makes most sense to do here.
     """
 
-    def __init__(self, mdp_params, env_params={}, mdp_fn_params=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+
+    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
         """
         mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
         env_params (dict): params for creation of an OvercookedEnv
-        mdp_fn_params (dict): params to setup random MDP generation
+        mdp_fn (callable function): a function that can be used to create mdp
         force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
-        mlp_params (dict): params for MediumLevelPlanner
+        mlp_params (dict): the parameters for mlp
+        debug (bool): whether to display debugging information on init
         """
         assert type(mdp_params) is dict, "mdp_params must be a dictionary"
-
-        if mdp_fn_params is None:
+        assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
+        env_params["mlp_params"] = mlp_params
+        if mdp_fn is None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
             self.mdp_fn = lambda: mdp
             self.env = OvercookedEnv.from_mdp(mdp, **env_params)
         else:
-            self.mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, **mdp_fn_params)
-            self.env = OvercookedEnv(self.mdp_fn, **env_params)
-        
+            # infinite mdp
+            if 'num_mdp' not in env_params or env_params['num_mdp'] == -1:
+                self.mdp_fn = mdp_fn
+                self.env = OvercookedEnv(self.mdp_fn, **env_params)
+            else:
+                num_mdp = env_params['num_mdp']
+                assert num_mdp > 0, "invalid number of mdp"
+                self.mdp_lst = [mdp_fn() for _ in range(num_mdp)]
+                self.mdp_fn = lambda : np.random.choice(self.mdp_lst)
+                self.env = OvercookedEnv(self.mdp_fn, **env_params)
+
         self.force_compute = force_compute
-        self.debug = debug
-        self.mlp_params = mlp_params
-        self._mlp = None
 
-    @property
-    def mlp(self):
-        assert not self.env.variable_mdp, "Variable mdp is not currently supported for planning"
-        if self._mlp is None: 
-            if self.debug: print("Computing Planner")
-            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.env.mdp, self.mlp_params, force_compute=self.force_compute)
-        return self._mlp
-
-    def get_params(self):
-        return {
-            "mdp_params": self.mdp.mdp_params,
-            "env_params": self.env.env_params,
-            "mdp_fn_params": self.mdp_fn_params,
-            "force_compute": self.force_compute,
-            "mlp_params": self.mlp_params,
-            "debug": self.debug
-        }
-
-    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False):
+    def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, native_eval=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    def evaluate_human_model_pair(self, num_games=1, display=False):
-        a0 = GreedyHumanModel(self.mlp)
-        a1 = GreedyHumanModel(self.mlp)
+    def evaluate_human_model_pair(self, num_games=1, display=False, native_eval=False):
+        a0 = GreedyHumanModel(self.env.mlp)
+        a1 = GreedyHumanModel(self.env.mlp)
         agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
-        a0 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
-        a1 = CoupledPlanningAgent(self.mlp, delivery_horizon=delivery_horizon)
-        a0.mlp.env = self.env
-        a1.mlp.env = self.env
-        agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None, info=True, native_eval=False):
+        # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
+        # if you would like to evaluate on a different env using rllib, please modifiy
+        # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
 
-    def evaluate_one_optimal_one_random(self, num_games, display=True):
-        a0 = CoupledPlanningAgent(self.mlp)
-        a1 = RandomAgent()
-        agent_pair = AgentPair(a0, a1)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-
-    def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
-        h = GreedyHumanModel(self.mlp)
-        r = CoupledPlanningAgent(self.mlp)
-        agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
-        return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True):
-        horizon_env = self.env.copy()
-        horizon_env.horizon = self.env.horizon if game_length is None else game_length
-        horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
-        horizon_env.reset()
-        return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+        # native eval: using self.env in evaluation instead of creating a copy
+        # this is particulally helpful with variable MDP, where we want to make sure
+        # the mdp used in evaluation is the same as the native self.env.mdp
+        if native_eval:
+            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
+                                         metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+        else:
+            horizon_env = self.env.copy()
+            horizon_env.horizon = self.env.horizon if game_length is None else game_length
+            horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
+            horizon_env.reset()
+            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
+                                            metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""
