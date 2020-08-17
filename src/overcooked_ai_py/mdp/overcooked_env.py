@@ -1,5 +1,5 @@
 import gym, tqdm
-import time, random
+import time
 import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action

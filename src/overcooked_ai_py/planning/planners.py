@@ -620,8 +620,7 @@ class JointMotionPlanner(object):
         delta_length = max(finishing_times) - min(finishing_times)
         if delta_length != 0:
             index_long_plan = np.argmax(finishing_times)
-            long_plan = plans[index_long_plan]
-            long_plan = long_plan[:min(finishing_times)]
+            plans[index_long_plan] = plans[index_long_plan][:min(finishing_times)]
         return plans
 
     def _rollout_end_pos_and_or(self, joint_start_state, joint_action_plan):
@@ -724,7 +723,7 @@ class MediumLevelActionManager(object):
     
     Args:
         mdp (OvercookedGridWorld): gridworld of interest
-        params (dictionary): parameters for the medium level action manager
+        mlam_params (dictionary): parameters for the medium level action manager
     """
 
     def __init__(self, mdp, mlam_params):

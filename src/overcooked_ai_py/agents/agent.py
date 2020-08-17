@@ -119,27 +119,6 @@ class AgentPair(AgentGroup):
         else:
             return super().joint_action(state)
 
-
-class CoupledPlanningPair(AgentPair):
-    """
-    Pair of identical coupled planning agents. Enables to search for optimal
-    action once rather than repeating computation to find action of second agent
-    """
-
-    def __init__(self, agent):
-        super().__init__(agent, agent, allow_duplicate_agents=True)
-
-    def joint_action(self, state):
-        # Reduce computation by half if both agents are coupled planning agents
-        joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
-
-        if len(joint_action_plan) == 0:
-            return ((Action.STAY, {}), (Action.STAY, {}))
-
-        joint_action_and_infos = [(a, {}) for a in joint_action_plan[0]]
-        return joint_action_and_infos
-
-
 class NNPolicy(object):
     """
     This is a common format for NN-based policies. Once one has wrangled the intended trained neural net
@@ -556,3 +535,23 @@ class GreedyHumanModel(Agent):
 #         action = first_joint_action[self.agent_index]
 #         return action, {}
 #
+
+# Deprecated. Due to Heuristic and MLP
+# class CoupledPlanningPair(AgentPair):
+#     """
+#     Pair of identical coupled planning agents. Enables to search for optimal
+#     action once rather than repeating computation to find action of second agent
+#     """
+#
+#     def __init__(self, agent):
+#         super().__init__(agent, agent, allow_duplicate_agents=True)
+#
+#     def joint_action(self, state):
+#         # Reduce computation by half if both agents are coupled planning agents
+#         joint_action_plan = self.a0.mlp.get_low_level_action_plan(state, self.a0.heuristic, delivery_horizon=self.a0.delivery_horizon, goal_info=True)
+#
+#         if len(joint_action_plan) == 0:
+#             return ((Action.STAY, {}), (Action.STAY, {}))
+#
+#         joint_action_and_infos = [(a, {}) for a in joint_action_plan[0]]
+#         return joint_action_and_infos
