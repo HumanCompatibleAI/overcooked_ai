@@ -126,39 +126,34 @@ class LayoutGenerator(object):
         """
         Return a PADDED MDP with mdp params specified in self.mdp_params
         """
-        mdp_params = self.mdp_params_generator.generate(outside_information)
+        mdp_gen_params = self.mdp_params_generator.generate(outside_information)
         outer_shape = self.outer_shape
-        if "layout_name" in mdp_params.keys() and mdp_params["layout_name"] is not None:
-            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        if "layout_name" in mdp_gen_params.keys() and mdp_gen_params["layout_name"] is not None:
+            mdp = OvercookedGridworld.from_layout_name(**mdp_gen_params)
             mdp_generator_fn = lambda: self.padded_mdp(mdp)
         else:
 
-            assert "inner_shape" in mdp_params.keys(), "mdp_params is missing inner_shape"
-            assert "prop_empty" in mdp_params.keys(), "mdp_params is missing prop_empty"
-            assert "prop_feats" in mdp_params.keys(), "mdp_params is missing prop_feats"
-            assert "display" in mdp_params.keys(), "mdp_params is missing display"
-            assert "start_all_orders" in mdp_params.keys(), "mdp_params is missing start_orders"
-            assert "recipe_values" in mdp_params.keys(), "mdp_params is missing recipe_values"
-            assert "recipe_times" in mdp_params.keys(), "mdp_params is missing recipe_times"
-            inner_shape = mdp_params["inner_shape"]
-            prop_empty = mdp_params["prop_empty"]
-            prop_feats = mdp_params["prop_feats"]
-            display = mdp_params["display"]
+            required_keys = ["inner_shape", "prop_empty", "prop_feats", "display", "start_all_orders"]
+            missing_keys = [k for k in required_keys if k not in mdp_gen_params.keys()]
+            assert len(missing_keys) == 0, "These keys were missing from the mdp_params: {}".format(missing_keys)
 
-            recipe_params = {"start_all_orders": mdp_params["start_all_orders"],
-                             "recipe_values": mdp_params["recipe_values"],
-                             "recipe_times": mdp_params["recipe_times"]}
+            recipe_params = {"start_all_orders": mdp_gen_params["start_all_orders"]}
+            if "recipe_values" in mdp_gen_params:
+                recipe_params["recipe_values"] = mdp_gen_params["recipe_values"]
+            if "recipe_times" in mdp_gen_params:
+                recipe_params["recipe_times"] = mdp_gen_params["recipe_times"]
 
+            inner_shape = mdp_gen_params["inner_shape"]
             assert inner_shape[0] <= outer_shape[0] and inner_shape[1] <= outer_shape[1], \
                 "inner_shape cannot fit into the outershap"
 
             layout_generator = LayoutGenerator(self.mdp_params_generator, outer_shape=self.outer_shape)
             mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
-                inner_shape=inner_shape,
-                prop_empty=prop_empty,
-                prop_features=prop_feats,
+                inner_shape=mdp_gen_params["inner_shape"],
+                prop_empty=mdp_gen_params["prop_empty"],
+                prop_features=mdp_gen_params["prop_feats"],
                 base_param=recipe_params,
-                display=display
+                display=mdp_gen_params["display"]
             )
 
         return mdp_generator_fn()

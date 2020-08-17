@@ -93,8 +93,6 @@ class OvercookedEnv(object):
 
     @property
     def mlp(self):
-        # print("mlp called")
-        # assert not self.env.variable_mdp, "Variable mdp is not currently supported for planning"
         if self._mlp is None:
             print("Computing Planner")
             self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.mdp, self.mlp_params,
@@ -179,8 +177,7 @@ class OvercookedEnv(object):
 
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs[0]] for player_action_probs in action_probs ]
 
-        if fname is None:
-            print("Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
+        output_string = "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
                     self.state.timestep,
                     tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                     r_t,
@@ -190,25 +187,13 @@ class OvercookedEnv(object):
                     # self.mdp.potential_function(self.state, self.mlp.mp),
                     "",
                     # 0.99 * env_info["phi_s_prime"] - env_info["phi_s"], # Assuming gamma 0.99
-                    self
-                )
-            )
+                    self)
+
+        if fname is None:
+            print(output_string)
         else:
             f = open(fname, 'a')
-            print(
-                "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {}\nState potential = {} \t Δ potential = {} \n{}\n".format(
-                    self.state.timestep,
-                    tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
-                    r_t,
-                    env_info["shaped_r_by_agent"],
-                    action_probs,
-                    "",
-                    # self.mdp.potential_function(self.state, self.mlp.mp),
-                    "",
-                    # 0.99 * env_info["phi_s_prime"] - env_info["phi_s"],  # Assuming gamma 0.99
-                    self
-                ), file=f
-            )
+            print(output_string, file=f)
             f.close()
 
     ###################
@@ -256,8 +241,9 @@ class OvercookedEnv(object):
     def reset(self, regen_mdp=True):
         """
         Resets the environment. Does NOT reset the agent.
-        The optional regen_mdp argument gives the option of not re-generating mdp on the reset,
-        which is particularly helpful with reproducing results on variable mdp
+        Args:
+            regen_mdp (bool): gives the option of not re-generating mdp on the reset,
+                                which is particularly helpful with reproducing results on variable mdp
         """
         if regen_mdp:
             self.mdp = self.mdp_generator_fn()
@@ -345,16 +331,18 @@ class OvercookedEnv(object):
         self.reset(False)
         return successor_state, done
 
-    def run_agents(self, agent_pair, include_final_state=False, display=False, display_until=np.Inf):
+    def run_agents(self, agent_pair, include_final_state=False, display=False, dir=None, display_until=np.Inf):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
         """
         assert self.state.timestep == 0, "Did not reset environment before running agents"
         trajectory = []
         done = False
+        # default is to not print to file
+        fname = None
 
-        if display:
-            fname = 'results_client_temp/roll_out_' + str(time.time()) + '.txt'
+        if dir != None:
+            fname = dir + '/roll_out_' + str(time.time()) + '.txt'
             f = open(fname, 'w+')
             print(self, file=f)
             f.close()
@@ -384,7 +372,7 @@ class OvercookedEnv(object):
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
         return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
 
-    def get_rollouts(self, agent_pair, num_games, display=False, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
+    def get_rollouts(self, agent_pair, num_games, display=False, dir=None, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -404,7 +392,7 @@ class OvercookedEnv(object):
         for i in range_iterator:
             agent_pair.set_mdp(self.mdp)
 
-            rollout_info = self.run_agents(agent_pair, display=display, include_final_state=final_state, display_until=display_until)
+            rollout_info = self.run_agents(agent_pair, display=display, dir=dir, include_final_state=final_state, display_until=display_until)
             trajectory, time_taken, tot_rews_sparse, _tot_rews_shaped = rollout_info
             obs, actions, rews, dones, infos = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
             trajectories["ep_states"].append(obs)
@@ -418,7 +406,9 @@ class OvercookedEnv(object):
             trajectories["env_params"].append(self.env_params)
             trajectories["metadatas"].append(metadata_fn(rollout_info))
 
-            # we do not need to regenerate MDP if we are getting a series of rollout using the same mdp
+            # we do not need to regenerate MDP if we are trying to generate a series of rollouts using the same MDP
+            # Basically, the FALSE here means that we are using the same layout and starting positions
+            # (if regen_mdp == True, resetting will call mdp_gen_fn to generate another layout & starting position)
             self.reset(regen_mdp=False)
             agent_pair.reset()
 

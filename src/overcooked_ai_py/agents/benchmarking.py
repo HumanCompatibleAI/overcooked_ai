@@ -28,6 +28,8 @@ class AgentEvaluator(object):
         env_params (dict): params for creation of an OvercookedEnv
         mdp_fn (callable function): a function that can be used to create mdp
         force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
+        mlp_params (dict): the parameters for mlp
+        debug (bool): whether to display debugging information on init
         """
         assert type(mdp_params) is dict, "mdp_params must be a dictionary"
         assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
@@ -52,28 +54,7 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    # Deprecated. Need to amend Heuristic before reactivating CoupledPlanningAgent:
-    # def evaluate_optimal_pair(self, num_games, delivery_horizon=2, display=False):
-    #     a0 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
-    #     a1 = CoupledPlanningAgent(self.env.mlp, delivery_horizon=delivery_horizon)
-    #     a0.mlp.env = self.env
-    #     a1.mlp.env = self.env
-    #     agent_pair = AgentPair(a0, a1)
-    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-    #
-    # def evaluate_one_optimal_one_random(self, num_games, display=True):
-    #     a0 = CoupledPlanningAgent(self.env.mlp)
-    #     a1 = RandomAgent()
-    #     agent_pair = AgentPair(a0, a1)
-    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-    #
-    # def evaluate_one_optimal_one_greedy_human(self, num_games, h_idx=0, display=True):
-    #     h = GreedyHumanModel(self.env.mlp)
-    #     r = CoupledPlanningAgent(self.env.mlp)
-    #     agent_pair = AgentPair(h, r) if h_idx == 0 else AgentPair(r, h)
-    #     return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display)
-
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, info=True, native_eval=False):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None, info=True, native_eval=False):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
@@ -82,14 +63,15 @@ class AgentEvaluator(object):
         # this is particulally helpful with variable MDP, where we want to make sure
         # the mdp used in evaluation is the same as the native self.env.mdp
         if native_eval:
-            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info,
+            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
                                          metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
         else:
             horizon_env = self.env.copy()
             horizon_env.horizon = self.env.horizon if game_length is None else game_length
             horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
             horizon_env.reset()
-            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
+                                            metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""

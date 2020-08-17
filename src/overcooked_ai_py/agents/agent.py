@@ -1,4 +1,4 @@
-import itertools, math, copy
+import itertools, math
 import numpy as np
 
 from overcooked_ai_py.mdp.actions import Action
@@ -105,10 +105,6 @@ class AgentPair(AgentGroup):
         super().__init__(*agents, allow_duplicate_agents=allow_duplicate_agents)
         assert self.n == 2
         self.a0, self.a1 = self.agents
-
-        # Deprecated
-        # if type(self.a0) is CoupledPlanningAgent and type(self.a1) is CoupledPlanningAgent:
-        #     print("If the two planning agents have same params, consider using CoupledPlanningPair instead to reduce computation time by a factor of 2")
 
     def joint_action(self, state):
         if self.a0 is self.a1:

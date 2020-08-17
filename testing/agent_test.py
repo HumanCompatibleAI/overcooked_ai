@@ -21,14 +21,14 @@ force_compute_large = False
 force_compute = True
 DISPLAY = False
 
-simple_mdp = OvercookedGridworld.from_layout_name('cramped_room_o_1order')
+simple_mdp = OvercookedGridworld.from_layout_name('cramped_room')
 large_mdp = OvercookedGridworld.from_layout_name('corridor')
 
 
 class TestAgentEvaluator(unittest.TestCase):
 
     def setUp(self):
-        self.agent_eval = AgentEvaluator({"layout_name": "cramped_room_o_1order"}, {"horizon": 100})
+        self.agent_eval = AgentEvaluator({"layout_name": "cramped_room"}, {"horizon": 100})
         
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
@@ -67,20 +67,6 @@ class TestBasicAgents(unittest.TestCase):
         self.assertEqual(time_taken, 10)
         self.assertEqual(env.mdp.get_standard_start_state().player_positions, end_state.player_positions)
 
-    # Deprecated. Due to CoupledPlanningAgent
-    # def test_two_coupled_agents(self):
-    #     a0 = CoupledPlanningAgent(self.mlp_large)
-    #     a1 = CoupledPlanningAgent(self.mlp_large)
-    #     agent_pair = AgentPair(a0, a1)
-    #     start_state = OvercookedState(
-    #         [P((2, 2), n),
-    #          P((2, 1), n)],
-    #         {})
-    #     env = OvercookedEnv.from_mdp(large_mdp, start_state_fn=lambda: start_state)
-    #     trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
-    #     end_state = trajectory[-1][0]
-
-
     def test_two_greedy_human_open_map(self):
         scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
         mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)        
@@ -93,7 +79,6 @@ class TestBasicAgents(unittest.TestCase):
             {})
         env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
-        end_state = trajectory[-1][0]
 
 
 if __name__ == '__main__':

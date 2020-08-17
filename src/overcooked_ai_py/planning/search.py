@@ -217,7 +217,6 @@ class Graph(object):
                 smallest_dist = curr_dist
 
         if best_index is None:
-            # !!! Big changes here: pending review
             # Basically, for some of the variable mdp, it is possible for an agent to be "trapped" and
             # unable to go from one joint state to another joint state
             # X S X O X         X S X O X
@@ -225,14 +224,9 @@ class Graph(object):
             # X     2 P   --->  X     1 P
             # X X X X X         X X X X X
             # This is actually an absolutely impossible transition
-
-            # Override the error for now and return an empty list
-            # raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
-            #                        + "This could be caused by using another layout's planner on this layout")
-
-            # here, we are returning a list with just the start_index, so that
-            # after taking the plan, the upstream will be left with nothing, enabling detection of this edge case
-            return [start_index]
+            # 08/16/2020 update: This has been addressed by catching NotConnectedError upstream
+            raise NotConnectedError("No path could be found from {} to {}".format(self._decoder[start_index], self._decoder[goal_index])
+                                   + "This could be caused by using another layout's planner on this layout")
 
         return [start_index] + self._get_node_index_path(best_index, goal_index)
 

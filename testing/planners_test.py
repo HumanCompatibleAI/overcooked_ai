@@ -339,7 +339,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         if min_t is not None: self.assertEqual(len(action_plan), min_t)
         if times is not None: self.assertEqual(plan_lengths, times)
 
-# Rewritten of Heuristic
+# Rewritten because the previous test depended on Heuristic, and Heuristic has been deprecated
 class TestMediumLevelPlannerSimple(unittest.TestCase):
     def test_simple_mdp_without_start_orientations(self):
         print("Simple - no start orientations (& shared motion goals)")

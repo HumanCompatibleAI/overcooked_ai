@@ -1,16 +1,10 @@
-# this denotes whether we are running the clean version of planners
-clean = True
-
 import itertools, os
 import numpy as np
 import pickle, time
 from overcooked_ai_py.utils import manhattan_distance
-from overcooked_ai_py.planning.search import Graph
+from overcooked_ai_py.planning.search import Graph, NotConnectedError
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
-if not clean:
-    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-
 from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
 
 # Run planning logic with additional checks and
@@ -587,8 +581,9 @@ class JointMotionPlanner(object):
         # Solve shortest-path graph problem
         start_positions = list(zip(*joint_start_state))[0]
         goal_positions = list(zip(*joint_goal_state))[0]
-        joint_positions_node_path = self.joint_graph_problem.get_node_path(start_positions, goal_positions)[1:]
-        if len(joint_positions_node_path) == 0:
+        try:
+            joint_positions_node_path = self.joint_graph_problem.get_node_path(start_positions, goal_positions)[1:]
+        except NotConnectedError:
             # The cost will be infinite if there is no path
             num_player = len(goal_positions)
             return [], None, [np.inf] * num_player
@@ -998,7 +993,8 @@ class MediumLevelPlanner(object):
             joint_motion_action_plans, end_pos_and_ors, plan_costs = self.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
             end_state = self.jmp.derive_state(start_state, end_pos_and_ors, joint_motion_action_plans)
 
-            if not clean and SAFE_RUN:
+            if SAFE_RUN:
+                from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
                 assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
                 s_prime, _ = OvercookedEnv.execute_plan(self.mdp, start_state, joint_motion_action_plans, display=False)
                 assert end_state == s_prime,  [self.mdp.state_string(s_prime), self.mdp.state_string(end_state)]

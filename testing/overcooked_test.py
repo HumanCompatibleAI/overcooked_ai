@@ -284,9 +284,10 @@ class TestGridworld(unittest.TestCase):
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
-        mdp = OvercookedGridworld.from_layout_name('corridor_original')
+        mdp = OvercookedGridworld.from_layout_name('corridor')
         expected_start_state = OvercookedState(
-            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {})
+            [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {},
+            all_orders=[{ "ingredients" : ["onion", "onion", "onion"]}])
         actual_start_state = mdp.get_standard_start_state()
         self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
