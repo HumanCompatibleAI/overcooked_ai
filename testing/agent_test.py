@@ -76,7 +76,9 @@ class TestBasicAgents(unittest.TestCase):
         start_state = OvercookedState(
             [P((8, 1), s),
              P((1, 1), s)],
-            {})
+            {},
+            all_orders=scenario_2_mdp.start_all_orders
+        )
         env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 

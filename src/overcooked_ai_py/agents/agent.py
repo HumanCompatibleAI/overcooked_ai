@@ -429,8 +429,9 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                # commented out because some of the overcooked_test have scinarios where this is called
-                # assert len(state.all_orders) == 1, "the current mid level planner only support 3-onion soup"
+                assert len(state.all_orders) == 1, \
+                    "The current mid level action manager only support 3-onion-soup order, but got orders" \
+                    + str(state.all_orders)
                 next_order = list(state.all_orders)[0]
 
                 if 'onion' in next_order:
