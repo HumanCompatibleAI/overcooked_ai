@@ -4,11 +4,9 @@ from IPython.display import display
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
-from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.planning.planners import MediumLevelPlanner
 
 
 class AgentEvaluator(object):
@@ -22,18 +20,18 @@ class AgentEvaluator(object):
     """
 
 
-    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
         """
         mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
         env_params (dict): params for creation of an OvercookedEnv
         mdp_fn (callable function): a function that can be used to create mdp
-        force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
-        mlp_params (dict): the parameters for mlp
+        force_compute (bool): whether should re-compute MediumLevelActionManager although matching file is found
+        mlam_params (dict): the parameters for mlam, the MediumLevelActionManager
         debug (bool): whether to display debugging information on init
         """
         assert type(mdp_params) is dict, "mdp_params must be a dictionary"
         assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
-        env_params["mlp_params"] = mlp_params
+        env_params["mlam_params"] = mlam_params
         if mdp_fn is None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
             self.mdp_fn = lambda: mdp
@@ -57,8 +55,8 @@ class AgentEvaluator(object):
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
     def evaluate_human_model_pair(self, num_games=1, display=False, native_eval=False):
-        a0 = GreedyHumanModel(self.env.mlp)
-        a1 = GreedyHumanModel(self.env.mlp)
+        a0 = GreedyHumanModel(self.env.mlam)
+        a1 = GreedyHumanModel(self.env.mlam)
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 

@@ -4,7 +4,7 @@ import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS
 
 DEFAULT_ENV_PARAMS = {
     "horizon": 400
@@ -54,12 +54,12 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
         horizon (int):                  Number of steps before the environment returns done=True
-        mlp_params (dict):              params for MediumLevelPlanner
+        mlam_params (dict):              params for MediumLevelActionManager
         info_level (int):               Change amount of logging
         num_mdp (int):                  the number of mdp if we are using a list of mdps
 
@@ -73,8 +73,8 @@ class OvercookedEnv(object):
         self.variable_mdp = num_mdp == 1
         self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
-        self._mlp = None
-        self.mlp_params = mlp_params
+        self._mlam = None
+        self.mlam_params = mlam_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
         self.reset()
@@ -84,15 +84,15 @@ class OvercookedEnv(object):
 
 
     @property
-    def mlp(self):
-        if self._mlp is None:
+    def mlam(self):
+        if self._mlam is None:
             print("Computing Planner")
-            self._mlp = MediumLevelPlanner.from_pickle_or_compute(self.mdp, self.mlp_params,
+            self._mlam = MediumLevelActionManager.from_pickle_or_compute(self.mdp, self.mlam_params,
                                                                   force_compute=False)
-        return self._mlp
+        return self._mlam
 
     @staticmethod
-    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlp_params=NO_COUNTERS_PARAMS, info_level=1):
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1):
         """
         Create an OvercookedEnv directly from a OvercookedGridworld mdp
         rather than a mdp generating function.
@@ -103,7 +103,7 @@ class OvercookedEnv(object):
             mdp_generator_fn=mdp_generator_fn,
             start_state_fn=start_state_fn,
             horizon=horizon,
-            mlp_params=mlp_params,
+            mlam_params=mlam_params,
             info_level=info_level,
             num_mdp=1
         )
@@ -167,7 +167,7 @@ class OvercookedEnv(object):
 
 
         if DISPLAY_PHI:
-            state_potential_str = "\nState potential = " + str(self.mdp.potential_function(self.state, self.mlp.mp)) + "\t"
+            state_potential_str = "\nState potential = " + str(self.mdp.potential_function(self.state, self.mlam.motion_planner)) + "\t"
             potential_diff_str = "Δ potential = " + str(0.99 * env_info["phi_s_prime"] - env_info["phi_s"]) + "\n" # Assuming gamma 0.99
         else:
             state_potential_str = ""
@@ -230,7 +230,7 @@ class OvercookedEnv(object):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.horizon, self.mlp)
+        return self.mdp.featurize_state(state, self.horizon, self.mlam)
 
     def reset(self, regen_mdp=True):
         """
@@ -241,7 +241,7 @@ class OvercookedEnv(object):
         """
         if regen_mdp:
             self.mdp = self.mdp_generator_fn()
-            self._mlp = None
+            self._mlam = None
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:
@@ -258,13 +258,17 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
-    def potential(self, mlp, state=None, gamma=0.99):
+    def potential(self, mlam, state=None, gamma=0.99):
         """
         Return the potential of the environment's current state, if no state is provided
         Otherwise return the potential of `state`
+        args:
+            mlam (MediumLevelActionManager): the mlam of self.mdp
+            state (OvercookedState): the current state we are evaluating the potential on
+            gamma (float): discount rate
         """
         state = state if state else self.state
-        return self.mdp.potential_function(state, mp=mlp.mp ,gamma=gamma)
+        return self.mdp.potential_function(state, mp=mlam.motion_planner ,gamma=gamma)
 
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """

@@ -3,11 +3,11 @@ import time
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, CoupledPlanningPair, RandomAgent
+from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, RandomAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.planning.planners import MediumLevelPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 
 np.random.seed(42)
@@ -45,17 +45,17 @@ class TestAgentEvaluator(unittest.TestCase):
         except AssertionError as e:
             self.fail("Trajectories were not returned in standard format:\n{}".format(e))
         
-    def test_mlp_computation(self):
+    def test_mlam_computation(self):
         try:
-            self.agent_eval.env.mlp
+            self.agent_eval.env.mlam
         except Exception as e:
-            self.fail("Failed to compute MediumLevelPlanner:\n{}".format(e))
+            self.fail("Failed to compute MediumLevelActionManager:\n{}".format(e))
 
 
 class TestBasicAgents(unittest.TestCase):
 
     def setUp(self):
-        self.mlp_large = MediumLevelPlanner.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
+        self.mlam_large = MediumLevelActionManager.from_pickle_or_compute(large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large)
 
     def test_fixed_plan_agents(self):
         a0 = FixedPlanAgent([s, e, n, w])
@@ -69,9 +69,9 @@ class TestBasicAgents(unittest.TestCase):
 
     def test_two_greedy_human_open_map(self):
         scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
-        mlp = MediumLevelPlanner.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)        
-        a0 = GreedyHumanModel(mlp)
-        a1 = GreedyHumanModel(mlp)
+        mlam = MediumLevelActionManager.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
+        a0 = GreedyHumanModel(mlam)
+        a1 = GreedyHumanModel(mlam)
         agent_pair = AgentPair(a0, a1)
         start_state = OvercookedState(
             [P((8, 1), s),

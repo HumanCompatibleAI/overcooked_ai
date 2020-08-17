@@ -272,10 +272,10 @@ class GreedyHumanModel(Agent):
     in which an individual agent cannot complete the task on their own.
     """
 
-    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
+    def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
                  auto_unstuck=True):
-        self.mlp = mlp
-        self.mdp = self.mlp.mdp
+        self.mlam = mlam
+        self.mdp = self.mlam.mdp
 
         # Bool for perfect rationality vs Boltzmann rationality for high level and low level action selection
         self.hl_boltzmann_rational = hl_boltzmann_rational  # For choices among high level goals of same type
@@ -327,7 +327,7 @@ class GreedyHumanModel(Agent):
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _ = self.mlp.mdp.get_state_transition(state, j_a)
+                    new_state, _ = self.mlam.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
                 # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
@@ -348,7 +348,7 @@ class GreedyHumanModel(Agent):
         or rationally), and returns the plan and the corresponding first action on that plan.
         """
         if self.hl_boltzmann_rational:
-            possible_plans = [self.mlp.mp.get_plan(start_pos_and_or, goal) for goal in motion_goals]
+            possible_plans = [self.mlam.motion_planner.get_plan(start_pos_and_or, goal) for goal in motion_goals]
             plan_costs = [plan[2] for plan in possible_plans]
             goal_idx, action_probs = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
             chosen_goal = motion_goals[goal_idx]
@@ -373,7 +373,7 @@ class GreedyHumanModel(Agent):
         min_cost = np.Inf
         best_action, best_goal = None, None
         for goal in motion_goals:
-            action_plan, _, plan_cost = self.mlp.mp.get_plan(start_pos_and_or, goal)
+            action_plan, _, plan_cost = self.mlam.motion_planner.get_plan(start_pos_and_or, goal)
             if plan_cost < min_cost:
                 best_action = action_plan[0]
                 min_cost = plan_cost
@@ -392,7 +392,7 @@ class GreedyHumanModel(Agent):
         for action in Action.ALL_ACTIONS:
             pos, orient = start_pos_and_or
             new_pos_and_or = self.mdp._move_if_direction(pos, orient, action)
-            _, _, plan_cost = self.mlp.mp.get_plan(new_pos_and_or, goal)
+            _, _, plan_cost = self.mlam.motion_planner.get_plan(new_pos_and_or, goal)
             sign = (-1) ** int(inverted_costs)
             future_costs.append(sign * plan_cost)
 
@@ -413,10 +413,10 @@ class GreedyHumanModel(Agent):
         """
         player = state.players[self.agent_index]
         other_player = state.players[1 - self.agent_index]
-        am = self.mlp.ml_action_manager
+        am = self.mlam
 
-        counter_objects = self.mlp.mdp.get_counter_objects_dict(state, list(self.mlp.mdp.terrain_pos_dict['X']))
-        pot_states_dict = self.mlp.mdp.get_pot_states(state)
+        counter_objects = self.mlam.mdp.get_counter_objects_dict(state, list(self.mlam.mdp.terrain_pos_dict['X']))
+        pot_states_dict = self.mlam.mdp.get_pot_states(state)
 
 
         if not player.has_object():
@@ -458,11 +458,11 @@ class GreedyHumanModel(Agent):
             else:
                 raise ValueError()
 
-        motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+        motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = [mg for mg in motion_goals if self.mlp.mp.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+            motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
             assert len(motion_goals) != 0
 
         return motion_goals

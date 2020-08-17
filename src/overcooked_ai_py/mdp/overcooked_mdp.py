@@ -1469,15 +1469,15 @@ class OvercookedGridworld(object):
         for obj_state in all_objects:
             assert obj_state.is_valid()
 
-    def find_free_counters_valid_for_both_players(self, state, mlp):
+    def find_free_counters_valid_for_both_players(self, state, mlam):
         """Finds all empty counter locations that are accessible to both players"""
         one_player, other_player = state.players
         free_counters = self.get_empty_counter_locations(state)
         free_counters_valid_for_both = []
         for free_counter in free_counters:
-            goals = mlp.mp.motion_goals_for_pos[free_counter]
-            if any([mlp.mp.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
-            any([mlp.mp.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
+            goals = mlam.motion_planner.motion_goals_for_pos[free_counter]
+            if any([mlam.motion_planner.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
+            any([mlam.motion_planner.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
                 free_counters_valid_for_both.append(free_counter)
         return free_counters_valid_for_both
 
@@ -1931,7 +1931,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlp):
+    def featurize_state(self, overcooked_state, mlam):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
@@ -1942,7 +1942,7 @@ class OvercookedGridworld(object):
         def make_closest_feature(idx, name, locations):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
             all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
-                                                                                                   mlp)
+                                                                                                   mlam)
 
         IDX_TO_OBJ = ["onion", "soup", "dish"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
@@ -2018,8 +2018,8 @@ class OvercookedGridworld(object):
         return ordered_features_p0, ordered_features_p1
 
 
-    def get_deltas_to_closest_location(self, player, locations, mlp):
-        _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
+    def get_deltas_to_closest_location(self, player, locations, mlam):
+        _, closest_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
         if closest_loc is None:
             # "any object that does not exist or I am carrying is going to show up as a (0,0)
             # but I can disambiguate the two possibilities by looking at the features 

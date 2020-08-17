@@ -1,5 +1,5 @@
 import unittest, time, pickle
-from overcooked_ai_py.planning.planners import MediumLevelPlanner
+from overcooked_ai_py.planning.planners import MediumLevelActionManager
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, SoupState, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -25,9 +25,9 @@ base_params = {
     'same_motion_goals': True
 }
 action_manger_filename = "simple_1_am.pkl"
-ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
-    simple_mdp, mlp_params=base_params, custom_filename=action_manger_filename, force_compute=force_compute)
-ml_planner_simple.env = OvercookedEnv.from_mdp(simple_mdp)
+ml_action_manager_simple = MediumLevelActionManager.from_pickle_or_compute(
+    simple_mdp, mlam_params=base_params, custom_filename=action_manger_filename, force_compute=force_compute)
+ml_action_manager_simple.env = OvercookedEnv.from_mdp(simple_mdp)
 
 base_params_start_or = {
     'start_orientations': True,
@@ -38,8 +38,8 @@ base_params_start_or = {
     'same_motion_goals': False
 }
 action_manger_filename = "simple_2_am.pkl"
-or_ml_planner_simple = MediumLevelPlanner.from_pickle_or_compute(
-    simple_mdp, mlp_params=base_params_start_or, custom_filename=action_manger_filename, force_compute=force_compute)
+or_ml_action_manager_simple = MediumLevelActionManager.from_pickle_or_compute(
+    simple_mdp, mlam_params=base_params_start_or, custom_filename=action_manger_filename, force_compute=force_compute)
 
 if large_mdp_tests:
     # Not testing by default
@@ -56,7 +56,7 @@ if large_mdp_tests:
         'same_motion_goals': False
     }
     action_manger_filename = "corridor_no_shared_motion_goals_am.pkl"
-    ml_planner_large_no_shared = MediumLevelPlanner.from_pickle_or_compute(
+    ml_planner_large_no_shared = MediumLevelActionManager.from_pickle_or_compute(
         large_mdp, no_counters_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
 
     same_goals_params = {
@@ -68,7 +68,7 @@ if large_mdp_tests:
         'same_motion_goals': True
     }
     action_manger_filename = "corridor_am.pkl"
-    ml_planner_large = MediumLevelPlanner.from_pickle_or_compute(
+    ml_planner_large = MediumLevelActionManager.from_pickle_or_compute(
         large_mdp, same_goals_params, custom_filename=action_manger_filename, force_compute=force_compute_large)
     # Deprecated.
     # hlam = HighLevelActionManager(ml_planner_large)
@@ -97,7 +97,7 @@ def soup_obj(soup_loc, num_onion_inside, cooking_tick):
 class TestMotionPlanner(unittest.TestCase):
 
     def test_gridworld_distance(self):
-        planner = ml_planner_simple.ml_action_manager.joint_motion_planner.motion_planner
+        planner = ml_action_manager_simple.joint_motion_planner.motion_planner
         start = ((2, 1), e)
         end = ((1, 1), w)
         dist = planner.get_gridworld_distance(start, end)
@@ -119,7 +119,7 @@ class TestMotionPlanner(unittest.TestCase):
         self.assertEqual(dist, 3)
 
     def test_simple_mdp(self):
-        planner = ml_planner_simple.ml_action_manager.joint_motion_planner.motion_planner
+        planner = ml_action_manager_simple.joint_motion_planner.motion_planner
         self.simple_mdp_already_at_goal(planner)
         self.simple_mdp_orientation_change(planner)
         self.simple_mdp_basic_plan(planner)
@@ -182,7 +182,7 @@ class TestMotionPlanner(unittest.TestCase):
 class TestJointMotionPlanner(unittest.TestCase):
 
     def test_same_start_and_end_pos_with_no_start_orientations(self):
-        jm_planner = ml_planner_simple.ml_action_manager.joint_motion_planner
+        jm_planner = ml_action_manager_simple.joint_motion_planner
         start = (((1, 1), w), ((1, 2), s))
         goal = (((1, 1), n), ((2, 1), n))
 
@@ -197,11 +197,11 @@ class TestJointMotionPlanner(unittest.TestCase):
         self.assertEqual(finshing_times, optimal_finshing_times)
 
     def test_with_start_orientations_simple_mdp(self):
-        jm_planner = or_ml_planner_simple.ml_action_manager.joint_motion_planner
+        jm_planner = or_ml_action_manager_simple.joint_motion_planner
         self.simple_mdp_suite(jm_planner)
     
     def test_without_start_orientations_simple_mdp(self):
-        jm_planner = ml_planner_simple.ml_action_manager.joint_motion_planner
+        jm_planner = ml_action_manager_simple.joint_motion_planner
         self.simple_mdp_suite(jm_planner)
 
     def simple_mdp_suite(self, jm_planner):
@@ -340,46 +340,46 @@ class TestJointMotionPlanner(unittest.TestCase):
         if times is not None: self.assertEqual(plan_lengths, times)
 
 # Rewritten because the previous test depended on Heuristic, and Heuristic has been deprecated
-class TestMediumLevelPlannerSimple(unittest.TestCase):
+class TestMediumLevelActionManagerSimple(unittest.TestCase):
     def test_simple_mdp_without_start_orientations(self):
         print("Simple - no start orientations (& shared motion goals)")
-        mlp = ml_planner_simple
-        self.simple_mpd_empty_hands(mlp)
-        self.simple_mdp_deliver_soup(mlp)
-        self.simple_mdp_pickup_counter_soup(mlp)
-        self.simple_mdp_pickup_counter_dish(mlp)
-        self.simple_mdp_pickup_counter_onion(mlp)
-        self.simple_mdp_drop_useless_dish_with_soup_idle(mlp)
-        self.simple_mdp_pickup_soup(mlp)
-        self.simple_mdp_pickup_dish(mlp)
-        self.simple_mdp_start_good_soup_cooking(mlp)
-        self.simple_mdp_start_bad_soup_cooking(mlp)
-        self.simple_mdp_start_1_onion_soup_cooking(mlp)
-        self.simple_mdp_drop_useless_onion_good_soup(mlp)
-        self.simple_mdp_drop_useless_onion_bad_soup(mlp)
-        self.simple_mdp_add_3rd_onion(mlp)
-        self.simple_mdp_add_2nd_onion(mlp)
-        self.simple_mdp_drop_useless_dish(mlp)
+        mlam = ml_action_manager_simple
+        self.simple_mpd_empty_hands(mlam)
+        self.simple_mdp_deliver_soup(mlam)
+        self.simple_mdp_pickup_counter_soup(mlam)
+        self.simple_mdp_pickup_counter_dish(mlam)
+        self.simple_mdp_pickup_counter_onion(mlam)
+        self.simple_mdp_drop_useless_dish_with_soup_idle(mlam)
+        self.simple_mdp_pickup_soup(mlam)
+        self.simple_mdp_pickup_dish(mlam)
+        self.simple_mdp_start_good_soup_cooking(mlam)
+        self.simple_mdp_start_bad_soup_cooking(mlam)
+        self.simple_mdp_start_1_onion_soup_cooking(mlam)
+        self.simple_mdp_drop_useless_onion_good_soup(mlam)
+        self.simple_mdp_drop_useless_onion_bad_soup(mlam)
+        self.simple_mdp_add_3rd_onion(mlam)
+        self.simple_mdp_add_2nd_onion(mlam)
+        self.simple_mdp_drop_useless_dish(mlam)
 
     def test_simple_mdp_with_start_orientations(self):
         print("Simple - with start orientations (no shared motion goals)")
-        mlp = or_ml_planner_simple
-        self.simple_mpd_empty_hands(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_deliver_soup(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_pickup_counter_soup(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_pickup_counter_dish(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_pickup_counter_onion(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_drop_useless_dish_with_soup_idle(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_pickup_soup(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_pickup_dish(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_start_good_soup_cooking(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_start_bad_soup_cooking(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_start_1_onion_soup_cooking(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_drop_useless_onion_good_soup(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_drop_useless_onion_bad_soup(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_add_3rd_onion(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_add_2nd_onion(mlp, counter_drop_forbidden=True)
-        self.simple_mdp_drop_useless_dish(mlp, counter_drop_forbidden=True)
+        mlam = or_ml_action_manager_simple
+        self.simple_mpd_empty_hands(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_deliver_soup(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_soup(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_dish(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_counter_onion(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_dish_with_soup_idle(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_soup(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_pickup_dish(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_start_good_soup_cooking(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_start_bad_soup_cooking(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_start_1_onion_soup_cooking(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_onion_good_soup(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_onion_bad_soup(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_add_3rd_onion(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_add_2nd_onion(mlam, counter_drop_forbidden=True)
+        self.simple_mdp_drop_useless_dish(mlam, counter_drop_forbidden=True)
 
     ONION_PICKUP = ((3, 2), (1, 0))
     DISH_PICKUP = ((2, 2), (0, 1))
@@ -617,16 +617,15 @@ class TestMediumLevelPlannerSimple(unittest.TestCase):
                                          )
 
 
-    def check_ml_action_manager(self, state, planner, expected_mla_0, expected_mla_1, debug=False):
+    def check_ml_action_manager(self, state, am, expected_mla_0, expected_mla_1, debug=False):
         """
         args:
             state (OvercookedState): an overcooked state
-            planner (MediumLevelPlanner): the planer whose action manager will be tested
+            am (MediumLevelActionManager): the planer whose action manager will be tested
 
         This function checks if all the mid-level actions make sense for each player state inside STATE
         """
         player_0, player_1 = state.players
-        am = planner.ml_action_manager
 
         mla_0 = am.get_medium_level_actions(state, player_0)
         mla_1 = am.get_medium_level_actions(state, player_1)
