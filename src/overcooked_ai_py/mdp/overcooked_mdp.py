@@ -272,10 +272,11 @@ class ObjectState(object):
     def __eq__(self, other):
         return isinstance(other, ObjectState) and \
             self.name == other.name and \
-            self.position == other.position
+            self.position == other.position and \
+            self.object_id == other.object_id
 
     def __hash__(self):
-        return hash((self.name, self.position))
+        return hash((self.name, self.position, self.object_id))
 
     def __repr__(self):
         return '{}@{}'.format(
@@ -313,7 +314,7 @@ class SoupState(ObjectState):
 
     def __eq__(self, other):
         return isinstance(other, SoupState) and self.name == other.name and self.position == other.position and self._cooking_tick == other._cooking_tick and \
-            all([this_i == other_i for this_i, other_i in zip(self._ingredients, other._ingredients)])
+            self.object_id == other.object_id and all([this_i == other_i for this_i, other_i in zip(self._ingredients, other._ingredients)])
 
     def __hash__(self):
         ingredient_hash = hash(tuple([hash(i) for i in self._ingredients]))
