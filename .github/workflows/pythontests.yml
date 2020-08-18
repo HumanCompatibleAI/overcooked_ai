@@ -57,7 +57,7 @@ jobs:
       with:
         flags: no-planners
         name: codecov-report
-        fail_ci_if_error: true
+        fail_ci_if_error: false
   ## This should be uncommented once the planners are updated
   # ubuntu_full_tests:
   #   runs-on: ubuntu-latest
