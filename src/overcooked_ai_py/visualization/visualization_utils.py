@@ -1,11 +1,12 @@
-import tempfile, webbrowser, pkgutil, json, uuid
+import tempfile, webbrowser, json, uuid, os
 from IPython.display import display, HTML
 from string import Template
-from .. import visualization
-
+from overcooked_ai_py.static import VISUALIZATION_DIR
 
 def load_visualization_file_as_str(filename):
-    return pkgutil.get_data(visualization.__name__, filename).decode()
+    with open(os.path.join(VISUALIZATION_DIR, filename), 'r') as f:
+        lines = f.readlines()
+        return "\n".join(lines)
 
 
 def run_html_in_web(html, prefix="overcooked_ai_visualization_"):
