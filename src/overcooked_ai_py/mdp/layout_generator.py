@@ -59,19 +59,18 @@ def DEFAILT_PARAMS_SCHEDULE_FN(outside_information):
 
 class MDPParamsGenerator(object):
 
-    def __init__(self, params_schedule_fn=None, mdp_params_always=None):
+    def __init__(self, params_schedule_fn):
         """
-        outer_shape: the outer shape of the mdp to be generated
-        schedule_fn: the function to produce a set of mdp_params for a specific layout
-        mdp_params_always: the mdp_params that the generator should always been using (no scheduling)
+        params_schedule_fn (callable): the function to produce a set of mdp_params for a specific layout
         """
-        assert params_schedule_fn != None or mdp_params_always != None, \
-            "one of params_schedule_fn and mdp_params_always must be not Null"
-        if mdp_params_always != None:
-            self.mdp_param_always = mdp_params_always
-            self.params_schedule_fn = lambda x: self.mdp_param_always
-        else:
-            self.params_schedule_fn = params_schedule_fn
+        assert callable(params_schedule_fn), "params scheduling function must be a callable"
+        self.params_schedule_fn = params_schedule_fn
+
+    @staticmethod
+    def from_fixed_param(mdp_params_always):
+        # s naive schedule function that always return the same set of parameter
+        naive_schedule_fn = lambda x: mdp_params_always
+        return MDPParamsGenerator(naive_schedule_fn)
 
     def generate(self, outside_information={}):
         """
@@ -113,7 +112,7 @@ class LayoutGenerator(object):
             # there is no schedule, we are using the same set of mdp_params all the time
             if mdp_params_schedule_fn is None:
                 assert mdp_params is not None
-                mdp_pg = MDPParamsGenerator(mdp_params_always=mdp_params)
+                mdp_pg = MDPParamsGenerator.from_fixed_param(mdp_params_always=mdp_params)
             else:
                 assert mdp_params is None, "please remove the mdp_params from the variable, " \
                                            "because mdp_params_schedule_fn exist and we will " \
