@@ -94,7 +94,7 @@ class LayoutGenerator(object):
             all_orders_kwargs = copy.deepcopy(mdp_params["generate_all_orders"])
 
             if all_orders_kwargs.get("recipes"):
-                 all_orders_kwargs["recipes"] = [r if isinstance(r, Recipe) else Recipe.from_dict(r) for r in all_orders_kwargs["recipes"]]
+                 all_orders_kwargs["recipes"] = [Recipe.from_dict(r) for r in all_orders_kwargs["recipes"]]
         
             all_recipes = Recipe.generate_random_recipes(**all_orders_kwargs)
             mdp_params["start_all_orders"] = [r.to_dict() for r in all_recipes]
