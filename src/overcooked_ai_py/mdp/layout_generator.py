@@ -99,7 +99,6 @@ class LayoutGenerator(object):
     ):
         """
         mdp_params: one set of fixed mdp parameter used by the enviroment
-        env_params: env parameters (horizon, etc)
         outer_shape: outer shape of the environment
         mdp_params_schedule_fn: the schedule for varying mdp params
         """
