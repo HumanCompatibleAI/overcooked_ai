@@ -31,7 +31,11 @@ class TestVisualizations(unittest.TestCase):
         self.assertTrue("it is style.css file" in html)
 
         self.assertTrue("#"+box_id in html)
-        self.assertFalse("$" in html)
+
+        list_of_replaced_variable_names = ["data", "box_id", "settings", "css_text", "js_text"]
+        for name in list_of_replaced_variable_names:
+            self.assertFalse("$"+name in html)
+
         self.assertTrue(json.dumps(self.extracted_events1) in html)
 
 if __name__ == '__main__':
