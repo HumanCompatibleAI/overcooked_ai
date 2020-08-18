@@ -15,7 +15,8 @@ jobs:
       run: pip install .
     - name: Run tests
       run: |
-        python testing/overcooked_test.py 
+        python testing/overcooked_test.py
+        python testing/visualization_test.py
   ## This should be uncommented once the planners are updated ##
   # osx_full_tests:
   #   runs-on: macos-latest
@@ -51,6 +52,7 @@ jobs:
     - name: Run tests and generate coverage report
       run: |
         coverage run testing/overcooked_test.py
+        coverage run -a testing/visualization_test.py
         coverage report
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
