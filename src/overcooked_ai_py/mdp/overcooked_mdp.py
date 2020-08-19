@@ -10,6 +10,17 @@ class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
+def custom_method_equal(obj1, obj2, method_name):
+    if hasattr(obj1, method_name):
+        return getattr(obj1, method_name)(obj2)
+    elif hasattr(obj2, method_name):
+        return getattr(obj2, method_name)(obj1)
+    else:
+        return obj1 == obj2
+
+def ids_independent_equal(obj1, obj2):
+    return custom_method_equal(obj1, obj2, "ids_independent_equal")
+
 class Recipe:
 
     TOMATO = 'tomato'
@@ -272,8 +283,14 @@ class ObjectState(object):
     def __eq__(self, other):
         return isinstance(other, ObjectState) and \
             self.name == other.name and \
-            self.position == other.position
+            self.position == other.position and \
+            self.object_id == other.object_id
 
+    def ids_independent_equal(self, other):
+        return isinstance(other, ObjectState) and \
+            self.name == other.name and \
+            self.position == other.position
+    
     def __hash__(self):
         return hash((self.name, self.position))
 
@@ -312,8 +329,14 @@ class SoupState(ObjectState):
         self._recipe = None
 
     def __eq__(self, other):
-        return isinstance(other, SoupState) and self.name == other.name and self.position == other.position and self._cooking_tick == other._cooking_tick and \
+        return isinstance(other, SoupState) and self.name == other.name and self.position == other.position and \
+            self._cooking_tick == other._cooking_tick and self.object_id == other.object_id and \
             all([this_i == other_i for this_i, other_i in zip(self._ingredients, other._ingredients)])
+
+    def ids_independent_equal(self, other):
+        return isinstance(other, SoupState) and self.name == other.name and self.position == other.position and \
+            self._cooking_tick == other._cooking_tick and \
+            all([ids_independent_equal(this_i, other_i) for this_i, other_i in zip(self._ingredients, other._ingredients)])
 
     def __hash__(self):
         ingredient_hash = hash(tuple([hash(i) for i in self._ingredients]))
@@ -419,7 +442,6 @@ class SoupState(ObjectState):
             raise ValueError("Cannot cook a soup that is already done")
         self._cooking_tick += 1
 
-
     def deepcopy(self):
         return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick, self.object_id)
     
@@ -432,7 +454,7 @@ class SoupState(ObjectState):
         info_dict['is_ready'] = self.is_ready
         info_dict['is_idle'] = self.is_idle
         info_dict['cook_time'] = -1 if self.is_idle else self.cook_time
-
+        info_dict['object_id'] = self.object_id
         # This is for backwards compatibility w/ overcooked-demo
         # Should be removed once overcooked-demo is updated to use 'cooking_tick' instead of '_cooking_tick'
         info_dict['_cooking_tick'] = self._cooking_tick
@@ -459,7 +481,7 @@ class SoupState(ObjectState):
         return cls(**obj_dict)
 
     @classmethod
-    def get_soup(cls, position, num_onions=1, num_tomatoes=0, cooking_tick=-1, finished=False, **kwargs):
+    def get_soup(cls, position, num_onions=1, num_tomatoes=0, cooking_tick=-1, finished=False, object_id=None, **kwargs):
         if num_onions < 0 or num_tomatoes < 0:
             raise ValueError("Number of active ingredients must be positive")
         if num_onions + num_tomatoes > Recipe.MAX_NUM_INGREDIENTS:
@@ -471,7 +493,7 @@ class SoupState(ObjectState):
         onions = [ObjectState(Recipe.ONION, position) for _ in range(num_onions)]
         tomatoes = [ObjectState(Recipe.TOMATO, position) for _ in range(num_tomatoes)]
         ingredients = onions + tomatoes
-        soup = cls(position, ingredients, cooking_tick)
+        soup = cls(position, ingredients, cooking_tick, object_id)
         if finished:
             soup.auto_finish()
         return soup
@@ -528,6 +550,12 @@ class PlayerState(object):
     def deepcopy(self):
         new_obj = None if self.held_object is None else self.held_object.deepcopy()
         return PlayerState(self.position, self.orientation, new_obj)
+    
+    def ids_independent_equal(self, other):
+        return isinstance(other, PlayerState) and \
+            self.position == other.position and \
+            self.orientation == other.orientation and \
+            ids_independent_equal(self.held_object, other.held_object)
 
     def __eq__(self, other):
         return isinstance(other, PlayerState) and \
@@ -556,7 +584,6 @@ class PlayerState(object):
         if held_obj is not None:
             player_dict["held_object"] = SoupState.from_dict(held_obj)
         return PlayerState(**player_dict)
-
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
@@ -696,16 +723,47 @@ class OvercookedState(object):
             all_orders=[order.to_dict() for order in self.all_orders],
             timestep=self.timestep)
 
-    def time_independent_equal(self, other):
-        order_lists_equal = self.all_orders == other.all_orders and self.bonus_orders == other.bonus_orders
+    def time_equal(self, other):
+        return self.timestep == other.timestep
+    
+    def order_lists_equal(self, other):
+        return self.all_orders == other.all_orders and self.bonus_orders == other.bonus_orders
 
-        return isinstance(other, OvercookedState) and \
-            self.players == other.players and \
-            set(self.objects.items()) == set(other.objects.items()) and \
-            order_lists_equal
+    def players_equal(self, other, ids_independent=False):
+        if ids_independent:
+            return all(ids_independent_equal(player1, player2) for player1, player2 in zip(self.players, other.players))
+        else:
+            return self.players == other.players
+
+    def objects_equal(self, other, ids_independent=False):
+        if ids_independent:
+            def key_position_and_name(item):
+                (key, obj) = item
+                return (key, obj.position, obj.name)
+            self_items = sorted(list(self.objects.items()), key=key_position_and_name)
+            other_items = sorted(list(other.objects.items()), key=key_position_and_name)
+            return len(self_items) == len(other_items) and \
+                all(key1 == key2 and ids_independent_equal(item1, item2)
+                for (key1, item1), (key2, item2) in zip(self_items, other_items))
+        else:
+            return set(self.objects.items()) == set(other.objects.items())
+
+    def custom_equal(self, other, time_independent=False, ids_independent=False):
+        result = isinstance(other, OvercookedState) and \
+            self.players_equal(other, ids_independent) and \
+            self.objects_equal(other, ids_independent) and \
+            self.order_lists_equal(other) and \
+            (time_independent or self.time_equal(other))
+        return result
+    
+    def ids_independent_equal(self, other):
+        return self.custom_equal(other, ids_independent=True)
+
+    def time_independent_equal(self, other):
+        return self.custom_equal(other, time_independent=True)
 
     def __eq__(self, other):
-        return self.time_independent_equal(other) and self.timestep == other.timestep
+        return self.custom_equal(other)
 
     def __hash__(self):
         order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
