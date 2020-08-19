@@ -334,7 +334,7 @@ class TestGridworld(unittest.TestCase):
             expected_reward = expected['reward']
             
             # Make sure everything lines up (note __eq__ is transitive)
-            self.assertTrue(pred_state.time_independent_equal(expected_state), '\n' + str(pred_state) + '\n' + str(expected_state))
+            self.assertTrue(pred_state.custom_equal(expected_state, time_independent=True, ids_independent=True), '\n' + str(pred_state) + '\n' + str(expected_state))
             self.assertEqual(sparse_reward, expected_reward)
 
         expected_path = os.path.join(TESTING_DATA_DIR, "test_transitions_and_environments", "expected.json")
