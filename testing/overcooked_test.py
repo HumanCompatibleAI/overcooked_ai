@@ -787,7 +787,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
         mdp1 = OvercookedGridworld.from_layout_name("counter_circuit")
-        mdp_fn = lambda: np.random.choice([mdp0, mdp1])
+        mdp_fn = lambda _ignored: np.random.choice([mdp0, mdp1])
         
         # Default env
         env = OvercookedEnv(mdp_fn, horizon=100)

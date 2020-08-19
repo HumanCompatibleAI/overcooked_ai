@@ -54,14 +54,15 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1, initial_info={}):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
         horizon (int):                  Number of steps before the environment returns done=True
-        mlam_params (dict):              params for MediumLevelActionManager
+        mlam_params (dict):             params for MediumLevelActionManager
         info_level (int):               Change amount of logging
         num_mdp (int):                  the number of mdp if we are using a list of mdps
+        initial_info (dict):            the initial outside information feed into the generator function
 
         TODO: Potentially make changes based on this discussion
         https://github.com/HumanCompatibleAI/overcooked_ai/pull/22#discussion_r416786847
@@ -77,7 +78,7 @@ class OvercookedEnv(object):
         self.mlam_params = mlam_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-        self.reset()
+        self.reset(outside_info=initial_info)
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
                 Reduce info level of OvercookedEnv to not see this message.")
@@ -98,7 +99,7 @@ class OvercookedEnv(object):
         rather than a mdp generating function.
         """
         assert isinstance(mdp, OvercookedGridworld)
-        mdp_generator_fn = lambda: mdp
+        mdp_generator_fn = lambda _ignored: mdp
         return OvercookedEnv(
             mdp_generator_fn=mdp_generator_fn,
             start_state_fn=start_state_fn,
@@ -232,15 +233,19 @@ class OvercookedEnv(object):
         """
         return self.mdp.featurize_state(state, self.horizon, self.mlam)
 
-    def reset(self, regen_mdp=True):
+    def reset(self, regen_mdp=True, outside_info={}):
         """
         Resets the environment. Does NOT reset the agent.
         Args:
             regen_mdp (bool): gives the option of not re-generating mdp on the reset,
                                 which is particularly helpful with reproducing results on variable mdp
+            outside_info (dict): the outside information that will be fed into the scheduling_fn (if used), which will
+                                 in turn generate a new set of mdp_params that is used to regenerate mdp.
+                                 Please note that, if you intend to use this arguments throughout the run,
+                                 you need to have a "initial_info" dictionary with the same keys in the "env_params"
         """
         if regen_mdp:
-            self.mdp = self.mdp_generator_fn()
+            self.mdp = self.mdp_generator_fn(outside_info)
             self._mlam = None
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()

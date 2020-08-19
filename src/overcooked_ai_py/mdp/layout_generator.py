@@ -69,7 +69,7 @@ class MDPParamsGenerator(object):
     @staticmethod
     def from_fixed_param(mdp_params_always):
         # s naive schedule function that always return the same set of parameter
-        naive_schedule_fn = lambda x: mdp_params_always
+        naive_schedule_fn = lambda _ignored: mdp_params_always
         return MDPParamsGenerator(naive_schedule_fn)
 
     def generate(self, outside_information={}):
@@ -106,7 +106,7 @@ class LayoutGenerator(object):
         if outer_shape is None:
             assert type(mdp_params) is dict and "layout_name" in mdp_params
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            mdp_fn = lambda: mdp
+            mdp_fn = lambda _ignored: mdp
         else:
             # there is no schedule, we are using the same set of mdp_params all the time
             if mdp_params_schedule_fn is None:

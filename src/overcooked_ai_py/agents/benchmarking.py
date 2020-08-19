@@ -81,7 +81,7 @@ class AgentEvaluator(object):
         Information for the rest of params please refer to the __init__ method above
         """
         assert type(mdp) == OvercookedGridworld, "mdp must be a OvercookedGridworld object"
-        mdp_fn = lambda: mdp
+        mdp_fn = lambda _ignored: mdp
         return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
 
     @staticmethod
@@ -107,7 +107,7 @@ class AgentEvaluator(object):
         if sampling_freq is None:
             sampling_freq = np.ones(len(mdp_lst)) /len(mdp_lst)
 
-        mdp_fn = lambda : np.random.choice(mdp_lst, p=sampling_freq)
+        mdp_fn = lambda _ignored: np.random.choice(mdp_lst, p=sampling_freq)
         return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, native_eval=False):
