@@ -26,7 +26,7 @@ large_mdp = OvercookedGridworld.from_layout_name('corridor')
 class TestAgentEvaluator(unittest.TestCase):
 
     def setUp(self):
-        self.agent_eval = AgentEvaluator({"layout_name": "cramped_room"}, {"horizon": 100})
+        self.agent_eval = AgentEvaluator.from_layout_name({"layout_name": "cramped_room"}, {"horizon": 100})
         
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
@@ -80,7 +80,7 @@ class TestBasicAgents(unittest.TestCase):
         env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
-class TestAgentEvaluator(unittest.TestCase):
+class TestAgentEvaluatorStatic(unittest.TestCase):
 
     layout_name_lst = ["asymmetric_advantages", "asymmetric_advantages_tomato", "bonus_order_test", "bottleneck",
                        "centre_objects", "centre_pots", "corridor", "forced_coordination_tomato", "unident",
@@ -96,7 +96,7 @@ class TestAgentEvaluator(unittest.TestCase):
     def test_from_mdp_params_layout(self):
         for layout_name in self.layout_name_lst:
             orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
-            ae = AgentEvaluator.from_mdp_params(mdp_params={"layout_name": layout_name}, env_params={"horizon": 400})
+            ae = AgentEvaluator.from_layout_name(mdp_params={"layout_name": layout_name}, env_params={"horizon": 400})
             ae_mdp = ae.env.mdp
             self.assertEqual(orignal_mdp, ae_mdp, "mdp with name " + layout_name + " experienced an inconsistency")
 
@@ -136,20 +136,20 @@ class TestAgentEvaluator(unittest.TestCase):
 
     def test_from_mdp_params_variable_across(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
-            ae0 = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                 env_params={"horizon": 400},
-                                                 outer_shape=self.outer_shape)
-            ae1 = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                 env_params={"horizon": 400},
-                                                 outer_shape=self.outer_shape)
+            ae0 = AgentEvaluator.from_mdp_params_infinite(mdp_params=mdp_gen_params,
+                                                          env_params={"horizon": 400, "num_mdp": np.inf},
+                                                          outer_shape=self.outer_shape)
+            ae1 = AgentEvaluator.from_mdp_params_infinite(mdp_params=mdp_gen_params,
+                                                          env_params={"horizon": 400, "num_mdp": np.inf},
+                                                          outer_shape=self.outer_shape)
             self.assertFalse(ae0.env.mdp == ae1.env.mdp,
                              "2 randomly generated layouts across 2 evaluators are the same, which is wrong")
 
     def test_from_mdp_params_variable_infinite(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
-            ae = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                env_params={"horizon": 400},
-                                                outer_shape= self.outer_shape)
+            ae = AgentEvaluator.from_mdp_params_infinite(mdp_params=mdp_gen_params,
+                                                         env_params={"horizon": 400, "num_mdp": np.inf},
+                                                         outer_shape=self.outer_shape)
             mdp_0 = ae.env.mdp.copy()
             for _ in range(5):
                 ae.env.reset(regen_mdp=True)
@@ -159,9 +159,9 @@ class TestAgentEvaluator(unittest.TestCase):
 
     def test_from_mdp_params_variable_infinite_no_regen(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
-            ae = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                env_params={"horizon": 400},
-                                                outer_shape= self.outer_shape)
+            ae = AgentEvaluator.from_mdp_params_infinite(mdp_params=mdp_gen_params,
+                                                         env_params={"horizon": 400, "num_mdp": np.inf},
+                                                         outer_shape=self.outer_shape)
             mdp_0 = ae.env.mdp.copy()
             for _ in range(5):
                 ae.env.reset(regen_mdp=False)
@@ -171,9 +171,9 @@ class TestAgentEvaluator(unittest.TestCase):
 
     def test_from_mdp_params_variable_infinite_specified(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
-            ae = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                env_params={"horizon": 400, "num_mdp": np.inf},
-                                                outer_shape=self.outer_shape)
+            ae = AgentEvaluator.from_mdp_params_infinite(mdp_params=mdp_gen_params,
+                                                         env_params={"horizon": 400, "num_mdp": np.inf},
+                                                         outer_shape=self.outer_shape)
             mdp_0 = ae.env.mdp.copy()
             for _ in range(5):
                 ae.env.reset(regen_mdp=True)
@@ -183,9 +183,9 @@ class TestAgentEvaluator(unittest.TestCase):
 
     def test_from_mdp_params_variable_finite(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
-            ae = AgentEvaluator.from_mdp_params(mdp_params=mdp_gen_params,
-                                                env_params={"horizon": 400, "num_mdp": 2},
-                                                outer_shape=self.outer_shape)
+            ae = AgentEvaluator.from_mdp_params_finite(mdp_params=mdp_gen_params,
+                                                       env_params={"horizon": 400, "num_mdp": 2},
+                                                       outer_shape=self.outer_shape)
             mdp_0 = ae.env.mdp.copy()
             seen = [mdp_0]
             for _ in range(20):
@@ -201,11 +201,8 @@ class TestAgentEvaluator(unittest.TestCase):
                 else:
                     self.assertTrue(False, "theoretically unreachable statement")
 
-
     layout_name_short_lst = ["cramped_room", "cramped_room_tomato", "simple_o", "simple_tomato", "simple_o_t"]
-
     biased = [0.1, 0.15, 0.2, 0.25, 0.3]
-
     num_reset = 200000
 
 

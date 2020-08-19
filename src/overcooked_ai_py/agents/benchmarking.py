@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from IPython.display import display
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
@@ -35,32 +35,44 @@ class AgentEvaluator(object):
         self.force_compute = force_compute
 
     @staticmethod
-    def from_mdp_params(mdp_params, env_params, outer_shape=None, mdp_params_schedule_fn=None, force_compute=False,
+    def from_mdp_params_infinite(mdp_params, env_params, outer_shape=None, mdp_params_schedule_fn=None, force_compute=False,
                         mlam_params=NO_COUNTERS_PARAMS, debug=False):
         """
         mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
         outer_shape: the outer shape of environment
         mdp_params_schedule_fn: the schedule for varying mdp params
         Information for the rest of params please refer to the __init__ method above
+
+        Infinitely generate mdp using the naive mdp_fn
         """
-        # special case: generate from layout name
-        if type(mdp_params) is dict and "layout_name" in mdp_params:
-            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            mdp_fn = lambda: mdp
-        else: # general case: variable mdp
-            assert outer_shape is not None, "outer_shape needs to be defined for variable mdp"
-            mdp_fn_naive = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, outer_shape, mdp_params_schedule_fn)
-            # infinite mdp
-            if 'num_mdp' not in env_params or np.isinf(env_params['num_mdp']):
-                mdp_fn = mdp_fn_naive
-            else: # finite mdp, random choice
-                num_mdp = env_params['num_mdp']
-                assert type(num_mdp) == int and num_mdp > 0, "invalid number of mdp: " + str(num_mdp)
-                mdp_lst = [mdp_fn_naive() for _ in range(num_mdp)]
-                mdp_fn = lambda : np.random.choice(mdp_lst)
-        if "outer_shape" in env_params:
-            del env_params["outer_shape"]
-        return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
+        assert outer_shape is not None, "outer_shape needs to be defined for variable mdp"
+        assert "num_mdp" in env_params and np.isinf(env_params["num_mdp"]), \
+            "num_mdp needs to be specified and infinite"
+        mdp_fn_naive = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, outer_shape, mdp_params_schedule_fn)
+        return AgentEvaluator(env_params, mdp_fn_naive, force_compute, mlam_params, debug)
+
+    @staticmethod
+    def from_mdp_params_finite(mdp_params, env_params, outer_shape=None, mdp_params_schedule_fn=None, force_compute=False,
+                        mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        outer_shape: the outer shape of environment
+        mdp_params_schedule_fn: the schedule for varying mdp params
+        Information for the rest of params please refer to the __init__ method above
+
+        Generate a finite list of mdp (mdp_lst) using the naive mdp_fn, and then use the from_mdp_lst to generate
+        the AgentEvaluator
+        """
+        assert outer_shape is not None, "outer_shape needs to be defined for variable mdp"
+        assert "num_mdp" in env_params and not np.isinf(env_params["num_mdp"]), \
+            "num_mdp needs to be specified and finite"
+        mdp_fn_naive = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, outer_shape, mdp_params_schedule_fn)
+        # finite mdp, random choice
+        num_mdp = env_params['num_mdp']
+        assert type(num_mdp) == int and num_mdp > 0, "invalid number of mdp: " + str(num_mdp)
+        mdp_lst = [mdp_fn_naive() for _ in range(num_mdp)]
+        return AgentEvaluator.from_mdp_lst(mdp_lst=mdp_lst, env_params=env_params,
+                                           force_compute=force_compute, mlam_params=mlam_params, debug=debug)
 
     @staticmethod
     def from_mdp(mdp, env_params, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
@@ -73,22 +85,29 @@ class AgentEvaluator(object):
         return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
 
     @staticmethod
+    def from_layout_name(mdp_params, env_params, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert type(mdp_params) is dict and "layout_name" in mdp_params
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        return AgentEvaluator.from_mdp(mdp, env_params, force_compute, mlam_params, debug)
+
+    @staticmethod
     def from_mdp_lst(mdp_lst, env_params, sampling_freq=None, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
         """
         mdp_lst (list): a list of mdp (OvercookedGridworld) we would like to
         sampling_freq (list): a list of number that signify the sampling frequency of each mdp in the mdp_lst
         Information for the rest of params please refer to the __init__ method above
         """
-        assert type(mdp_lst) == type([]), "mdp must be a OvercookedGridworld object"
-        for mdp in mdp_lst:
-            assert type(mdp) == OvercookedGridworld, "some mdp in the mdp_lst are not OvercookedGridworld"
+        assert type(mdp_lst) == type([]), "mdp_lst must be a list"
+        assert all([type(mdp) == OvercookedGridworld for mdp in mdp_lst]), "some mdps are not OvercookedGridworld objects"
 
         if sampling_freq is None:
-            mdp_fn = lambda : np.random.choice(mdp_lst)
-        else:
-            assert len(sampling_freq) == len(mdp_lst), "sampling frequency is not the same length as the mdp_lst"
-            assert np.sum(sampling_freq) == 1.0
-            mdp_fn = lambda : np.random.choice(mdp_lst, p=sampling_freq)
+            sampling_freq = np.ones(len(mdp_lst)) /len(mdp_lst)
+
+        mdp_fn = lambda : np.random.choice(mdp_lst, p=sampling_freq)
         return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, native_eval=False):
