@@ -10,6 +10,7 @@ class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
+
 class Recipe:
     MAX_NUM_INGREDIENTS = 3
 
@@ -240,8 +241,6 @@ class Recipe:
         return cls(**obj_dict)
         
 
-
-
 class ObjectState(object):
     """
     State of an object in OvercookedGridworld.
@@ -294,7 +293,6 @@ class ObjectState(object):
 
 
 class SoupState(ObjectState):
-
 
     def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
         """
@@ -429,7 +427,6 @@ class SoupState(ObjectState):
             raise ValueError("Cannot cook a soup that is already done")
         self._cooking_tick += 1
 
-
     def deepcopy(self):
         return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick)
     
@@ -486,7 +483,6 @@ class SoupState(ObjectState):
             soup.auto_finish()
         return soup
         
-
 
 class PlayerState(object):
     """
@@ -910,7 +906,6 @@ class OvercookedGridworld(object):
 
         return OvercookedGridworld(**mdp_config)
 
-
     def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
         self.recipe_config = {
             "num_items_for_soup" : num_items_for_soup,
@@ -1214,7 +1209,6 @@ class OvercookedGridworld(object):
 
             return gamma**recipe.time * gamma**(pot_onion_steps * n_onions) * gamma**(pot_tomato_steps * n_tomatoes) * self.get_recipe_value(state, recipe, discounted=False)
 
-
     def deliver_soup(self, state, player, soup):
         """
         Deliver the soup, and get reward if there is no order list
@@ -1225,7 +1219,6 @@ class OvercookedGridworld(object):
         player.remove_object()
 
         return self.get_recipe_value(state, soup.recipe)
-
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
@@ -1262,7 +1255,6 @@ class OvercookedGridworld(object):
         for obj in state.objects.values():
             if obj.name == 'soup' and obj.is_cooking:
                 obj.cook()
-                
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""
@@ -1411,7 +1403,6 @@ class OvercookedGridworld(object):
 
     def get_full_but_not_cooking_pots(self, pot_states):
         return pot_states['{}_items'.format(Recipe.MAX_NUM_INGREDIENTS)]
-
 
     def get_full_pots(self, pot_states):
         return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states) + self.get_full_but_not_cooking_pots(pot_states)

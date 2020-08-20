@@ -80,6 +80,7 @@ class TestBasicAgents(unittest.TestCase):
         env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
+
 class TestAgentEvaluatorStatic(unittest.TestCase):
 
     layout_name_lst = ["asymmetric_advantages", "asymmetric_advantages_tomato", "bonus_order_test", "bottleneck",
@@ -205,7 +206,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
     biased = [0.1, 0.15, 0.2, 0.25, 0.3]
     num_reset = 200000
 
-
     def test_from_mdp_lst_default(self):
         mdp_lst = [OvercookedGridworld.from_layout_name(name) for name in self.layout_name_short_lst]
         ae = AgentEvaluator.from_mdp_lst(mdp_lst=mdp_lst, env_params={"horizon": 400})
@@ -253,7 +253,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
 
         for k, v in counts.items():
             self.assertAlmostEqual(gt[k], v/self.num_reset, 2, "more than 2 places off for " + k)
-
 
 
 if __name__ == '__main__':

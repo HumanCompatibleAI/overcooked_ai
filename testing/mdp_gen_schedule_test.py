@@ -98,6 +98,7 @@ default_env_params_infinite = {"horizon": 400, "num_mdp": np.inf}
 
 default_env_params_infinite_interval = {"horizon": 400, "num_mdp": np.inf, "initial_info": {"progress": 0}}
 
+
 class TestParamScheduleFnConstant(unittest.TestCase):
 
     def test_constant_schedule_095_01(self):

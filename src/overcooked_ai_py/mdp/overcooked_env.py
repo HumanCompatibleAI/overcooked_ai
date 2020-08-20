@@ -83,7 +83,6 @@ class OvercookedEnv(object):
             print("Environment has (near-)infinite horizon and no terminal states. \
                 Reduce info level of OvercookedEnv to not see this message.")
 
-
     @property
     def mlam(self):
         if self._mlam is None:
@@ -363,7 +362,6 @@ class OvercookedEnv(object):
 
             if display and self.state.timestep < display_until:
                 self.print_state_transition(a_t, r_t, info, fname)
-
 
         assert len(trajectory) == self.state.timestep, "{} vs {}".format(len(trajectory), self.state.timestep)
 

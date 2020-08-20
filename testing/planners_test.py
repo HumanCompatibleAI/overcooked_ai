@@ -339,6 +339,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         if min_t is not None: self.assertEqual(len(action_plan), min_t)
         if times is not None: self.assertEqual(plan_lengths, times)
 
+
 # Rewritten because the previous test depended on Heuristic, and Heuristic has been deprecated
 class TestMediumLevelActionManagerSimple(unittest.TestCase):
     def test_simple_mdp_without_start_orientations(self):
@@ -428,7 +429,6 @@ class TestMediumLevelActionManagerSimple(unittest.TestCase):
                                      [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP]
                                      )
 
-
     def simple_mdp_pickup_counter_dish(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
@@ -451,7 +451,6 @@ class TestMediumLevelActionManagerSimple(unittest.TestCase):
                                      [self.ONION_PICKUP, self.DISH_PICKUP, self.COUNTER_PICKUP]
                                      )
 
-
     def simple_mdp_drop_useless_dish_with_soup_idle(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
             [P((2, 2), n),
@@ -468,7 +467,6 @@ class TestMediumLevelActionManagerSimple(unittest.TestCase):
                                          [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
                                          [self.COUNTER_DROP]
                                          )
-
 
     def simple_mdp_pickup_soup(self, planner, counter_drop_forbidden=False):
         s = OvercookedState(
@@ -615,7 +613,6 @@ class TestMediumLevelActionManagerSimple(unittest.TestCase):
                                          [self.ONION_PICKUP, self.DISH_PICKUP, self.POT_INTERACT],
                                          [self.COUNTER_DROP, self.POT_INTERACT]
                                          )
-
 
     def check_ml_action_manager(self, state, am, expected_mla_0, expected_mla_1, debug=False):
         """
