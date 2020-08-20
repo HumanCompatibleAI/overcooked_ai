@@ -1,11 +1,8 @@
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, RandomAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
-from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 
 np.random.seed(42)
