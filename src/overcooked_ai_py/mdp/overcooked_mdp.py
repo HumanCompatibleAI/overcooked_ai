@@ -59,7 +59,7 @@ class Recipe:
         return hash(self.ingredients)
 
     def __eq__(self, other):
-        return sorted(self.ingredients) == sorted(other.ingredients)
+        return self.ingredients == other.ingredients
 
     def __ne__(self, other):
         return not self == other
@@ -323,7 +323,7 @@ class SoupState(ObjectState):
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
-    def display_string(self):
+    def __str__(self):
         res = "{"
         for ingredient in sorted(self.ingredients):
             res += Recipe.STR_REP[ingredient]
@@ -1037,7 +1037,6 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-        # phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -1060,8 +1059,6 @@ class OvercookedGridworld(object):
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
-
-        # phi_s_prime = self.potential_function(new_state)
         infos = {
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
@@ -1764,7 +1761,7 @@ class OvercookedGridworld(object):
                         grid_string_add += str(player_idx_lst[0])
                         if player_object.name[0] == "s":
                             # this is a soup
-                            grid_string_add += player_object.display_string()
+                            grid_string_add += str(player_object)
                         else:
                             grid_string_add += player_object.name[:1]
                     else:
@@ -1774,14 +1771,14 @@ class OvercookedGridworld(object):
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
-                            grid_string_add += state_obj.display_string()
+                            grid_string_add += str(state_obj)
                         else:
                             grid_string_add += state_obj.name[:1]
 
                     elif element == "P" and state.has_object((x, y)):
                         soup = state.get_object((x, y))
                         # display soup
-                        grid_string_add += soup.display_string()
+                        grid_string_add += str(soup)
 
                 grid_string += grid_string_add
                 grid_string += "".join([" "] * (7 - len(grid_string_add)))
@@ -2075,8 +2072,8 @@ class OvercookedGridworld(object):
         # Constants needed for potential function
         potential_params = {
             'gamma' : gamma,
-            'tomato_value' : Recipe._tomato_value,
-            'onion_value' : Recipe._onion_value,
+            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
+            'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)

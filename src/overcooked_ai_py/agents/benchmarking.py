@@ -2,7 +2,8 @@ import copy
 import numpy as np
 from IPython.display import display
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, \
+    load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
@@ -101,7 +102,7 @@ class AgentEvaluator(object):
         sampling_freq (list): a list of number that signify the sampling frequency of each mdp in the mdp_lst
         Information for the rest of params please refer to the __init__ method above
         """
-        assert type(mdp_lst) == type([]), "mdp_lst must be a list"
+        assert is_iterable(mdp_lst), "mdp_lst must be a list"
         assert all([type(mdp) == OvercookedGridworld for mdp in mdp_lst]), "some mdps are not OvercookedGridworld objects"
 
         if sampling_freq is None:
@@ -120,7 +121,8 @@ class AgentEvaluator(object):
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None, info=True, native_eval=False):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None,
+                            display_phi=False, info=True, native_eval=False):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
@@ -129,15 +131,15 @@ class AgentEvaluator(object):
         # this is particulally helpful with variable MDP, where we want to make sure
         # the mdp used in evaluation is the same as the native self.env.mdp
         if native_eval:
-            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
-                                         metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, display_phi=display_phi,
+                                         info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
         else:
             horizon_env = self.env.copy()
             horizon_env.horizon = self.env.horizon if game_length is None else game_length
             horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
             horizon_env.reset()
-            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
-                                            metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, display_phi=display_phi,
+                                            info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""

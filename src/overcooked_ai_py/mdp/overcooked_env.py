@@ -12,8 +12,6 @@ DEFAULT_ENV_PARAMS = {
 
 MAX_HORIZON = 1e10
 
-DISPLAY_PHI = False
-
 class OvercookedEnv(object):
     """
     An environment wrapper for the OvercookedGridworld Markov Decision Process.
@@ -156,7 +154,7 @@ class OvercookedEnv(object):
             print(self)
         self.state = old_state
 
-    def print_state_transition(self, a_t, r_t, env_info, fname=None):
+    def print_state_transition(self, a_t, r_t, env_info, fname=None, display_phi=False):
         """
         Terminal graphics visualization of a state transition.
         """
@@ -165,22 +163,18 @@ class OvercookedEnv(object):
 
         action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs[0]] for player_action_probs in action_probs ]
 
-
-        if DISPLAY_PHI:
+        if display_phi:
             state_potential_str = "\nState potential = " + str(self.mdp.potential_function(self.state, self.mlam.motion_planner)) + "\t"
-            potential_diff_str = "Δ potential = " + str(0.99 * env_info["phi_s_prime"] - env_info["phi_s"]) + "\n" # Assuming gamma 0.99
         else:
             state_potential_str = ""
-            potential_diff_str = ""
 
-        output_string = "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {} {} {} \n{}\n".format(
+        output_string = "Timestep: {}\nJoint action taken: {} \t Reward: {} + shaping_factor * {}\nAction probs by index: {} {} \n{}\n".format(
                     self.state.timestep,
                     tuple(Action.ACTION_TO_CHAR[a] for a in a_t),
                     r_t,
                     env_info["shaped_r_by_agent"],
                     action_probs,
                     state_potential_str,
-                    potential_diff_str,
                     self)
 
         if fname is None:
@@ -333,7 +327,7 @@ class OvercookedEnv(object):
         self.reset(False)
         return successor_state, done
 
-    def run_agents(self, agent_pair, include_final_state=False, display=False, dir=None, display_until=np.Inf):
+    def run_agents(self, agent_pair, include_final_state=False, display=False, dir=None, display_phi=False, display_until=np.Inf):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
         """
@@ -361,7 +355,7 @@ class OvercookedEnv(object):
             trajectory.append((s_t, a_t, r_t, done, info))
 
             if display and self.state.timestep < display_until:
-                self.print_state_transition(a_t, r_t, info, fname)
+                self.print_state_transition(a_t, r_t, info, fname, display_phi)
 
         assert len(trajectory) == self.state.timestep, "{} vs {}".format(len(trajectory), self.state.timestep)
 
@@ -373,7 +367,8 @@ class OvercookedEnv(object):
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
         return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
 
-    def get_rollouts(self, agent_pair, num_games, display=False, dir=None, final_state=False, display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
+    def get_rollouts(self, agent_pair, num_games, display=False, dir=None, final_state=False, display_phi=False,
+                     display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
         """
         Simulate `num_games` number rollouts with the current agent_pair and returns processed 
         trajectories.
@@ -393,7 +388,8 @@ class OvercookedEnv(object):
         for i in range_iterator:
             agent_pair.set_mdp(self.mdp)
 
-            rollout_info = self.run_agents(agent_pair, display=display, dir=dir, include_final_state=final_state, display_until=display_until)
+            rollout_info = self.run_agents(agent_pair, display=display, dir=dir, include_final_state=final_state,
+                                           display_phi=display_phi, display_until=display_until)
             trajectory, time_taken, tot_rews_sparse, _tot_rews_shaped = rollout_info
             obs, actions, rews, dones, infos = trajectory.T[0], trajectory.T[1], trajectory.T[2], trajectory.T[3], trajectory.T[4]
             trajectories["ep_states"].append(obs)
