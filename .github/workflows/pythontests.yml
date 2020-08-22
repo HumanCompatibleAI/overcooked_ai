@@ -16,7 +16,6 @@ jobs:
     - name: Run tests
       run: |
         python testing/overcooked_test.py
-        python testing/visualization_test.py
   ## This should be uncommented once the planners are updated ##
   # osx_full_tests:
   #   runs-on: macos-latest
