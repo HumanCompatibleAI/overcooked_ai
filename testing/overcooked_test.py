@@ -784,6 +784,18 @@ class TestOvercookedEnvironment(unittest.TestCase):
             (((1, 1), (-1, 0)), ((3, 1), (0, -1)), ((2, 1), (-1, 0)), ((4, 2), (0, 1)))
         )
 
+    def test_display(self):
+        mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
+        mdp_fn = lambda _ignored: mdp0
+        env = OvercookedEnv(mdp_fn, horizon=20)
+        env.get_rollouts(self.rnd_agent_pair, 1, display=True)
+
+    def test_display_phi(self):
+        mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
+        mdp_fn = lambda _ignored: mdp0
+        env = OvercookedEnv(mdp_fn, horizon=20)
+        env.get_rollouts(self.rnd_agent_pair, 1, display=True, display_phi=True)
+
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
         mdp1 = OvercookedGridworld.from_layout_name("counter_circuit")

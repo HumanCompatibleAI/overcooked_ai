@@ -1026,7 +1026,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action):
+    def get_state_transition(self, state, joint_action, display_phi=False, motion_planner=None):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -1064,6 +1064,10 @@ class OvercookedGridworld(object):
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
         }
+        if display_phi:
+            assert motion_planner is not None, "motion planner must be defined if display_phi is true"
+            infos["phi_s"] = self.potential_function(state, motion_planner)
+            infos["phi_s_prime"] = self.potential_function(new_state, motion_planner)
         return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):

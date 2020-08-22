@@ -5,7 +5,7 @@ from overcooked_ai_py.utils import manhattan_distance
 from overcooked_ai_py.planning.search import Graph, NotConnectedError
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
-from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
+from overcooked_ai_py.data.planners import load_saved_action_manager, load_saved_motion_planner, PLANNERS_DIR
 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
@@ -53,6 +53,49 @@ class MotionPlanner(object):
         self.motion_goals_for_pos = self._get_goal_dict()
 
         self.all_plans = self._populate_all_plans()
+
+    def save_to_file(self, filename):
+        with open(filename, 'wb') as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
+    def from_file(filename):
+        return load_saved_motion_planner(filename)
+
+    @staticmethod
+    def from_pickle_or_compute(mdp, counter_goals, custom_filename=None, force_compute=False, info=False):
+        assert isinstance(mdp, OvercookedGridworld)
+
+        filename = custom_filename if custom_filename is not None else mdp.layout_name + "_mp.pkl"
+
+        if force_compute:
+            return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        try:
+            mp = MotionPlanner.from_file(filename)
+
+            if mp.counter_goals != counter_goals or mp.mdp != mdp:
+                print("motion planner with different counter goal or mdp found, computing from scratch")
+                return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+            print("Recomputing motion planner due to:", e)
+            return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        if info:
+            print("Loaded MotionPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
+        return mp
+
+    @staticmethod
+    def compute_mp(filename, mdp, counter_goals):
+        final_filepath = os.path.join(PLANNERS_DIR, filename)
+        print("Computing MotionPlanner to be saved in {}".format(final_filepath))
+        start_time = time.time()
+        mp = MotionPlanner(mdp, counter_goals)
+        print("It took {} seconds to create mp".format(time.time() - start_time))
+        mp.save_to_file(final_filepath)
+        return mp
+
 
     def get_plan(self, start_pos_and_or, goal_pos_and_or):
         """
