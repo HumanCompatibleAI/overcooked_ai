@@ -24,14 +24,8 @@ def test_render_state_from_dict(test_dict):
     correct_pixels_num = np.sum(correct_pixels)/3 # rough estimation given that pixel has 3 color values (RGB format)
     all_pixels_num = expected_result.size/3
     if correct_pixels_num != all_pixels_num:
-        row_size, column_size, color_size = expected_result.shape
         incorrect_pixels_num = all_pixels_num - correct_pixels_num
-        incorrect_rows = [i for i, col in enumerate(correct_pixels[:]) if np.sum(col) != column_size*color_size]
-        incorrect_cols = [i for i, row in enumerate(correct_pixels) if np.sum(row) != row_size*color_size]
-
         print("test not passed, wrong color of", incorrect_pixels_num, "pixels out of ", all_pixels_num)
-        print("incorrect rows", incorrect_rows)
-        print("incorrect columns", incorrect_cols)
         print("test_dict", json.dumps(input_dict))
         return False
     print("test with: ", input_dict["result_array_filename"], "is ok")
