@@ -2,13 +2,9 @@ import itertools, copy
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict
+from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict, classproperty
 from overcooked_ai_py.mdp.actions import Action, Direction
 
-
-class classproperty(property):
-    def __get__(self, cls, owner):
-        return classmethod(self.fget).__get__(None, owner)()
 
 class Recipe:
 
