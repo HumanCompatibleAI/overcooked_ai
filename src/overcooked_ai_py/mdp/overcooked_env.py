@@ -211,7 +211,6 @@ class OvercookedEnv(object):
         """
         assert not self.is_done()
         if joint_agent_action_info is None: joint_agent_action_info = [{}, {}]
-        # mp = self.mp if display_phi else None
         next_state, mdp_infos = self.mdp.get_state_transition(self.state, joint_action, display_phi, self.mp)
 
         # Update game_stats 

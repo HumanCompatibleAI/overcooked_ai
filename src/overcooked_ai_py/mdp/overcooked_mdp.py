@@ -59,6 +59,7 @@ class Recipe:
         return hash(self.ingredients)
 
     def __eq__(self, other):
+        # The ingredients property already returns sorted items, so equivalence check is sufficient
         return self.ingredients == other.ingredients
 
     def __ne__(self, other):
