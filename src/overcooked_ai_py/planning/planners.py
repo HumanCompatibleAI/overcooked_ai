@@ -673,7 +673,7 @@ class JointMotionPlanner(object):
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state)
+        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, all_orders=self.mdp.start_all_orders)
         env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done

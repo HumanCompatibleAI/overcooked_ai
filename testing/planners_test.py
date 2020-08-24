@@ -16,6 +16,7 @@ P, Obj = PlayerState, ObjectState
 # Simple MDP Setup
 simple_mdp = OvercookedGridworld.from_layout_name('simple_o')
 
+
 base_params = {
     'start_orientations': False,
     'wait_allowed': False,
@@ -45,7 +46,7 @@ if large_mdp_tests:
     # Not testing by default
 
     # Large MDP Setup
-    large_mdp = OvercookedGridworld.from_layout_name('corridor', start_order_list=['any'], cook_time=5)
+    large_mdp = OvercookedGridworld.from_layout_name('corridor', cook_time=5)
 
     no_counters_params = {
         'start_orientations': False,
@@ -159,7 +160,7 @@ class TestMotionPlanner(unittest.TestCase):
 
     def check_single_motion_plan(self, motion_planner, start_pos_and_or, goal_pos_and_or, expected_length=None):
         dummy_agent = P((3, 2), n)
-        start_state = OvercookedState([P(*start_pos_and_or), dummy_agent], {}, order_list=['any', 'any'])
+        start_state = OvercookedState([P(*start_pos_and_or), dummy_agent], {}, all_orders=simple_mdp.start_all_orders)
         action_plan, pos_and_or_plan, plan_cost = motion_planner.get_plan(start_pos_and_or, goal_pos_and_or)
         
         # Checking that last state obtained matches goal position
@@ -328,7 +329,7 @@ class TestJointMotionPlanner(unittest.TestCase):
         action_plan, end_pos_and_orients, plan_lengths = joint_motion_planner.get_low_level_action_plan(start, goal)
         if debug: print("Start state: {}, Goal state: {}, Action plan: {}".format(start, goal, action_plan))
 
-        start_state = OvercookedState([P(*start[0]), P(*start[1])], {}, order_list=['any', 'any'])
+        start_state = OvercookedState([P(*start[0]), P(*start[1])], {}, all_orders=simple_mdp.start_all_orders)
         env = OvercookedEnv.from_mdp(joint_motion_planner.mdp, horizon=1000)
         resulting_state, _ = env.execute_plan(start_state, action_plan, display=display)
 
