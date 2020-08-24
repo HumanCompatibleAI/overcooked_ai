@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 from collections.abc import Iterable
 from overcooked_ai_py.static import LAYOUTS_DIR
+from collections.abc import Iterable
 
 # I/O
 
@@ -167,3 +168,6 @@ def profile(fnc):
 
 def read_layout_dict(layout_name):
     return load_dict_from_file(os.path.join(LAYOUTS_DIR, layout_name + ".layout"))
+
+def is_iterable(obj):
+    return isinstance(obj, Iterable)

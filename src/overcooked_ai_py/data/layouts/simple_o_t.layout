@@ -5,7 +5,10 @@
                 XXDSX""",
     "start_bonus_orders": [],
     "start_all_orders" : [
-        { "ingredients" : ["tomato", "tomato", "tomato"]}
+        { "ingredients" : ["onion", "onion", "onion"]},
+	{ "ingredients" : ["tomato", "tomato", "tomato"]}
     ],
+    "recipe_values" : [20, 15],
+    "recipe_times" : [5, 5],
     "rew_shaping_params": None
 }
