@@ -15,7 +15,7 @@ SERVING_LOC = 'S'
 CODE_TO_TYPE = { 0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 4: POT, 5: DISH_DISPENSER, 6: SERVING_LOC}
 TYPE_TO_CODE = { v:k for k, v in CODE_TO_TYPE.items() }
 
-DEFAULT_FEATURE_TYPES = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC] # NOTE: TOMATO_DISPENSER is disabled by default
+DEFAULT_FEATURE_TYPES = (POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC) # NOTE: TOMATO_DISPENSER is disabled by default
 
 class LayoutGenerator(object):
     # NOTE: This class hasn't been tested extensively.
@@ -35,7 +35,7 @@ class LayoutGenerator(object):
         size_bounds=((4, 7), (4, 7)), 
         prop_empty=(0.6, 0.8),
         prop_feats=(0.1, 0.2),
-        feature_types=None,
+        feature_types=DEFAULT_FEATURE_TYPES,
         display=False
     ):
         """
@@ -48,7 +48,7 @@ class LayoutGenerator(object):
         size_bounds: (min_layout_size, max_layout_size)
         prop_empty: (min, max) proportion of empty space in generated layout
         prop_feats: (min, max) proportion of counters with features on them
-        feature_types: list of feature types, by default it is set to DEFAULT_FEATURE_TYPES
+        feature_types: tuple (or list) of feature types
         """
         
         if mdp_params.get("layout_name") is not None:
@@ -121,7 +121,7 @@ class LayoutGenerator(object):
         mdp_params = LayoutGenerator.add_generated_mdp_params_orders(self.mdp_params)
         return OvercookedGridworld.from_grid(mdp_grid, base_layout_params=mdp_params)
 
-    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True, feature_types=None):        
+    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True, feature_types=DEFAULT_FEATURE_TYPES):        
         grid = Grid(inner_shape)
         self.dig_space_with_disjoint_sets(grid, prop_empty)
         self.add_features(grid, prop_features, feature_types)
@@ -198,11 +198,10 @@ class LayoutGenerator(object):
                 if grid.is_valid_dig_location(location):
                     fringe.add(location)
 
-    def add_features(self, grid, prop_features=0, feature_types=None):
+    def add_features(self, grid, prop_features=0, feature_types=DEFAULT_FEATURE_TYPES):
         """
         Places one round of basic features and then adds random features 
         until prop_features of valid locations are filled"""
-        if not feature_types: feature_types = DEFAULT_FEATURE_TYPES
 
         valid_locations = grid.valid_feature_locations()
         np.random.shuffle(valid_locations)
