@@ -1,14 +1,14 @@
-import json, copy
+import copy
 import numpy as np
 from IPython.display import display
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, \
+    load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
-from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.planning.planners import MediumLevelPlanner
+from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 
 
 class AgentEvaluator(object):
@@ -21,48 +21,108 @@ class AgentEvaluator(object):
     pickleable. We should think about possible improvements/what makes most sense to do here.
     """
 
-
-    def __init__(self, mdp_params={}, env_params={}, mdp_fn=None, force_compute=False, mlp_params=NO_COUNTERS_PARAMS, debug=False):
+    def __init__(self, env_params, mdp_fn, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
         """
-        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
         env_params (dict): params for creation of an OvercookedEnv
         mdp_fn (callable function): a function that can be used to create mdp
-        force_compute (bool): whether should re-compute MediumLevelPlanner although matching file is found
-        mlp_params (dict): the parameters for mlp
+        force_compute (bool): whether should re-compute MediumLevelActionManager although matching file is found
+        mlam_params (dict): the parameters for mlam, the MediumLevelActionManager
         debug (bool): whether to display debugging information on init
         """
-        assert type(mdp_params) is dict, "mdp_params must be a dictionary"
-        assert (mdp_params != {} and env_params != {}) or mdp_fn != None, "either evaluate from params or fn"
-        env_params["mlp_params"] = mlp_params
-        if mdp_fn is None:
-            mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            self.mdp_fn = lambda: mdp
-            self.env = OvercookedEnv.from_mdp(mdp, **env_params)
-        else:
-            # infinite mdp
-            if 'num_mdp' not in env_params or env_params['num_mdp'] == -1:
-                self.mdp_fn = mdp_fn
-                self.env = OvercookedEnv(self.mdp_fn, **env_params)
-            else:
-                num_mdp = env_params['num_mdp']
-                assert num_mdp > 0, "invalid number of mdp"
-                self.mdp_lst = [mdp_fn() for _ in range(num_mdp)]
-                self.mdp_fn = lambda : np.random.choice(self.mdp_lst)
-                self.env = OvercookedEnv(self.mdp_fn, **env_params)
-
+        assert callable(mdp_fn), "mdp generating function must be a callable function"
+        env_params["mlam_params"] = mlam_params
+        self.mdp_fn = mdp_fn
+        self.env = OvercookedEnv(self.mdp_fn, **env_params)
         self.force_compute = force_compute
+
+    @staticmethod
+    def from_mdp_params_infinite(mdp_params, env_params, outer_shape=None, mdp_params_schedule_fn=None, force_compute=False,
+                        mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        outer_shape: the outer shape of environment
+        mdp_params_schedule_fn: the schedule for varying mdp params
+        Information for the rest of params please refer to the __init__ method above
+
+        Infinitely generate mdp using the naive mdp_fn
+        """
+        assert outer_shape is not None, "outer_shape needs to be defined for variable mdp"
+        assert "num_mdp" in env_params and np.isinf(env_params["num_mdp"]), \
+            "num_mdp needs to be specified and infinite"
+        mdp_fn_naive = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, outer_shape, mdp_params_schedule_fn)
+        return AgentEvaluator(env_params, mdp_fn_naive, force_compute, mlam_params, debug)
+
+    @staticmethod
+    def from_mdp_params_finite(mdp_params, env_params, outer_shape=None, mdp_params_schedule_fn=None, force_compute=False,
+                        mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        outer_shape: the outer shape of environment
+        mdp_params_schedule_fn: the schedule for varying mdp params
+        Information for the rest of params please refer to the __init__ method above
+
+        Generate a finite list of mdp (mdp_lst) using the naive mdp_fn, and then use the from_mdp_lst to generate
+        the AgentEvaluator
+        """
+        assert outer_shape is not None, "outer_shape needs to be defined for variable mdp"
+        assert "num_mdp" in env_params and not np.isinf(env_params["num_mdp"]), \
+            "num_mdp needs to be specified and finite"
+        mdp_fn_naive = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params, outer_shape, mdp_params_schedule_fn)
+        # finite mdp, random choice
+        num_mdp = env_params['num_mdp']
+        assert type(num_mdp) == int and num_mdp > 0, "invalid number of mdp: " + str(num_mdp)
+        mdp_lst = [mdp_fn_naive() for _ in range(num_mdp)]
+        return AgentEvaluator.from_mdp_lst(mdp_lst=mdp_lst, env_params=env_params,
+                                           force_compute=force_compute, mlam_params=mlam_params, debug=debug)
+
+    @staticmethod
+    def from_mdp(mdp, env_params, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp (OvercookedGridworld): the mdp that we want the AgentEvaluator to always generate
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert type(mdp) == OvercookedGridworld, "mdp must be a OvercookedGridworld object"
+        mdp_fn = lambda _ignored: mdp
+        return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
+
+    @staticmethod
+    def from_layout_name(mdp_params, env_params, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_params (dict): params for creation of an OvercookedGridworld instance through the `from_layout_name` method
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert type(mdp_params) is dict and "layout_name" in mdp_params
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        return AgentEvaluator.from_mdp(mdp, env_params, force_compute, mlam_params, debug)
+
+    @staticmethod
+    def from_mdp_lst(mdp_lst, env_params, sampling_freq=None, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
+        """
+        mdp_lst (list): a list of mdp (OvercookedGridworld) we would like to
+        sampling_freq (list): a list of number that signify the sampling frequency of each mdp in the mdp_lst
+        Information for the rest of params please refer to the __init__ method above
+        """
+        assert is_iterable(mdp_lst), "mdp_lst must be a list"
+        assert all([type(mdp) == OvercookedGridworld for mdp in mdp_lst]), "some mdps are not OvercookedGridworld objects"
+
+        if sampling_freq is None:
+            sampling_freq = np.ones(len(mdp_lst)) /len(mdp_lst)
+
+        mdp_fn = lambda _ignored: np.random.choice(mdp_lst, p=sampling_freq)
+        return AgentEvaluator(env_params, mdp_fn, force_compute, mlam_params, debug)
 
     def evaluate_random_pair(self, num_games=1, all_actions=True, display=False, native_eval=False):
         agent_pair = AgentPair(RandomAgent(all_actions=all_actions), RandomAgent(all_actions=all_actions))
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
     def evaluate_human_model_pair(self, num_games=1, display=False, native_eval=False):
-        a0 = GreedyHumanModel(self.env.mlp)
-        a1 = GreedyHumanModel(self.env.mlp)
+        a0 = GreedyHumanModel(self.env.mlam)
+        a1 = GreedyHumanModel(self.env.mlam)
         agent_pair = AgentPair(a0, a1)
         return self.evaluate_agent_pair(agent_pair, num_games=num_games, display=display, native_eval=native_eval)
 
-    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None, info=True, native_eval=False):
+    def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None,
+                            display_phi=False, info=True, native_eval=False):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
         # if you would like to evaluate on a different env using rllib, please modifiy
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
@@ -71,15 +131,15 @@ class AgentEvaluator(object):
         # this is particulally helpful with variable MDP, where we want to make sure
         # the mdp used in evaluation is the same as the native self.env.mdp
         if native_eval:
-            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
-                                         metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+            return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, display_phi=display_phi,
+                                         info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
         else:
             horizon_env = self.env.copy()
             horizon_env.horizon = self.env.horizon if game_length is None else game_length
             horizon_env.start_state_fn = self.env.start_state_fn if start_state_fn is None else start_state_fn
             horizon_env.reset()
-            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, info=info,
-                                            metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
+            return horizon_env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, display_phi=display_phi,
+                                            info=info, metadata_fn=metadata_fn, metadata_info_fn=metadata_info_fn)
 
     def get_agent_pair_trajs(self, a0, a1=None, num_games=100, game_length=None, start_state_fn=None, display=False, info=True):
         """Evaluate agent pair on both indices, and return trajectories by index"""
@@ -345,7 +405,7 @@ class AgentEvaluator(object):
         cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
         mdp_params = trajectories["mdp_params"][traj_idx]
         env_params = trajectories["env_params"][traj_idx]
-        env = AgentEvaluator(mdp_params, env_params=env_params).env
+        env = AgentEvaluator.from_mdp_params(mdp_params, env_params=env_params).env
 
         def update(t = 1.0):
             traj_timestep = int(t)

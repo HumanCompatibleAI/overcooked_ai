@@ -5,7 +5,7 @@ from overcooked_ai_py.utils import manhattan_distance
 from overcooked_ai_py.planning.search import Graph, NotConnectedError
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, PlayerState, OvercookedGridworld, EVENT_TYPES
-from overcooked_ai_py.data.planners import load_saved_action_manager, PLANNERS_DIR
+from overcooked_ai_py.data.planners import load_saved_action_manager, load_saved_motion_planner, PLANNERS_DIR
 
 # Run planning logic with additional checks and
 # computation to prevent or identify possible minor errors
@@ -53,6 +53,49 @@ class MotionPlanner(object):
         self.motion_goals_for_pos = self._get_goal_dict()
 
         self.all_plans = self._populate_all_plans()
+
+    def save_to_file(self, filename):
+        with open(filename, 'wb') as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
+    def from_file(filename):
+        return load_saved_motion_planner(filename)
+
+    @staticmethod
+    def from_pickle_or_compute(mdp, counter_goals, custom_filename=None, force_compute=False, info=False):
+        assert isinstance(mdp, OvercookedGridworld)
+
+        filename = custom_filename if custom_filename is not None else mdp.layout_name + "_mp.pkl"
+
+        if force_compute:
+            return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        try:
+            mp = MotionPlanner.from_file(filename)
+
+            if mp.counter_goals != counter_goals or mp.mdp != mdp:
+                print("motion planner with different counter goal or mdp found, computing from scratch")
+                return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+            print("Recomputing motion planner due to:", e)
+            return MotionPlanner.compute_mp(filename, mdp, counter_goals)
+
+        if info:
+            print("Loaded MotionPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
+        return mp
+
+    @staticmethod
+    def compute_mp(filename, mdp, counter_goals):
+        final_filepath = os.path.join(PLANNERS_DIR, filename)
+        print("Computing MotionPlanner to be saved in {}".format(final_filepath))
+        start_time = time.time()
+        mp = MotionPlanner(mdp, counter_goals)
+        print("It took {} seconds to create mp".format(time.time() - start_time))
+        mp.save_to_file(final_filepath)
+        return mp
+
 
     def get_plan(self, start_pos_and_or, goal_pos_and_or):
         """
@@ -620,8 +663,7 @@ class JointMotionPlanner(object):
         delta_length = max(finishing_times) - min(finishing_times)
         if delta_length != 0:
             index_long_plan = np.argmax(finishing_times)
-            long_plan = plans[index_long_plan]
-            long_plan = long_plan[:min(finishing_times)]
+            plans[index_long_plan] = plans[index_long_plan][:min(finishing_times)]
         return plans
 
     def _rollout_end_pos_and_or(self, joint_start_state, joint_action_plan):
@@ -631,7 +673,7 @@ class JointMotionPlanner(object):
         # Also assumes can't deliver more than two orders in one motion goal
         # (otherwise Environment will terminate)
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state)
+        dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, all_orders=self.mdp.start_all_orders)
         env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
@@ -724,23 +766,61 @@ class MediumLevelActionManager(object):
     
     Args:
         mdp (OvercookedGridWorld): gridworld of interest
-        params (dictionary): parameters for the medium level action manager
+        mlam_params (dictionary): parameters for the medium level action manager
     """
 
-    def __init__(self, mdp, params):
+    def __init__(self, mdp, mlam_params):
         self.mdp = mdp
         
-        self.params = params
-        self.wait_allowed = params['wait_allowed']
-        self.counter_drop = params["counter_drop"]
-        self.counter_pickup = params["counter_pickup"]
+        self.params = mlam_params
+        self.wait_allowed = mlam_params['wait_allowed']
+        self.counter_drop = mlam_params["counter_drop"]
+        self.counter_pickup = mlam_params["counter_pickup"]
         
-        self.joint_motion_planner = JointMotionPlanner(mdp, params)
+        self.joint_motion_planner = JointMotionPlanner(mdp, mlam_params)
         self.motion_planner = self.joint_motion_planner.motion_planner
 
     def save_to_file(self, filename):
         with open(filename, 'wb') as output:
             pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
+    def from_file(filename):
+        return load_saved_action_manager(filename)
+
+    @staticmethod
+    def from_pickle_or_compute(mdp, mlam_params, custom_filename=None, force_compute=False, info=True):
+        assert isinstance(mdp, OvercookedGridworld)
+
+        filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
+
+        if force_compute:
+            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+
+        try:
+            mlam = MediumLevelActionManager.from_file(filename)
+
+            if mlam.params != mlam_params or mlam.mdp != mdp:
+                print("medium level action manager with different params or mdp found, computing from scratch")
+                return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+
+        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+            print("Recomputing planner due to:", e)
+            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+
+        if info:
+            print("Loaded MediumLevelActionManager from {}".format(os.path.join(PLANNERS_DIR, filename)))
+        return mlam
+
+    @staticmethod
+    def compute_mlam(filename, mdp, mlam_params):
+        final_filepath = os.path.join(PLANNERS_DIR, filename)
+        print("Computing MediumLevelActionManager to be saved in {}".format(final_filepath))
+        start_time = time.time()
+        mlam = MediumLevelActionManager(mdp, mlam_params=mlam_params)
+        print("It took {} seconds to create mlam".format(time.time() - start_time))
+        mlam.save_to_file(final_filepath)
+        return mlam
 
     def joint_ml_actions(self, state):
         """Determine all possible joint medium level actions for a certain state"""
@@ -914,93 +994,95 @@ class MediumLevelActionManager(object):
                 possible_motion_goals.append(motion_goal)
         return possible_motion_goals
 
-class MediumLevelPlanner(object):
-    """
-    A planner that computes optimal plans for two agents to deliver a certain number of dishes
-    in an OvercookedGridworld using medium level actions (single motion goals) in the corresponding
-    A* search problem.
-    """
-
-    def __init__(self, mdp, mlp_params, ml_action_manager=None):
-        self.mdp = mdp
-        self.params = mlp_params
-        self.ml_action_manager = ml_action_manager if ml_action_manager else MediumLevelActionManager(mdp, mlp_params)
-        self.jmp = self.ml_action_manager.joint_motion_planner
-        self.mp = self.jmp.motion_planner
-
-    @staticmethod
-    def from_action_manager_file(filename):
-        mlp_action_manager = load_saved_action_manager(filename)
-        mdp = mlp_action_manager.mdp
-        params = mlp_action_manager.params
-        return MediumLevelPlanner(mdp, params, mlp_action_manager)
-
-    @staticmethod
-    def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False, info=True):
-        assert isinstance(mdp, OvercookedGridworld)
-
-        filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
-
-        if force_compute:
-            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
-
-        try:
-            mlp = MediumLevelPlanner.from_action_manager_file(filename)
-
-            if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
-                print("Mlp with different params or mdp found, computing from scratch")
-                return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
-
-        except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
-            print("Recomputing planner due to:", e)
-            return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
-
-        if info:
-            print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
-        return mlp
-
-    @staticmethod
-    def compute_mlp(filename, mdp, mlp_params):
-        final_filepath = os.path.join(PLANNERS_DIR, filename)
-        print("Computing MediumLevelPlanner to be saved in {}".format(final_filepath))
-        start_time = time.time()
-        mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
-        print("It took {} seconds to create mlp".format(time.time() - start_time))
-        mlp.ml_action_manager.save_to_file(final_filepath)
-        return mlp
-
-    def get_successor_states(self, start_state):
-        """Successor states for medium-level actions are defined as
-        the first state in the corresponding motion plan in which
-        one of the two agents' subgoals is satisfied.
-
-        Returns: list of
-            joint_motion_goal: ((pos1, or1), (pos2, or2)) specifying the
-                                motion plan goal for both agents
-
-            successor_state:   OvercookedState corresponding to state
-                               arrived at after executing part of the motion plan
-                               (until one of the agents arrives at his goal status)
-
-            plan_length:       Time passed until arrival to the successor state
-        """
-        if self.mdp.is_terminal(start_state):
-            return []
-
-        start_jm_state = start_state.players_pos_and_or
-        successor_states = []
-        for goal_jm_state in self.ml_action_manager.joint_ml_actions(start_state):
-            joint_motion_action_plans, end_pos_and_ors, plan_costs = self.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
-            end_state = self.jmp.derive_state(start_state, end_pos_and_ors, joint_motion_action_plans)
-
-            if SAFE_RUN:
-                from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-                assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
-                s_prime, _ = OvercookedEnv.execute_plan(self.mdp, start_state, joint_motion_action_plans, display=False)
-                assert end_state == s_prime,  [self.mdp.state_string(s_prime), self.mdp.state_string(end_state)]
-
-            successor_states.append((goal_jm_state, end_state, min(plan_costs)))
-        return successor_states
+# # Deprecated, since agent-level dynamic planning is no longer used
+# class MediumLevelPlanner(object):
+#     """
+#     A planner that computes optimal plans for two agents to deliver a certain number of dishes
+#     in an OvercookedGridworld using medium level actions (single motion goals) in the corresponding
+#     A* search problem.
+#     """
+#
+#     def __init__(self, mdp, mlp_params, ml_action_manager=None):
+#         self.mdp = mdp
+#         self.params = mlp_params
+#         self.ml_action_manager = ml_action_manager if ml_action_manager else MediumLevelActionManager(mdp, mlp_params)
+#         self.jmp = self.ml_action_manager.joint_motion_planner
+#         self.mp = self.jmp.motion_planner
+#
+#     @staticmethod
+#     def from_action_manager_file(filename):
+#         mlp_action_manager = load_saved_action_manager(filename)
+#         mdp = mlp_action_manager.mdp
+#         params = mlp_action_manager.params
+#         return MediumLevelPlanner(mdp, params, mlp_action_manager)
+#
+#     @staticmethod
+#     def from_pickle_or_compute(mdp, mlp_params, custom_filename=None, force_compute=False, info=True):
+#         assert isinstance(mdp, OvercookedGridworld)
+#
+#         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
+#
+#         if force_compute:
+#             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+#
+#         try:
+#             mlp = MediumLevelPlanner.from_action_manager_file(filename)
+#
+#             if mlp.ml_action_manager.params != mlp_params or mlp.mdp != mdp:
+#                 print("Mlp with different params or mdp found, computing from scratch")
+#                 return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+#
+#         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
+#             print("Recomputing planner due to:", e)
+#             return MediumLevelPlanner.compute_mlp(filename, mdp, mlp_params)
+#
+#         if info:
+#             print("Loaded MediumLevelPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
+#         return mlp
+#
+#     @staticmethod
+#     def compute_mlp(filename, mdp, mlp_params):
+#         final_filepath = os.path.join(PLANNERS_DIR, filename)
+#         print("Computing MediumLevelPlanner to be saved in {}".format(final_filepath))
+#         start_time = time.time()
+#         mlp = MediumLevelPlanner(mdp, mlp_params=mlp_params)
+#         print("It took {} seconds to create mlp".format(time.time() - start_time))
+#         mlp.ml_action_manager.save_to_file(final_filepath)
+#         return mlp
+#
+    # Deprecated.
+    # def get_successor_states(self, start_state):
+    #     """Successor states for medium-level actions are defined as
+    #     the first state in the corresponding motion plan in which
+    #     one of the two agents' subgoals is satisfied.
+    #
+    #     Returns: list of
+    #         joint_motion_goal: ((pos1, or1), (pos2, or2)) specifying the
+    #                             motion plan goal for both agents
+    #
+    #         successor_state:   OvercookedState corresponding to state
+    #                            arrived at after executing part of the motion plan
+    #                            (until one of the agents arrives at his goal status)
+    #
+    #         plan_length:       Time passed until arrival to the successor state
+    #     """
+    #     if self.mdp.is_terminal(start_state):
+    #         return []
+    #
+    #     start_jm_state = start_state.players_pos_and_or
+    #     successor_states = []
+    #     for goal_jm_state in self.ml_action_manager.joint_ml_actions(start_state):
+    #         joint_motion_action_plans, end_pos_and_ors, plan_costs = self.jmp.get_low_level_action_plan(start_jm_state, goal_jm_state)
+    #         end_state = self.jmp.derive_state(start_state, end_pos_and_ors, joint_motion_action_plans)
+    #
+    #         if SAFE_RUN:
+    #             from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+    #             assert end_pos_and_ors[0] == goal_jm_state[0] or end_pos_and_ors[1] == goal_jm_state[1]
+    #             s_prime, _ = OvercookedEnv.execute_plan(self.mdp, start_state, joint_motion_action_plans, display=False)
+    #             assert end_state == s_prime,  [self.mdp.state_string(s_prime), self.mdp.state_string(end_state)]
+    #
+    #         successor_states.append((goal_jm_state, end_state, min(plan_costs)))
+    #     return successor_states
 
     # Deprecated.
     # def get_successor_states_fixed_other(self, start_state, other_agent, other_agent_idx):

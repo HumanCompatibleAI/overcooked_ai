@@ -10,6 +10,7 @@ class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
+
 class Recipe:
     MAX_NUM_INGREDIENTS = 3
 
@@ -58,7 +59,8 @@ class Recipe:
         return hash(self.ingredients)
 
     def __eq__(self, other):
-        return sorted(self.ingredients) == sorted(other.ingredients)
+        # The ingredients property already returns sorted items, so equivalence check is sufficient
+        return self.ingredients == other.ingredients
 
     def __ne__(self, other):
         return not self == other
@@ -240,8 +242,6 @@ class Recipe:
         return cls(**obj_dict)
         
 
-
-
 class ObjectState(object):
     """
     State of an object in OvercookedGridworld.
@@ -295,7 +295,6 @@ class ObjectState(object):
 
 class SoupState(ObjectState):
 
-
     def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
         """
         Represents a soup object. An object becomes a soup the instant it is placed in a pot. The
@@ -325,7 +324,7 @@ class SoupState(ObjectState):
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
-    def display_string(self):
+    def __str__(self):
         res = "{"
         for ingredient in sorted(self.ingredients):
             res += Recipe.STR_REP[ingredient]
@@ -429,7 +428,6 @@ class SoupState(ObjectState):
             raise ValueError("Cannot cook a soup that is already done")
         self._cooking_tick += 1
 
-
     def deepcopy(self):
         return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick)
     
@@ -486,7 +484,6 @@ class SoupState(ObjectState):
             soup.auto_finish()
         return soup
         
-
 
 class PlayerState(object):
     """
@@ -910,7 +907,6 @@ class OvercookedGridworld(object):
 
         return OvercookedGridworld(**mdp_config)
 
-
     def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
         self.recipe_config = {
             "num_items_for_soup" : num_items_for_soup,
@@ -1031,7 +1027,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action):
+    def get_state_transition(self, state, joint_action, display_phi=False, motion_planner=None):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -1042,7 +1038,6 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-        # phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -1065,13 +1060,15 @@ class OvercookedGridworld(object):
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
-
-        # phi_s_prime = self.potential_function(new_state)
         infos = {
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
         }
+        if display_phi:
+            assert motion_planner is not None, "motion planner must be defined if display_phi is true"
+            infos["phi_s"] = self.potential_function(state, motion_planner)
+            infos["phi_s_prime"] = self.potential_function(new_state, motion_planner)
         return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
@@ -1214,7 +1211,6 @@ class OvercookedGridworld(object):
 
             return gamma**recipe.time * gamma**(pot_onion_steps * n_onions) * gamma**(pot_tomato_steps * n_tomatoes) * self.get_recipe_value(state, recipe, discounted=False)
 
-
     def deliver_soup(self, state, player, soup):
         """
         Deliver the soup, and get reward if there is no order list
@@ -1225,7 +1221,6 @@ class OvercookedGridworld(object):
         player.remove_object()
 
         return self.get_recipe_value(state, soup.recipe)
-
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
@@ -1262,7 +1257,6 @@ class OvercookedGridworld(object):
         for obj in state.objects.values():
             if obj.name == 'soup' and obj.is_cooking:
                 obj.cook()
-                
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""
@@ -1412,7 +1406,6 @@ class OvercookedGridworld(object):
     def get_full_but_not_cooking_pots(self, pot_states):
         return pot_states['{}_items'.format(Recipe.MAX_NUM_INGREDIENTS)]
 
-
     def get_full_pots(self, pot_states):
         return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states) + self.get_full_but_not_cooking_pots(pot_states)
 
@@ -1469,15 +1462,15 @@ class OvercookedGridworld(object):
         for obj_state in all_objects:
             assert obj_state.is_valid()
 
-    def find_free_counters_valid_for_both_players(self, state, mlp):
+    def find_free_counters_valid_for_both_players(self, state, mlam):
         """Finds all empty counter locations that are accessible to both players"""
         one_player, other_player = state.players
         free_counters = self.get_empty_counter_locations(state)
         free_counters_valid_for_both = []
         for free_counter in free_counters:
-            goals = mlp.mp.motion_goals_for_pos[free_counter]
-            if any([mlp.mp.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
-            any([mlp.mp.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
+            goals = mlam.motion_planner.motion_goals_for_pos[free_counter]
+            if any([mlam.motion_planner.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
+            any([mlam.motion_planner.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
                 free_counters_valid_for_both.append(free_counter)
         return free_counters_valid_for_both
 
@@ -1773,7 +1766,7 @@ class OvercookedGridworld(object):
                         grid_string_add += str(player_idx_lst[0])
                         if player_object.name[0] == "s":
                             # this is a soup
-                            grid_string_add += player_object.display_string()
+                            grid_string_add += str(player_object)
                         else:
                             grid_string_add += player_object.name[:1]
                     else:
@@ -1783,14 +1776,14 @@ class OvercookedGridworld(object):
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
-                            grid_string_add += state_obj.display_string()
+                            grid_string_add += str(state_obj)
                         else:
                             grid_string_add += state_obj.name[:1]
 
                     elif element == "P" and state.has_object((x, y)):
                         soup = state.get_object((x, y))
                         # display soup
-                        grid_string_add += soup.display_string()
+                        grid_string_add += str(soup)
 
                 grid_string += grid_string_add
                 grid_string += "".join([" "] * (7 - len(grid_string_add)))
@@ -1931,7 +1924,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlp):
+    def featurize_state(self, overcooked_state, mlam):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
@@ -1942,7 +1935,7 @@ class OvercookedGridworld(object):
         def make_closest_feature(idx, name, locations):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
             all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
-                                                                                                   mlp)
+                                                                                                   mlam)
 
         IDX_TO_OBJ = ["onion", "soup", "dish"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
@@ -2018,8 +2011,8 @@ class OvercookedGridworld(object):
         return ordered_features_p0, ordered_features_p1
 
 
-    def get_deltas_to_closest_location(self, player, locations, mlp):
-        _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
+    def get_deltas_to_closest_location(self, player, locations, mlam):
+        _, closest_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
         if closest_loc is None:
             # "any object that does not exist or I am carrying is going to show up as a (0,0)
             # but I can disambiguate the two possibilities by looking at the features 
@@ -2084,8 +2077,8 @@ class OvercookedGridworld(object):
         # Constants needed for potential function
         potential_params = {
             'gamma' : gamma,
-            'tomato_value' : Recipe._tomato_value,
-            'onion_value' : Recipe._onion_value,
+            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
+            'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
