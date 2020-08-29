@@ -159,7 +159,7 @@ class LayoutGenerator(object):
                 prop_empty=mdp_gen_params["prop_empty"],
                 prop_features=mdp_gen_params["prop_feats"],
                 base_param=recipe_params,
-                feature_types=mdp_gen_params["feature_types"]
+                feature_types=mdp_gen_params["feature_types"],
                 display=mdp_gen_params["display"]
             )            
 
