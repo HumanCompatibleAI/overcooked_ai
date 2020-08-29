@@ -2,7 +2,7 @@ import itertools, copy
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, load_from_json, read_layout_dict
+from overcooked_ai_py.utils import pos_distance, read_layout_dict
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -10,13 +10,16 @@ class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
+
 class Recipe:
+    MAX_NUM_INGREDIENTS = 3
 
     TOMATO = 'tomato'
     ONION = 'onion'
     ALL_INGREDIENTS = [ONION, TOMATO]
 
     ALL_RECIPES_CACHE = {}
+    STR_REP = {'tomato': "†", 'onion': "ø"}
 
     _computed = False
     _configured = False
@@ -56,6 +59,7 @@ class Recipe:
         return hash(self.ingredients)
 
     def __eq__(self, other):
+        # The ingredients property already returns sorted items, so equivalence check is sufficient
         return self.ingredients == other.ingredients
 
     def __ne__(self, other):
@@ -266,8 +270,6 @@ class Recipe:
         return cls(**obj_dict)
         
 
-
-
 class ObjectState(object):
     """
     State of an object in OvercookedGridworld.
@@ -321,14 +323,12 @@ class ObjectState(object):
 
 class SoupState(ObjectState):
 
-
     def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
         """
         Represents a soup object. An object becomes a soup the instant it is placed in a pot. The
         soup's recipe is a list of ingredient names used to create it. A soup's recipe is undetermined
         until it has begun cooking. 
 
-        name (str): always "soup" for a soup instance
         position (tupe): (x, y) coordinates in the grid
         ingrdients (list(ObjectState)): Objects that have been used to cook this soup. Determiens @property recipe
         cooking (int): How long the soup has been cooking for. -1 means cooking hasn't started yet
@@ -351,6 +351,16 @@ class SoupState(ObjectState):
         supercls_str = super(SoupState, self).__repr__()
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
+
+    def __str__(self):
+        res = "{"
+        for ingredient in sorted(self.ingredients):
+            res += Recipe.STR_REP[ingredient]
+        if self.is_cooking:
+            res += str(self._cooking_tick)
+        elif self.is_ready:
+            res += str("✓")
+        return res
 
     @ObjectState.position.setter
     def position(self, new_pos):
@@ -446,7 +456,6 @@ class SoupState(ObjectState):
             raise ValueError("Cannot cook a soup that is already done")
         self._cooking_tick += 1
 
-
     def deepcopy(self):
         return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick)
     
@@ -503,7 +512,6 @@ class SoupState(ObjectState):
             soup.auto_finish()
         return soup
         
-
 
 class PlayerState(object):
     """
@@ -864,6 +872,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
 
+
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
         """
@@ -892,10 +901,14 @@ class OvercookedGridworld(object):
         One can override default configuration parameters of the mdp in
         partial_mdp_config.
         """
-        mdp_config = base_layout_params.copy()
+        mdp_config = copy.deepcopy(base_layout_params)
 
         layout_grid = [[c for c in row] for row in layout_grid]
         OvercookedGridworld._assert_valid_grid(layout_grid)
+
+        if "layout_name" not in mdp_config:
+            layout_name = "|".join(["".join(line) for line in layout_grid])
+            mdp_config["layout_name"] = layout_name
 
         player_positions = [None] * 9
         for y, row in enumerate(layout_grid):
@@ -921,7 +934,6 @@ class OvercookedGridworld(object):
             mdp_config[k] = v
 
         return OvercookedGridworld(**mdp_config)
-
 
     def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
         self.recipe_config = {
@@ -1043,7 +1055,7 @@ class OvercookedGridworld(object):
         # There is a finite horizon, handled by the environment.
         return False
 
-    def get_state_transition(self, state, joint_action):
+    def get_state_transition(self, state, joint_action, display_phi=False, motion_planner=None):
         """Gets information about possible transitions for the action.
 
         Returns the next state, sparse reward and reward shaping.
@@ -1054,7 +1066,6 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-        # phi_s = self.potential_function(state)
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
@@ -1077,13 +1088,15 @@ class OvercookedGridworld(object):
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
-
-        # phi_s_prime = self.potential_function(new_state)
         infos = {
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
         }
+        if display_phi:
+            assert motion_planner is not None, "motion planner must be defined if display_phi is true"
+            infos["phi_s"] = self.potential_function(state, motion_planner)
+            infos["phi_s_prime"] = self.potential_function(new_state, motion_planner)
         return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
@@ -1226,7 +1239,6 @@ class OvercookedGridworld(object):
 
             return gamma**recipe.time * gamma**(pot_onion_steps * n_onions) * gamma**(pot_tomato_steps * n_tomatoes) * self.get_recipe_value(state, recipe, discounted=False)
 
-
     def deliver_soup(self, state, player, soup):
         """
         Deliver the soup, and get reward if there is no order list
@@ -1237,7 +1249,6 @@ class OvercookedGridworld(object):
         player.remove_object()
 
         return self.get_recipe_value(state, soup.recipe)
-
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
@@ -1274,7 +1285,6 @@ class OvercookedGridworld(object):
         for obj in state.objects.values():
             if obj.name == 'soup' and obj.is_cooking:
                 obj.cook()
-                
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""
@@ -1384,6 +1394,7 @@ class OvercookedGridworld(object):
                 pots_states_dict['empty'].append(pot_pos)
             else:
                 soup = state.get_object(pot_pos)
+                assert soup.name == 'soup', "soup at " + pot_pos + " is not a soup but a " + soup.name
                 if soup.is_ready:
                     pots_states_dict['ready'].append(pot_pos)
                 elif soup.is_cooking:
@@ -1422,7 +1433,6 @@ class OvercookedGridworld(object):
 
     def get_full_but_not_cooking_pots(self, pot_states):
         return pot_states['{}_items'.format(Recipe.MAX_NUM_INGREDIENTS)]
-
 
     def get_full_pots(self, pot_states):
         return self.get_cooking_pots(pot_states) + self.get_ready_pots(pot_states) + self.get_full_but_not_cooking_pots(pot_states)
@@ -1480,15 +1490,15 @@ class OvercookedGridworld(object):
         for obj_state in all_objects:
             assert obj_state.is_valid()
 
-    def find_free_counters_valid_for_both_players(self, state, mlp):
+    def find_free_counters_valid_for_both_players(self, state, mlam):
         """Finds all empty counter locations that are accessible to both players"""
         one_player, other_player = state.players
         free_counters = self.get_empty_counter_locations(state)
         free_counters_valid_for_both = []
         for free_counter in free_counters:
-            goals = mlp.mp.motion_goals_for_pos[free_counter]
-            if any([mlp.mp.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
-            any([mlp.mp.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
+            goals = mlam.motion_planner.motion_goals_for_pos[free_counter]
+            if any([mlam.motion_planner.is_valid_motion_start_goal_pair(one_player.pos_and_or, goal) for goal in goals]) and \
+            any([mlam.motion_planner.is_valid_motion_start_goal_pair(other_player.pos_and_or, goal) for goal in goals]):
                 free_counters_valid_for_both.append(free_counter)
         return free_counters_valid_for_both
 
@@ -1769,6 +1779,7 @@ class OvercookedGridworld(object):
         grid_string = ""
         for y, terrain_row in enumerate(self.terrain_mtx):
             for x, element in enumerate(terrain_row):
+                grid_string_add = ""
                 if (x, y) in players_dict.keys():
                     player = players_dict[(x, y)]
                     orientation = player.orientation
@@ -1777,43 +1788,36 @@ class OvercookedGridworld(object):
                     player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
                     assert len(player_idx_lst) == 1
 
-                    grid_string += Action.ACTION_TO_CHAR[orientation]
+                    grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
                     if player_object:
-                        grid_string += player_object.name[:1]
-                        grid_string += str(player_idx_lst[0])
+                        grid_string_add += str(player_idx_lst[0])
+                        if player_object.name[0] == "s":
+                            # this is a soup
+                            grid_string_add += str(player_object)
+                        else:
+                            grid_string_add += player_object.name[:1]
                     else:
-                        grid_string += str(player_idx_lst[0])
+                        grid_string_add += str(player_idx_lst[0])
                 else:
+                    grid_string_add += element
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
-                        grid_string = grid_string + element + state_obj.name[:1]
+                        if state_obj.name[0] == "s":
+                            grid_string_add += str(state_obj)
+                        else:
+                            grid_string_add += state_obj.name[:1]
 
                     elif element == "P" and state.has_object((x, y)):
                         soup = state.get_object((x, y))
-                        # TODO: Figure out a way to represent more rich soup space
-                        if Recipe.ONION in soup.ingredients:
-                            grid_string += "ø"
-                        elif Recipe.TOMATO in soup.ingredients:
-                            grid_string += "†"
-                        else:
-                            grid_string += " "
+                        # display soup
+                        grid_string_add += str(soup)
 
-                        if soup.is_cooking:
-                            grid_string += str(soup._cooking_tick)
-                        
-                        # NOTE: do not currently have terminal graphics 
-                        # support for cooking times greater than 3.
-                        elif len(soup.ingredients) == 2:
-                            grid_string += "="
-                        elif len(soup.ingredients) == 1:
-                            grid_string += "-"
-                        else:
-                            grid_string += " "
-                    else:
-                        grid_string += element + " "
+                grid_string += grid_string_add
+                grid_string += "".join([" "] * (7 - len(grid_string_add)))
+                grid_string += " "
 
-            grid_string += "\n"
+            grid_string += "\n\n"
         
         if state.bonus_orders:
             grid_string += "Bonus orders: {}\n".format(
@@ -1829,6 +1833,7 @@ class OvercookedGridworld(object):
     @property
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [26])
+
 
     def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
@@ -1859,12 +1864,7 @@ class OvercookedGridworld(object):
 
             # MAP LAYERS
             if horizon - overcooked_state.timestep < 40:
-                # state_mask_dict["urgency"] = np.ones(self.shape) * (horizon - overcooked_state.timestep)
                 state_mask_dict["urgency"] = np.ones(self.shape)
-
-
-            # state_mask_dict["urgency"] = np.ones(self.shape) * (40 - min(40, horizon - overcooked_state.timestep))
-            # state_mask_dict["urgency"] = np.ones(self.shape) * 40
 
             for loc in self.get_counter_locations():
                 state_mask_dict["counter_loc"][loc] = 1
@@ -1909,13 +1909,12 @@ class OvercookedGridworld(object):
                             state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time - obj._cooking_tick)
                             if obj.is_ready:
                                 state_mask_dict["soup_done"] += make_layer(obj.position, 1)
+
                     else:
                         # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
                         state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
                         state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
                         state_mask_dict["soup_done"] += make_layer(obj.position, 1)
-                    # else:
-                    #     raise ValueError("Unrecognized soup")
 
                 elif obj.name == "dish":
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
@@ -1953,7 +1952,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlp):
+    def featurize_state(self, overcooked_state, mlam):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
@@ -1964,7 +1963,7 @@ class OvercookedGridworld(object):
         def make_closest_feature(idx, name, locations):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
             all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
-                                                                                                   mlp)
+                                                                                                   mlam)
 
         IDX_TO_OBJ = ["onion", "soup", "dish"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
@@ -2040,8 +2039,8 @@ class OvercookedGridworld(object):
         return ordered_features_p0, ordered_features_p1
 
 
-    def get_deltas_to_closest_location(self, player, locations, mlp):
-        _, closest_loc = mlp.mp.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
+    def get_deltas_to_closest_location(self, player, locations, mlam):
+        _, closest_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
         if closest_loc is None:
             # "any object that does not exist or I am carrying is going to show up as a (0,0)
             # but I can disambiguate the two possibilities by looking at the features 
@@ -2057,10 +2056,6 @@ class OvercookedGridworld(object):
 
     def potential_function(self, state, mp, gamma=0.99):
         """
-        A potential function used for more principled reward shaping
-        For details see "Policy invariance under reward transformations:
-        Theory and application to reward shaping"
-
         Essentially, this is the ɸ(s) function.
 
         The main goal here to to approximately infer the actions of an optimal agent, and derive an estimate for the value
@@ -2110,8 +2105,8 @@ class OvercookedGridworld(object):
         # Constants needed for potential function
         potential_params = {
             'gamma' : gamma,
-            'tomato_value' : Recipe._tomato_value,
-            'onion_value' : Recipe._onion_value,
+            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
+            'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
@@ -2268,61 +2263,61 @@ class OvercookedGridworld(object):
     # DEPRECATED #
     ##############
 
-    def calculate_distance_based_shaped_reward(self, state, new_state):
-        """
-        Adding reward shaping based on distance to certain features.
-        """
-        distance_based_shaped_reward = 0
-        
-        pot_states = self.get_pot_states(new_state)
-        ready_pots = pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
-        cooking_pots = ready_pots + pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
-        nearly_ready_pots = cooking_pots + pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
-        dishes_in_play = len(new_state.player_objects_by_type['dish'])
-        for player_old, player_new in zip(state.players, new_state.players):
-            # Linearly increase reward depending on vicinity to certain features, where distance of 10 achieves 0 reward
-            max_dist = 8
-
-            if player_new.held_object is not None and player_new.held_object.name == 'dish' and len(nearly_ready_pots) >= dishes_in_play:
-                min_dist_to_pot_new = np.inf
-                min_dist_to_pot_old = np.inf
-                for pot in nearly_ready_pots:
-                    new_dist = np.linalg.norm(np.array(pot) - np.array(player_new.position))
-                    old_dist = np.linalg.norm(np.array(pot) - np.array(player_old.position))
-                    if new_dist < min_dist_to_pot_new:
-                        min_dist_to_pot_new = new_dist
-                    if old_dist < min_dist_to_pot_old:
-                        min_dist_to_pot_old = old_dist
-                if min_dist_to_pot_old > min_dist_to_pot_new:
-                    distance_based_shaped_reward += self.reward_shaping_params["POT_DISTANCE_REW"] * (1 - min(min_dist_to_pot_new / max_dist, 1))
-
-            if player_new.held_object is None and len(cooking_pots) > 0 and dishes_in_play == 0:
-                min_dist_to_d_new = np.inf
-                min_dist_to_d_old = np.inf
-                for serving_loc in self.terrain_pos_dict['D']:
-                    new_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_new.position))
-                    old_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_old.position))
-                    if new_dist < min_dist_to_d_new:
-                        min_dist_to_d_new = new_dist
-                    if old_dist < min_dist_to_d_old:
-                        min_dist_to_d_old = old_dist
-
-                if min_dist_to_d_old > min_dist_to_d_new:
-                    distance_based_shaped_reward += self.reward_shaping_params["DISH_DISP_DISTANCE_REW"] * (1 - min(min_dist_to_d_new / max_dist, 1))
-
-            if player_new.held_object is not None and player_new.held_object.name == 'soup':
-                min_dist_to_s_new = np.inf
-                min_dist_to_s_old = np.inf
-                for serving_loc in self.terrain_pos_dict['S']:
-                    new_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_new.position))
-                    old_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_old.position))
-                    if new_dist < min_dist_to_s_new:
-                        min_dist_to_s_new = new_dist
-
-                    if old_dist < min_dist_to_s_old:
-                        min_dist_to_s_old = old_dist
-                
-                if min_dist_to_s_old > min_dist_to_s_new:
-                    distance_based_shaped_reward += self.reward_shaping_params["SOUP_DISTANCE_REW"] * (1 - min(min_dist_to_s_new / max_dist, 1))
-
-        return distance_based_shaped_reward
+    # def calculate_distance_based_shaped_reward(self, state, new_state):
+    #     """
+    #     Adding reward shaping based on distance to certain features.
+    #     """
+    #     distance_based_shaped_reward = 0
+    #
+    #     pot_states = self.get_pot_states(new_state)
+    #     ready_pots = pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
+    #     cooking_pots = ready_pots + pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
+    #     nearly_ready_pots = cooking_pots + pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
+    #     dishes_in_play = len(new_state.player_objects_by_type['dish'])
+    #     for player_old, player_new in zip(state.players, new_state.players):
+    #         # Linearly increase reward depending on vicinity to certain features, where distance of 10 achieves 0 reward
+    #         max_dist = 8
+    #
+    #         if player_new.held_object is not None and player_new.held_object.name == 'dish' and len(nearly_ready_pots) >= dishes_in_play:
+    #             min_dist_to_pot_new = np.inf
+    #             min_dist_to_pot_old = np.inf
+    #             for pot in nearly_ready_pots:
+    #                 new_dist = np.linalg.norm(np.array(pot) - np.array(player_new.position))
+    #                 old_dist = np.linalg.norm(np.array(pot) - np.array(player_old.position))
+    #                 if new_dist < min_dist_to_pot_new:
+    #                     min_dist_to_pot_new = new_dist
+    #                 if old_dist < min_dist_to_pot_old:
+    #                     min_dist_to_pot_old = old_dist
+    #             if min_dist_to_pot_old > min_dist_to_pot_new:
+    #                 distance_based_shaped_reward += self.reward_shaping_params["POT_DISTANCE_REW"] * (1 - min(min_dist_to_pot_new / max_dist, 1))
+    #
+    #         if player_new.held_object is None and len(cooking_pots) > 0 and dishes_in_play == 0:
+    #             min_dist_to_d_new = np.inf
+    #             min_dist_to_d_old = np.inf
+    #             for serving_loc in self.terrain_pos_dict['D']:
+    #                 new_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_new.position))
+    #                 old_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_old.position))
+    #                 if new_dist < min_dist_to_d_new:
+    #                     min_dist_to_d_new = new_dist
+    #                 if old_dist < min_dist_to_d_old:
+    #                     min_dist_to_d_old = old_dist
+    #
+    #             if min_dist_to_d_old > min_dist_to_d_new:
+    #                 distance_based_shaped_reward += self.reward_shaping_params["DISH_DISP_DISTANCE_REW"] * (1 - min(min_dist_to_d_new / max_dist, 1))
+    #
+    #         if player_new.held_object is not None and player_new.held_object.name == 'soup':
+    #             min_dist_to_s_new = np.inf
+    #             min_dist_to_s_old = np.inf
+    #             for serving_loc in self.terrain_pos_dict['S']:
+    #                 new_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_new.position))
+    #                 old_dist = np.linalg.norm(np.array(serving_loc) - np.array(player_old.position))
+    #                 if new_dist < min_dist_to_s_new:
+    #                     min_dist_to_s_new = new_dist
+    #
+    #                 if old_dist < min_dist_to_s_old:
+    #                     min_dist_to_s_old = old_dist
+    #
+    #             if min_dist_to_s_old > min_dist_to_s_new:
+    #                 distance_based_shaped_reward += self.reward_shaping_params["SOUP_DISTANCE_REW"] * (1 - min(min_dist_to_s_new / max_dist, 1))
+    #
+    #     return distance_based_shaped_reward

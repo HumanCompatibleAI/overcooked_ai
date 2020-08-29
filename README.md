@@ -1,4 +1,7 @@
+![MDP python tests](https://github.com/HumanCompatibleAI/overcooked_ai/workflows/.github/workflows/pythontests.yml/badge.svg) ![overcooked-ai codecov](https://codecov.io/gh/HumanCompatibleAI/overcooked_ai/branch/master/graph/badge.svg)
+
 # Overcooked-AI
+
 <p align="center">
   <!-- <img src="overcooked_ai_js/images/screenshot.png" width="350"> -->
   <img src="./images/layouts.gif" width="100%"> 

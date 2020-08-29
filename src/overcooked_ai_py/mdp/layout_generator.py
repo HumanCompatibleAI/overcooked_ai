@@ -1,8 +1,9 @@
 import numpy as np
-import copy
+
+import random, copy
 from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
 EMPTY = ' '
 COUNTER = 'X'
@@ -12,77 +13,157 @@ POT = 'P'
 DISH_DISPENSER = 'D'
 SERVING_LOC = 'S'
 
-CODE_TO_TYPE = { 0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 4: POT, 5: DISH_DISPENSER, 6: SERVING_LOC}
-TYPE_TO_CODE = { v:k for k, v in CODE_TO_TYPE.items() }
+CODE_TO_TYPE = {0: EMPTY, 1: COUNTER, 2: ONION_DISPENSER, 3: TOMATO_DISPENSER, 4: POT, 5: DISH_DISPENSER,
+                6: SERVING_LOC}
+TYPE_TO_CODE = {v: k for k, v in CODE_TO_TYPE.items()}
+
+
+
+def mdp_fn_random_choice(mdp_fn_choices):
+    assert type(mdp_fn_choices) is list and len(mdp_fn_choices) > 0
+    return random.choice(mdp_fn_choices)
+
+
+"""
+size_bounds: (min_layout_size, max_layout_size)
+prop_empty: (min, max) proportion of empty space in generated layout
+prop_feats: (min, max) proportion of counters with features on them
+"""
+
+DEFAULT_MDP_GEN_PARAMS = {
+    "inner_shape": (5, 4),
+    "prop_empty": 0.95,
+    "prop_feats": 0.1,
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+    ],
+    "recipe_values" : [20],
+    "recipe_times" : [20],
+    "display": False
+}
+
+
+def DEFAILT_PARAMS_SCHEDULE_FN(outside_information):
+    mdp_default_gen_params = {
+        "inner_shape": (5, 4),
+        "prop_empty": 0.95,
+        "prop_feats": 0.1,
+        "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+        ],
+        "recipe_values" : [20],
+        "recipe_times" : [20],
+        "display": False
+    }
+    return mdp_default_gen_params
+
+
+class MDPParamsGenerator(object):
+
+    def __init__(self, params_schedule_fn):
+        """
+        params_schedule_fn (callable): the function to produce a set of mdp_params for a specific layout
+        """
+        assert callable(params_schedule_fn), "params scheduling function must be a callable"
+        self.params_schedule_fn = params_schedule_fn
+
+    @staticmethod
+    def from_fixed_param(mdp_params_always):
+        # s naive schedule function that always return the same set of parameter
+        naive_schedule_fn = lambda _ignored: mdp_params_always
+        return MDPParamsGenerator(naive_schedule_fn)
+
+    def generate(self, outside_information={}):
+        """
+        generate a set of mdp_params that can be used to generate a mdp
+        outside_information (dict): passing in outside information
+        """
+        assert type(outside_information) is dict
+        mdp_params = self.params_schedule_fn(outside_information)
+        return mdp_params
 
 DEFAULT_FEATURE_TYPES = (POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC) # NOTE: TOMATO_DISPENSER is disabled by default
 
 class LayoutGenerator(object):
     # NOTE: This class hasn't been tested extensively.
 
-    def __init__(self, outer_shape, mdp_params):
+    def __init__(self, mdp_params_generator, outer_shape=(5, 4)):
         """
-        Defines a layout generator that will return OvercoookedGridworld instances 
-        with layout of size `outer_shape`
+        Defines a layout generator that will return OvercoookedGridworld instances
+        using mdp_params_generator
         """
-        self.outer_shape = np.array(outer_shape)
-        self.mdp_params = mdp_params
+        self.mdp_params_generator = mdp_params_generator
+        self.outer_shape = outer_shape
 
     @staticmethod
     def mdp_gen_fn_from_dict(
-        mdp_params={},
-        mdp_choices=None,
-        size_bounds=((4, 7), (4, 7)), 
-        prop_empty=(0.6, 0.8),
-        prop_feats=(0.1, 0.2),
-        feature_types=DEFAULT_FEATURE_TYPES,
-        display=False
+            mdp_params, outer_shape=None, mdp_params_schedule_fn=None
     ):
         """
-        Returns an MDP generator with the passed in properties.
-
-        mdp_choices: selects MDP randomly among choices
-
-        OR (if mdp_choices is None)
-
-        size_bounds: (min_layout_size, max_layout_size)
-        prop_empty: (min, max) proportion of empty space in generated layout
-        prop_feats: (min, max) proportion of counters with features on them
-        feature_types: tuple (or list) of feature types
+        mdp_params: one set of fixed mdp parameter used by the enviroment
+        outer_shape: outer shape of the environment
+        mdp_params_schedule_fn: the schedule for varying mdp params
         """
-        
-        if mdp_params.get("layout_name") is not None:
+        # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
+        if outer_shape is None:
+            assert type(mdp_params) is dict and "layout_name" in mdp_params
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
-            mdp_generator_fn = lambda: mdp
-        elif mdp_choices is not None:
-            assert type(mdp_choices) is list
-            
-            # If list of MDPs, randomly choose one at each reset
-            mdp_sizes = []
-            for mdp_name in mdp_choices:
-                mdp = OvercookedGridworld.from_layout_name(mdp_name, **mdp_params)
-                mdp_sizes.append([mdp.width, mdp.height])
-            widths, heights = np.array(mdp_sizes).T
-            min_padding = max(widths), max(heights)            
-            
-            def mdp_generator_fn():
-                chosen_mdp = np.random.choice(mdp_choices)
-                mdp = OvercookedGridworld.from_layout_name(chosen_mdp, **mdp_params)
-                lg = LayoutGenerator(min_padding, mdp_params)
-                mdp_padded = lg.padded_mdp(mdp)
-                return mdp_padded
+            mdp_fn = lambda _ignored: mdp
         else:
-            min_padding = (size_bounds[0][1], size_bounds[1][1])
-            layout_generator = LayoutGenerator(min_padding, mdp_params)
-            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
-                inner_shape=[rnd_int_uniform(*dim) for dim in size_bounds],
-                prop_empty=rnd_uniform(*prop_empty),
-                prop_features=rnd_uniform(*prop_feats),
-                feature_types=feature_types,
-                display=display
-            )
+            # there is no schedule, we are using the same set of mdp_params all the time
+            if mdp_params_schedule_fn is None:
+                assert mdp_params is not None
+                mdp_pg = MDPParamsGenerator.from_fixed_param(mdp_params_always=mdp_params)
+            else:
+                assert mdp_params is None, "please remove the mdp_params from the variable, " \
+                                           "because mdp_params_schedule_fn exist and we will " \
+                                           "always use the schedule_fn if it exist"
+                mdp_pg = MDPParamsGenerator(params_schedule_fn=mdp_params_schedule_fn)
+            lg = LayoutGenerator(mdp_pg, outer_shape)
+            mdp_fn = lg.generate_padded_mdp
+        return mdp_fn
 
-        return mdp_generator_fn
+    def generate_padded_mdp(self, outside_information={}):
+        """
+        Return a PADDED MDP with mdp params specified in self.mdp_params
+        """
+        mdp_gen_params = self.mdp_params_generator.generate(outside_information)
+        outer_shape = self.outer_shape
+        if "layout_name" in mdp_gen_params.keys() and mdp_gen_params["layout_name"] is not None:
+            mdp = OvercookedGridworld.from_layout_name(**mdp_gen_params)
+            mdp_generator_fn = lambda: self.padded_mdp(mdp)
+        else:
+
+            required_keys = ["inner_shape", "prop_empty", "prop_feats", "display"]
+            missing_keys = [k for k in required_keys if k not in mdp_gen_params.keys()]
+            assert len(missing_keys) == 0, "These keys were missing from the mdp_params: {}".format(missing_keys)
+            inner_shape = mdp_gen_params["inner_shape"]
+            assert inner_shape[0] <= outer_shape[0] and inner_shape[1] <= outer_shape[1], \
+                "inner_shape cannot fit into the outershap"
+            layout_generator = LayoutGenerator(self.mdp_params_generator, outer_shape=self.outer_shape)
+            
+            if "start_all_orders" in mdp_gen_params:
+                recipe_params = {"start_all_orders": mdp_gen_params["start_all_orders"]}
+                if "recipe_values" in mdp_gen_params:
+                    recipe_params["recipe_values"] = mdp_gen_params["recipe_values"]
+                if "recipe_times" in mdp_gen_params:
+                    recipe_params["recipe_times"] = mdp_gen_params["recipe_times"]
+            else:
+                recipe_params = LayoutGenerator.add_generated_mdp_params_orders(self.mdp_params)
+            
+            if "feature_types" not in mdp_gen_params:
+                mdp_gen_params["feature_types"] = DEFAULT_FEATURE_TYPES
+            
+            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
+                inner_shape=mdp_gen_params["inner_shape"],
+                prop_empty=mdp_gen_params["prop_empty"],
+                prop_features=mdp_gen_params["prop_feats"],
+                base_param=recipe_params,
+                feature_types=mdp_gen_params["feature_types"]
+                display=mdp_gen_params["display"]
+            )            
+
+        return mdp_generator_fn()
 
     @staticmethod
     def add_generated_mdp_params_orders(mdp_params):
@@ -118,10 +199,11 @@ class LayoutGenerator(object):
 
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
+
         mdp_params = LayoutGenerator.add_generated_mdp_params_orders(self.mdp_params)
         return OvercookedGridworld.from_grid(mdp_grid, base_layout_params=mdp_params)
-
-    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, display=True, feature_types=DEFAULT_FEATURE_TYPES):        
+    
+    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, base_param, feature_types=DEFAULT_FEATURE_TYPES, display=True):        
         grid = Grid(inner_shape)
         self.dig_space_with_disjoint_sets(grid, prop_empty)
         self.add_features(grid, prop_features, feature_types)
@@ -129,8 +211,7 @@ class LayoutGenerator(object):
         padded_grid = self.embed_grid(grid)
         start_positions = self.get_random_starting_positions(padded_grid)
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
-        mdp_params = LayoutGenerator.add_generated_mdp_params_orders(self.mdp_params)
-        return OvercookedGridworld.from_grid(mdp_grid, base_layout_params=mdp_params)
+        return OvercookedGridworld.from_grid(mdp_grid, base_param)
 
     def padded_grid_to_layout_grid(self, padded_grid, start_positions, display=False):
         if display:
@@ -143,7 +224,7 @@ class LayoutGenerator(object):
         for i, pos in enumerate(start_positions):
             x, y = pos
             mdp_grid[y][x] = str(i + 1)
-        
+
         return mdp_grid
 
     def embed_grid(self, grid):
@@ -183,8 +264,8 @@ class LayoutGenerator(object):
         grid = Grid(shape)
         self.dig_space_with_fringe_expansion(grid, prop_empty)
         self.add_features(grid)
-        print(grid)
-    
+        # print(grid)
+
     def dig_space_with_fringe_expansion(self, grid, prop_empty=0.1):
         starting_location = grid.get_random_interior_location()
         fringe = Fringe(grid)
@@ -229,7 +310,7 @@ class LayoutGenerator(object):
 
 
 class Grid(object):
-    
+
     def __init__(self, shape):
         assert len(shape) == 2, "Grid must be 2 dimensional"
         grid = (np.ones(shape) * TYPE_TO_CODE[COUNTER]).astype(np.int)
@@ -251,7 +332,7 @@ class Grid(object):
     def terrain_at_loc(self, location):
         x, y = location
         return self.mtx[x][y]
-    
+
     def dig(self, location):
         assert self.is_valid_dig_location(location)
         self.change_location(location, EMPTY)
@@ -276,13 +357,13 @@ class Grid(object):
         for d in Direction.ALL_DIRECTIONS:
             new_location = Action.move_in_direction(location, d)
             if self.is_in_bounds(new_location):
-                near_locations.append(new_location)                
+                near_locations.append(new_location)
         return near_locations
 
     def is_in_bounds(self, location):
         x, y = location
         return x >= 0 and y >= 0 and x < self.shape[0] and y < self.shape[1]
-        
+
     def is_valid_dig_location(self, location):
         x, y = location
 
@@ -392,7 +473,7 @@ class DisjointSets(object):
     def __init__(self, elements):
         self.num_elements = len(elements)
         self.num_sets = len(elements)
-        self.parents = { element : element for element in elements }
+        self.parents = {element: element for element in elements}
 
     def is_connected(self):
         return self.num_sets == 1

@@ -11,7 +11,7 @@ def generate_serialized_trajectory(mdp, save_path):
     sparse_reward = 0
     while sparse_reward <= 0:
         np.random.seed(seed)
-        ae = AgentEvaluator(mdp.mdp_params, env_params={"horizon": 1500})
+        ae = AgentEvaluator.from_mdp(mdp, env_params={"horizon": 1500})
         test_trajs = ae.evaluate_random_pair(all_actions=True, num_games=1)
         sparse_reward = np.mean(test_trajs["ep_returns"])
         seed += 1
