@@ -1,8 +1,9 @@
 import numpy as np
-import random
+
+import random, copy
 from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
 
 EMPTY = ' '
 COUNTER = 'X'
@@ -81,6 +82,7 @@ class MDPParamsGenerator(object):
         mdp_params = self.params_schedule_fn(outside_information)
         return mdp_params
 
+DEFAULT_FEATURE_TYPES = (POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC) # NOTE: TOMATO_DISPENSER is disabled by default
 
 class LayoutGenerator(object):
     # NOTE: This class hasn't been tested extensively.
@@ -126,36 +128,71 @@ class LayoutGenerator(object):
         Return a PADDED MDP with mdp params specified in self.mdp_params
         """
         mdp_gen_params = self.mdp_params_generator.generate(outside_information)
+
         outer_shape = self.outer_shape
         if "layout_name" in mdp_gen_params.keys() and mdp_gen_params["layout_name"] is not None:
             mdp = OvercookedGridworld.from_layout_name(**mdp_gen_params)
             mdp_generator_fn = lambda: self.padded_mdp(mdp)
         else:
-
-            required_keys = ["inner_shape", "prop_empty", "prop_feats", "display", "start_all_orders"]
+            required_keys = ["inner_shape", "prop_empty", "prop_feats", "display"]
+            # with generate_all_orders key start_all_orders will be generated inside make_new_layout method
+            if not mdp_gen_params.get("generate_all_orders"): 
+                required_keys.append("start_all_orders")
             missing_keys = [k for k in required_keys if k not in mdp_gen_params.keys()]
+            if len(missing_keys) != 0:
+                print("missing keys dict", mdp_gen_params)
             assert len(missing_keys) == 0, "These keys were missing from the mdp_params: {}".format(missing_keys)
-
-            recipe_params = {"start_all_orders": mdp_gen_params["start_all_orders"]}
-            if "recipe_values" in mdp_gen_params:
-                recipe_params["recipe_values"] = mdp_gen_params["recipe_values"]
-            if "recipe_times" in mdp_gen_params:
-                recipe_params["recipe_times"] = mdp_gen_params["recipe_times"]
-
             inner_shape = mdp_gen_params["inner_shape"]
             assert inner_shape[0] <= outer_shape[0] and inner_shape[1] <= outer_shape[1], \
                 "inner_shape cannot fit into the outershap"
-
             layout_generator = LayoutGenerator(self.mdp_params_generator, outer_shape=self.outer_shape)
-            mdp_generator_fn = lambda: layout_generator.make_disjoint_sets_layout(
-                inner_shape=mdp_gen_params["inner_shape"],
-                prop_empty=mdp_gen_params["prop_empty"],
-                prop_features=mdp_gen_params["prop_feats"],
-                base_param=recipe_params,
-                display=mdp_gen_params["display"]
-            )
-
+            
+            if "feature_types" not in mdp_gen_params:
+                mdp_gen_params["feature_types"] = DEFAULT_FEATURE_TYPES
+            
+            mdp_generator_fn = lambda: layout_generator.make_new_layout(mdp_gen_params)
         return mdp_generator_fn()
+    
+    @staticmethod
+    def create_base_params(mdp_gen_params):
+        assert mdp_gen_params.get("start_all_orders") or mdp_gen_params.get("generate_all_orders")
+        mdp_gen_params = LayoutGenerator.add_generated_mdp_params_orders(mdp_gen_params)
+        recipe_params = {"start_all_orders": mdp_gen_params["start_all_orders"]}
+        if mdp_gen_params.get("start_bonus_orders"):
+            recipe_params["start_bonus_orders"] = mdp_gen_params["start_bonus_orders"]
+        if "recipe_values" in mdp_gen_params:
+            recipe_params["recipe_values"] = mdp_gen_params["recipe_values"]
+        if "recipe_times" in mdp_gen_params:
+            recipe_params["recipe_times"] = mdp_gen_params["recipe_times"]
+        return recipe_params
+        
+    @staticmethod
+    def add_generated_mdp_params_orders(mdp_params):
+        """
+        adds generated parameters (i.e. generated orders) to mdp_params,
+        returns onchanged copy of mdp_params when there is no "generate_all_orders" and "generate_bonus_orders" keys inside mdp_params
+        """
+        mdp_params = copy.deepcopy(mdp_params)
+        if mdp_params.get("generate_all_orders"):
+            all_orders_kwargs = copy.deepcopy(mdp_params["generate_all_orders"])
+
+            if all_orders_kwargs.get("recipes"):
+                 all_orders_kwargs["recipes"] = [Recipe.from_dict(r) for r in all_orders_kwargs["recipes"]]
+        
+            all_recipes = Recipe.generate_random_recipes(**all_orders_kwargs)
+            mdp_params["start_all_orders"] = [r.to_dict() for r in all_recipes]
+        else:
+            all_recipes = Recipe.ALL_RECIPES
+
+        if mdp_params.get("generate_bonus_orders"):
+            bonus_orders_kwargs = copy.deepcopy(mdp_params["generate_bonus_orders"])
+
+            if not bonus_orders_kwargs.get("recipes"): 
+                bonus_orders_kwargs["recipes"] = all_recipes
+
+            bonus_recipes = Recipe.generate_random_recipes(**bonus_orders_kwargs)
+            mdp_params["start_bonus_orders"] = [r.to_dict() for r in bonus_recipes]
+        return mdp_params
 
     def padded_mdp(self, mdp, display=False):
         """Returns a padded MDP from an MDP"""
@@ -166,10 +203,20 @@ class LayoutGenerator(object):
         mdp_grid = self.padded_grid_to_layout_grid(padded_grid, start_positions, display=display)
         return OvercookedGridworld.from_grid(mdp_grid)
 
-    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, base_param={}, display=True):
+    def make_new_layout(self, mdp_gen_params):
+        return self.make_disjoint_sets_layout(
+            inner_shape=mdp_gen_params["inner_shape"],
+            prop_empty=mdp_gen_params["prop_empty"],
+            prop_features=mdp_gen_params["prop_feats"],
+            base_param=LayoutGenerator.create_base_params(mdp_gen_params),
+            feature_types=mdp_gen_params["feature_types"],
+            display=mdp_gen_params["display"]
+        )      
+
+    def make_disjoint_sets_layout(self, inner_shape, prop_empty, prop_features, base_param, feature_types=DEFAULT_FEATURE_TYPES, display=True):        
         grid = Grid(inner_shape)
         self.dig_space_with_disjoint_sets(grid, prop_empty)
-        self.add_features(grid, prop_features)
+        self.add_features(grid, prop_features, feature_types)
 
         padded_grid = self.embed_grid(grid)
         start_positions = self.get_random_starting_positions(padded_grid)
@@ -242,12 +289,10 @@ class LayoutGenerator(object):
                 if grid.is_valid_dig_location(location):
                     fringe.add(location)
 
-    def add_features(self, grid, prop_features=0):
+    def add_features(self, grid, prop_features=0, feature_types=DEFAULT_FEATURE_TYPES):
         """
         Places one round of basic features and then adds random features 
         until prop_features of valid locations are filled"""
-        feature_types = [POT, ONION_DISPENSER, DISH_DISPENSER, SERVING_LOC]
-        # feature_types = [POT, ONION_DISPENSER, TOMATO_DISPENSER, DISH_DISPENSER, SERVING_LOC]  # NOTE: currently disabled TOMATO_DISPENSER
 
         valid_locations = grid.valid_feature_locations()
         np.random.shuffle(valid_locations)
