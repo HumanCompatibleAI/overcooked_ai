@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='overcooked_ai',
-      version='1.0.2',
+      version='1.0.3',
       description='Cooperative multi-agent environment based on Overcooked',
       long_description=long_description,
       long_description_content_type="text/markdown",
