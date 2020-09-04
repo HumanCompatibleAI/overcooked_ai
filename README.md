@@ -24,7 +24,7 @@ Check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl) for t
 
 You can install the pre-compiled wheel file using pip.
 ```
-pip install overcooked_ai
+pip install overcooked-ai
 ```
 Note that PyPI releases are stable but infrequent. For the most up-to-date development features, build from source
 
@@ -59,7 +59,7 @@ python testing/overcooked_test.py
 
 If you're thinking of using the planning code extensively, you should run the full testing suite that verifies all of the Overcooked accessory tools (this can take 5-10 mins): 
 ```
-python -m unittest -s testing/ -p "*_test.py"
+python -m unittest discover -s testing/ -p "*_test.py"
 ```
 
 
