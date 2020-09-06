@@ -236,7 +236,7 @@ class OvercookedEnv(object):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.horizon, self.mlam)
+        return self.mdp.featurize_state(state, self.mlam, self.horizon)
 
     def reset(self, regen_mdp=True, outside_info={}):
         """
