@@ -26,7 +26,6 @@ class Recipe:
     _conf = {}
     
     def __new__(cls, ingredients):
-        # The default ingredients are added because of a strange pickle loader issue when loading motion planner
         if not cls._configured:
             raise ValueError("Recipe class must be configured before recipes can be created")
         # Some basic argument verification
@@ -1953,7 +1952,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlam):
+    def featurize_state(self, overcooked_state, horizon, mlam):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
