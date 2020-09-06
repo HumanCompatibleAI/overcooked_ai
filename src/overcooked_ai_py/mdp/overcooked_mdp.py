@@ -25,7 +25,7 @@ class Recipe:
     _configured = False
     _conf = {}
     
-    def __new__(cls, ingredients=('onion', 'onion', 'onion')):
+    def __new__(cls, ingredients):
         # The default ingredients are added because of a strange pickle loader issue when loading motion planner
         if not cls._configured:
             raise ValueError("Recipe class must be configured before recipes can be created")

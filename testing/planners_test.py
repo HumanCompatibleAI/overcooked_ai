@@ -3,6 +3,8 @@ from overcooked_ai_py.planning.planners import MediumLevelActionManager
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, PlayerState, ObjectState, SoupState, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+from overcooked_ai_py.agents.agent import AgentPair, GreedyHumanModel
 
 large_mdp_tests = False
 force_compute = True
@@ -641,7 +643,74 @@ class TestMediumLevelActionManagerSimple(unittest.TestCase):
                          "player 0's ml_action should be " + str(expected_mla_1) +
                          " but get " + str(mla_1))
 
-        
+class TestScenarios(unittest.TestCase):
+    def repetative_runs(self, evaluator, num_games=10):
+        trajectory_0 = evaluator.evaluate_human_model_pair(num_games=num_games, native_eval=True)
+        trajectory_1 = evaluator.evaluate_human_model_pair(num_games=num_games, native_eval=True)
+
+        h0 = GreedyHumanModel(evaluator.env.mlam)
+        h1 = GreedyHumanModel(evaluator.env.mlam)
+        ap_hh_2 = AgentPair(h0, h1)
+        trajectory_2 = evaluator.evaluate_agent_pair(agent_pair=ap_hh_2, num_games=num_games, native_eval=True)
+
+        h3 = GreedyHumanModel(evaluator.env.mlam)
+        h4 = GreedyHumanModel(evaluator.env.mlam)
+        ap_hh_3 = AgentPair(h3, h4)
+        trajectory_3 = evaluator.evaluate_agent_pair(agent_pair=ap_hh_3, num_games=num_games, native_eval=True)
+
+
+    def test_scenario_3_no_counter(self):
+        # Asymmetric advantage scenario
+        #
+        # X X X X X O X X X X
+        # S           X X P X
+        # X         ↑H      X
+        # D   X X X X!X X   X
+        # X           →R    O
+        # X X X X X X X X X X
+        #
+        # This test does not allow counter by using the default NO_COUNTER_PARAMS when calling from_layout_name
+
+        mdp_params = {"layout_name": "scenario3"}
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        start_state = mdp.get_standard_start_state()
+
+        env_params = {"start_state_fn": lambda: start_state, "horizon": 1000}
+        eva = AgentEvaluator.from_layout_name(mdp_params, env_params, force_compute=force_compute)
+
+        self.repetative_runs(eva)
+
+
+    def test_scenario_3_yes_counter(self):
+        # Asymmetric advantage scenario
+        #
+        # X X X X X O X X X X
+        # S           X X P X
+        # X         ↑H      X
+        # D   X X X X!X X   X
+        # X           →R    O
+        # X X X X X X X X X X
+        #
+        # This test does not allow only (5. 3) as the only counter
+
+        mdp_params = {"layout_name": "scenario3"}
+        mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+        start_state = mdp.get_standard_start_state()
+
+        valid_counters = [(5, 3)]
+        one_counter_params = {
+            'start_orientations': False,
+            'wait_allowed': False,
+            'counter_goals': valid_counters,
+            'counter_drop': valid_counters,
+            'counter_pickup': [],
+            'same_motion_goals': True
+        }
+
+        env_params = {"start_state_fn": lambda: start_state, "horizon": 1000}
+        eva = AgentEvaluator.from_layout_name(mdp_params, env_params, mlam_params=one_counter_params, force_compute=force_compute)
+
+        self.repetative_runs(eva)
 # # Deprecated. because of Heuristic
 # class TestHighLevelPlanner(unittest.TestCase):
 #     """The HighLevelPlanner class has been mostly discontinued"""

@@ -252,7 +252,8 @@ class OvercookedEnv(object):
         if regen_mdp:
             self.mdp = self.mdp_generator_fn(outside_info)
             self._mlam = None
-            self._mp = None
+            # The motion planner (self.mp) will almost certainly be used. Initialize here to avoid pickle loading issues
+            self.mp
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:
