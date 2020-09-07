@@ -10,7 +10,6 @@ class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
-<<<<<<< HEAD
 def custom_method_equal(obj1, obj2, method_name):
     if hasattr(obj1, method_name):
         return getattr(obj1, method_name)(obj2)
@@ -21,8 +20,6 @@ def custom_method_equal(obj1, obj2, method_name):
 
 def ids_independent_equal(obj1, obj2):
     return custom_method_equal(obj1, obj2, "ids_independent_equal")
-=======
->>>>>>> upstream/master
 
 class Recipe:
     MAX_NUM_INGREDIENTS = 3
@@ -344,12 +341,7 @@ class ObjectState(object):
 
 
 class SoupState(ObjectState):
-<<<<<<< HEAD
     def __init__(self, position, ingredients=[], cooking_tick=-1, object_id=None, **kwargs):
-=======
-
-    def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
->>>>>>> upstream/master
         """
         Represents a soup object. An object becomes a soup the instant it is placed in a pot. The
         soup's recipe is a list of ingredient names used to create it. A soup's recipe is undetermined
@@ -1134,11 +1126,7 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-<<<<<<< HEAD
-        # phi_s = self.potential_function(state)
         events_list = []
-=======
->>>>>>> upstream/master
 
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
