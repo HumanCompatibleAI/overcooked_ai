@@ -1,10 +1,9 @@
-import copy
+import copy, json
 import numpy as np
 from IPython.display import display
 
-
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, \
-    load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable
+    load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable, NumpyArrayEncoder
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
