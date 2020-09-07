@@ -8,9 +8,9 @@
                 X     XX     X
                 X     XX     X
                 XXXXXSXXPPXXXX""",
-    "start_order_list": None,
-    "cook_time": 20,
-    "num_items_for_soup": 3,
-    "delivery_reward": 20,
+    "start_bonus_orders": [],
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+    ],
     "rew_shaping_params": None
 }
