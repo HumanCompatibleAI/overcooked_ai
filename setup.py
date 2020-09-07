@@ -10,7 +10,8 @@ setup(name='overcooked_ai',
       packages=find_packages('src'),
       package_dir={"": "src"},
       package_data={
-        'overcooked_ai_py' : ['data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle']
+        'overcooked_ai_py' : ['data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle', 
+        "visualization/web/*.js", "visualization/web/*.html", "visualization/web/*.css"]
       },
       install_requires=[
         'numpy',
