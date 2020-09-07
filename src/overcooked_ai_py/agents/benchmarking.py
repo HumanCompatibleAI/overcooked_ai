@@ -2,14 +2,14 @@ import json, copy
 import numpy as np
 from IPython.display import display
 
-from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, NumpyArrayEncoder
+from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, load_from_json, mean_and_std_err, append_dictionaries, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, NumpyArrayEncoder, load_text_file
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.agents.agent import AgentPair, CoupledPlanningAgent, RandomAgent, GreedyHumanModel
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.visualization.extract_events import extract_events
-from overcooked_ai_py.visualization.visualization_utils import run_html_in_ipython, run_html_in_web, create_chart_html
+from overcooked_ai_py.visualization.visualization_utils import run_html_in_ipython, run_html_in_web, create_chart_html, DEFAULT_EVENT_CHART_SETTINGS
 
 
 class AgentEvaluator(object):
@@ -394,10 +394,16 @@ class AgentEvaluator(object):
         ipython - chooses between opening chart
         in default browser or below ipython cell (for ipython=True)
         chart_settings - json with various chart settings that overwrittes default ones
-        for more info see create_chart_html function with comments aboutr default chart settings
         """
-        events = extract_events(trajs, traj_index)
-        html = create_chart_html(events, chart_settings)
+        settings = DEFAULT_EVENT_CHART_SETTINGS.copy()
+        settings.update(chart_settings or {})
+
+        if settings.get("show_cumulative_data"):
+            events = extract_events(trajs, traj_index, settings["cumulative_events_description"])
+        else: # no need to add cumulative data that won't be shown
+            events = extract_events(trajs, traj_index)
+
+        html = create_chart_html(events, settings)
         if ipython:
             run_html_in_ipython(html)
         else:

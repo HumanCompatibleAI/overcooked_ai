@@ -1,0 +1,156 @@
+/* it is event_chart_default.css file - do not delete this line, is it used for tests */ 
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+.axis .label {
+  fill: #000;
+  font-size: 12px;
+  text-anchor: end;
+  
+}
+.y.axis .label {
+  transform: rotate(-90deg);
+}
+
+
+.chart-box { /* main box with chart, width and height is total space taken by all chart code */ 
+  width: 720px;
+  background-color:rgb(227, 229, 202);
+}
+.chart-area {
+  transform: translate(40px, 20px);  /* translate to right to make place for left axis */ 
+  width: 620px;
+  height: 70px;
+  background-color: rgb(227, 229, 202);
+}
+
+.line-holding  {/* line between item pickup and drop/potting/delivery */ 
+  stroke-width: 3px; 
+}
+.line-holding.highlighted {  /* highlighted means that mouse is hovered over any element associated with an item */ 
+  stroke-width: 6px;
+}
+.data-point { /* data point is for single event e.g. item pickup, drop */ 
+  stroke-width: 2px;
+}
+.object-type-tomato {
+  fill: red;
+  stroke: red;
+}
+.object-type-onion {
+  fill: #F6C283;
+  stroke: #F6C283;
+}
+.object-type-soup {
+  fill: blue;
+  stroke: blue;
+}
+.object-type-dish {
+  fill: silver;
+  stroke: silver;
+}
+.data-point-adjective-none {
+  stroke:#000;
+}
+.data-point.adjective-optimal {
+  stroke: rgb(0, 255, 55);
+}
+.data-point.adjective-useful {
+  stroke: rgb(0, 221, 255);
+}
+.data-point.adjective-viable {
+  stroke: rgb(255, 217, 0);
+}
+.data-point.adjective-useless {
+  stroke: rgb(218, 132, 229);
+}
+.data-point.adjective-catastrophic {
+  stroke: rgb(255, 0, 0);
+}
+.data-point.highlighted { /* highlighted means that mouse is hovered over any element associated with an item */ 
+  stroke-width: 3px;
+}
+
+
+.cumulative-data.line {
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  fill: none;
+}
+.cumulative-data.player-all.line{
+  stroke: #55BDB3;
+}
+.cumulative-data.player-all.legend-data-point{
+  fill:  #55BDB3;
+}
+.cumulative-data.player-0.line {
+  stroke: #6F4A74;
+}
+.cumulative-data.player-0.legend-data-point {
+  fill:  #6F4A74;
+}
+.cumulative-data.player-1.line {
+  stroke: #4E8C2C;
+}
+.cumulative-data.player-1.legend-data-point{
+  fill: #4E8C2C;
+}
+.cumulative-data.player-2.line {
+  stroke: #6F2929;
+}
+.cumulative-data.player-2.legend-data-point{
+  fill: #6F2929;
+}
+.cumulative-data.player-3.line {
+  stroke: #A33E3E;
+}
+.cumulative-data.player-3.legend-data-point{
+  fill: #A33E3E;
+}
+
+
+.legends {
+  display: flex;
+  background-color: rgb(227, 229, 202);
+  width: 720px;
+  padding-bottom: 15px;
+}
+.legend-title {
+  font-size:1.2em;
+}
+.legend-data-point-area {
+  float:left;
+  margin-right: 10px;
+}
+.legend-data-point-description {
+  float:left;
+}
+.legend-column {
+  width: fit-content;
+  margin-right: 10px;
+  margin-left: 10px;
+}
+.legend-row {
+  height: fit-content;
+  display: flex;
+  align-items: center;
+  margin-top:10px;
+}
+.player-colour-legend-data-point {
+  stroke-width:0px;
+}
+.cumulative-line-type-legend-data-point {
+  fill:None;
+  stroke:black;
+}
+
+/* not used classes now, but they would work so feel free to use them
+.legend-data-point {}
+.data-point.action-pickup {}
+.data-point.action-drop {}
+.data-point.action-potting {}
+.data-point.action-delivery {} */

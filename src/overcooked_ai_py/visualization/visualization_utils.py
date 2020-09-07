@@ -1,12 +1,30 @@
 import tempfile, webbrowser, json, uuid, os
 from IPython.display import display, HTML
 from string import Template
-from overcooked_ai_py.static import VISUALIZATION_DIR
+from overcooked_ai_py.static import WEB_VISUALIZATION_DIR
+from overcooked_ai_py.utils import load_text_file
+
+DEFAULT_EVENT_CHART_SETTINGS = {
+    # all numerical values are pixels
+    "label_text_shift": 30, # how far from axis is axis label
+    "object_event_height": 10, "object_event_width":16, # used both in chart and its legend
+    "show_event_data": True, # chart that shows when events happened
+    "use_adjectives": True, # adjectives of events like useful, catastrophic etc.
+    "actions_to_show": ["pickup","drop", "delivery", "potting", "holding"], # holding is the only continous event - line between pickup and drop/potting/delivery
+    "show_cumulative_data": True, # cumulative data is data about sum of events done so far in any point in time - line chart
+    "cumulative_data_ticks": 4, # number of ticks on cumulative data axis
+    # list of dicts where every dict is one cumulative events curve for every player + one additional for all players
+    # in format: {"actions":["action1", "action2"], "adjectives":["adj1", "adj2"]}, "name": "Name of line in legend",
+    #  "class": "css-class-name"} in case of lacking key all actions/adjectives are assumed; only 1 adjective needs to match between adjectives list and event adjectives
+    "cumulative_events_description": [{"actions":["pickup", "drop", "potting", "delivery"], "name": "All events"}],
+    "show_legends": True,
+    "use_default_css_file": True, # file found in overcooked_ai_py/visualization/web/event_chart_default.css; when set false you need to rewrite most of the settings from there
+    "custom_css_path": None,
+    "custom_css_string": ""
+}
 
 def load_visualization_file_as_str(filename):
-    with open(os.path.join(VISUALIZATION_DIR, filename), 'r') as f:
-        lines = f.readlines()
-        return "\n".join(lines)
+    return load_text_file(os.path.join(WEB_VISUALIZATION_DIR, filename))
 
 
 def run_html_in_web(html, prefix="overcooked_ai_visualization_"):
@@ -21,35 +39,29 @@ def run_html_in_ipython(html):
     display(HTML(html))
 
 
-def create_chart_html(events_data, chart_settings=None, box_id=None):
-    # all numerical values are pixels
-    # not explicity stated below margins are not implemented
-    default_chart_settings = {'height': 250, # height of whole chart container
-        'width': 720,  # width of whole chart container
-        'margin': {'top': 20, 'right': 60, 'bottom': 180, 'left': 40}, # margins of chart (not container) without legends
-        'hold_line_width': 3, # hold line is line between pickup and drop event that symbolizes holding object by the player
-        'highlighted_hold_line_width': 6, # highlighting element is by hovering mouse over something associated with described object
-        'object_line_width': 0, 'highlighted_object_line_width':3,
-        'object_event_height': 10, 'object_event_width':16, # object event is triangle
-        'label_text_shift': 30, # how far from axis is axis label
-        'add_cumulative_data': True, # cumulative data is data about cumulative events
-        'cumulative_data_ticks': 4,
-        'show_legends': True, # when setting show_legends to False it is recommended to also lower height and margin.bottom
-        'legend_title_size': 10, 'legend_points_height': 10, 'legend_points_width': 16, 
-        'legend_points_margin': {'bottom': 5, 'right': 5}, # margin after legend point and next point or legend text
-        'legend_margin': {'right':  5} # margin between legend columns
-        }
-
-    settings = default_chart_settings.copy()
-    settings.update(chart_settings or {})
-
-    box_id = box_id or "graph-div-" + str(uuid.uuid1())
-
+def create_chart_html(events_data, chart_settings=None,  chart_box_id=None, legends_box_id=None):
+    
+    css_strings = []
+    if chart_settings.get("use_default_css_file"):
+        css_strings.append(load_visualization_file_as_str("event_chart_default.css"))
+    if chart_settings.get("custom_css_path"):
+        css_strings.append(load_text_file(chart_settings["custom_css_path"]))
+    if chart_settings.get("custom_css_string"):
+        css_strings.append(chart_settings["custom_css_string"])
+    css_string = "\n/* new css string */\n".join(css_strings)
+    # delete unused settings, especially custom_css_string as it can be big
+    del chart_settings["use_default_css_file"]
+    del chart_settings["custom_css_path"]
+    del chart_settings["custom_css_string"]
+    
+    chart_box_id = chart_box_id or "chart-div-" + str(uuid.uuid1())
+    legends_box_id = legends_box_id or "legends-div-" + str(uuid.uuid1())
     js_text_template = Template(load_visualization_file_as_str("event_chart.js"))
-    js_text = js_text_template.substitute({'data': json.dumps(events_data), 'box_id': "#"+box_id, 
-        'settings': json.dumps(settings)})
+    js_text = js_text_template.substitute({'data': json.dumps(events_data), 'chart_box_id': "#"+chart_box_id,
+     'legends_box_id': "#"+legends_box_id, 'settings': json.dumps(chart_settings)})
 
-    html_template = Template(load_visualization_file_as_str("chart.html"))
-    css_text = load_visualization_file_as_str("style.css")
+    html_template = Template(load_visualization_file_as_str("event_chart.html"))
 
-    return html_template.substitute({'css_text': css_text, 'js_text': js_text, 'box_id':box_id})
+    return html_template.substitute({'css_text': css_string, 'js_text': js_text, 'chart_box_id': chart_box_id,
+     'legends_box_id': legends_box_id})
+
