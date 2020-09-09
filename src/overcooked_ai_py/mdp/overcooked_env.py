@@ -93,8 +93,11 @@ class OvercookedEnv(object):
     @property
     def mp(self):
         if self._mp is None:
-            self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
-                                                            force_compute=False)
+            if self._mlam is not None:
+                self._mp = self.mlam.motion_planner
+            else:
+                self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
+                                                                force_compute=False)
         return self._mp
 
     @staticmethod
@@ -252,8 +255,7 @@ class OvercookedEnv(object):
         if regen_mdp:
             self.mdp = self.mdp_generator_fn(outside_info)
             self._mlam = None
-            # The motion planner (self.mp) will almost certainly be used. Initialize here to avoid pickle loading issues
-            self.mp
+            self._mp = None
         if self.start_state_fn is None:
             self.state = self.mdp.get_standard_start_state()
         else:
