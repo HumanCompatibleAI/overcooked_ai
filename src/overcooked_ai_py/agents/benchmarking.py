@@ -1,6 +1,5 @@
 import copy
 import numpy as np
-from IPython.display import display
 
 from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_from_rew_list, save_as_json, \
     load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable
@@ -240,46 +239,6 @@ class AgentEvaluator(object):
         return trajs
 
     @staticmethod
-    def get_joint_traj_in_single_agent_stable_baselines_format(trajs, encoding_fn, save=False, filename=None):
-        """
-        This requires splitting each trajectory into two, one for each action in the
-        joint action.
-        """
-        trajs = copy.deepcopy(trajs)
-        sb_traj_dict_keys = ["actions", "obs", "rewards", "episode_starts", "episode_returns"]
-        sb_trajs_dict = { k:[] for k in sb_traj_dict_keys }
-
-        AgentEvaluator.add_observations_to_trajs_in_metadata(trajs, encoding_fn)
-
-        for traj_idx in range(len(trajs["ep_lengths"])):
-            # Extract single-agent trajectory for each agent
-            # for agent_idx in range(2):
-            agent_idx = trajs["metadatas"]["ep_agent_idxs"][traj_idx]
-                
-            # Getting only actions for current agent index, and processing them to an array 
-            # with shape (1, )
-            processed_agent_actions = [[Action.ACTION_TO_INDEX[j_a[agent_idx]]] for j_a in trajs["ep_actions"][traj_idx]]
-            sb_trajs_dict["actions"].extend(processed_agent_actions)
-
-            agent_obs = [both_agent_obs[agent_idx] for both_agent_obs in trajs["metadatas"]["ep_obs_for_both_agents"][traj_idx]]
-            sb_trajs_dict["obs"].extend(agent_obs)
-
-            sb_trajs_dict["rewards"].extend(trajs["ep_rewards"][traj_idx])
-
-            # Converting episode dones to episode starts
-            traj_starts = [1 if i == 0 else 0 for i in range(trajs["ep_lengths"][traj_idx])]
-            sb_trajs_dict["episode_starts"].extend(traj_starts)
-            sb_trajs_dict["episode_returns"].append(trajs["ep_returns"][traj_idx])
-
-        sb_trajs_dict = { k:np.array(v) for k, v in sb_trajs_dict.items() }
-
-        if save:
-            assert filename is not None
-            np.savez(filename, **sb_trajs_dict)
-
-        return sb_trajs_dict
-
-    @staticmethod
     def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
         assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectory.keys())
@@ -373,53 +332,6 @@ class AgentEvaluator(object):
                 obs_metadata.append([encoding_fn(s) for s in one_traj_states])
             return "ep_obs_for_both_agents", obs_metadata
         return AgentEvaluator.add_metadata_to_traj(trajs, metadata_fn, ["ep_states"])
-
-
-    ### VIZUALIZATION METHODS ###
-
-    @staticmethod
-    def interactive_from_traj(trajectories, traj_idx=0, nested_keys_to_print=[]):
-        """
-        Displays ith trajectory of trajectories (in standard format) 
-        interactively in a Jupyter notebook.
-
-        keys_to_print is a list of keys of info to be printed. By default
-        states and actions (corresponding to the previous timestep will be printed)
-        will be printed.
-        """
-        from ipywidgets import widgets, interactive_output
-
-        states = trajectories["ep_states"][traj_idx]
-        joint_actions = trajectories["ep_actions"][traj_idx]
-        
-        other_info = {}
-        for nested_k in nested_keys_to_print:
-            inner_data = trajectories
-            for k in nested_k:
-                inner_data = inner_data[k]
-            inner_data = inner_data[traj_idx]
-            
-            assert np.array(inner_data).shape == np.array(states).shape, "{} vs {}".format(np.array(inner_data).shape, np.array(states).shape)
-            other_info[k] = inner_data
-
-        cumulative_rewards = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][traj_idx])
-        mdp_params = trajectories["mdp_params"][traj_idx]
-        env_params = trajectories["env_params"][traj_idx]
-        env = AgentEvaluator.from_mdp_params(mdp_params, env_params=env_params).env
-
-        def update(t = 1.0):
-            traj_timestep = int(t)
-            env.state = states[traj_timestep]
-            joint_action = joint_actions[traj_timestep - 1] if traj_timestep > 0 else (Action.STAY, Action.STAY)
-            print(env)
-            print("Joint Action: {} \t Score: {}".format(Action.joint_action_to_char(joint_action), cumulative_rewards[t]))
-
-            for k, data in other_info.items():
-                print("{}: {}".format(k, data[traj_timestep]))
-
-        t = widgets.IntSlider(min=0, max=len(states) - 1, step=1, value=0)
-        out = interactive_output(update, {'t': t})
-        display(out, t)
 
     # EVENTS VISUALIZATION METHODS #
     
