@@ -1952,7 +1952,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlam):
+    def featurize_state(self, overcooked_state, mlam, horizon=400):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
