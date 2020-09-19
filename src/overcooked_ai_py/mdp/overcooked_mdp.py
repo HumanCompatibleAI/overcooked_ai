@@ -1,15 +1,24 @@
-import itertools, copy
+import itertools, copy, uuid, json
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, read_layout_dict
+from overcooked_ai_py.utils import pos_distance, read_layout_dict, delete_duplicates
 from overcooked_ai_py.mdp.actions import Action, Direction
-
 
 class classproperty(property):
     def __get__(self, cls, owner):
         return classmethod(self.fget).__get__(None, owner)()
 
+def custom_method_equal(obj1, obj2, method_name):
+    if hasattr(obj1, method_name):
+        return getattr(obj1, method_name)(obj2)
+    elif hasattr(obj2, method_name):
+        return getattr(obj2, method_name)(obj1)
+    else:
+        return obj1 == obj2
+
+def ids_independent_equal(obj1, obj2):
+    return custom_method_equal(obj1, obj2, "ids_independent_equal")
 
 class Recipe:
     MAX_NUM_INGREDIENTS = 3
@@ -60,7 +69,7 @@ class Recipe:
 
     def __eq__(self, other):
         # The ingredients property already returns sorted items, so equivalence check is sufficient
-        return self.ingredients == other.ingredients
+        return isinstance(other, Recipe) and self.ingredients == other.ingredients
 
     def __ne__(self, other):
         return not self == other
@@ -269,6 +278,381 @@ class Recipe:
     def from_dict(cls, obj_dict):
         return cls(**obj_dict)
         
+class Order:
+    def __init__(self, recipe, time_to_expire=None, expire_penalty=0, base_reward=None, linear_time_bonus_reward=0.0, order_id=None, is_bonus=False):
+        """
+        recipe (Recipe or dict): recipe for order
+        time_to_expire (int): time for order to disappear and occur expire_penalty
+        expire_penalty (int): negative reward when Order expires before fulfilling it
+        base_reward (int): reward for fulfilling order independent of time
+        linear_time_bonus_reward (float): reward per every remaining timestep for fulfilling order before expiring
+        order_id (str): unique id for the order
+        is_bonus(bool): indication if order should be shown in bonus_orders lists
+        """
+        recipe_dict = recipe.to_dict() if isinstance(recipe, Recipe) else recipe
+        self._recipe_dict = recipe_dict # not assigning recipe to self.recipe as it causes errors with recipe when unpickling objects containing Order
+        self.time_to_expire = time_to_expire
+        self.expire_penalty = expire_penalty
+
+        self.order_id = Order.create_order_id()  if order_id is None else order_id
+        self._base_reward = base_reward
+        self.linear_time_bonus_reward = linear_time_bonus_reward or 0
+        self.is_bonus = is_bonus
+
+    @property
+    def recipe(self):
+        return Recipe.from_dict(self._recipe_dict)
+
+    @property
+    def is_temporary(self):
+        return self.time_to_expire is not None
+
+    @is_temporary.setter
+    def is_temporary(self, _):
+        raise AttributeError("is_temporary param is read-only, edit time_to_expire instead (None is for pernament order)")
+
+    @property
+    def base_reward(self):
+        return self.recipe.value if self._base_reward is None else self._base_reward
+
+    @base_reward.setter
+    def base_reward(self, v):
+        self._base_reward = v
+
+    @property
+    def is_expired(self):
+        return self.time_to_expire == 0
+
+    def __str__(self):
+        return str(self.to_dict())
+
+    def __repr__(self):
+        return repr(self.to_dict())
+
+    def __hash__(self):
+        return hash((self.recipe, self.time_to_expire, self.expire_penalty, self.order_id, self._base_reward, self.linear_time_bonus_reward, self.is_bonus))
+
+    def __deepcopy__(self, memo):
+        return Order(recipe=copy.deepcopy(self.recipe),
+                    time_to_expire=self.time_to_expire,
+                    expire_penalty=self.expire_penalty,
+                    base_reward=self._base_reward,
+                    linear_time_bonus_reward=self.linear_time_bonus_reward,
+                    order_id=self.order_id,
+                    is_bonus=self.is_bonus)
+
+    def __eq__(self, other):
+        return self.ids_independent_equal(other) \
+            and self.order_id == other.order_id
+
+    def ids_independent_equal(self, other):
+        return isinstance(other, Order) \
+            and self.recipe == other.recipe \
+            and self.time_to_expire == other.time_to_expire \
+            and self.expire_penalty == other.expire_penalty \
+            and self._base_reward == other._base_reward \
+            and self.linear_time_bonus_reward == other.linear_time_bonus_reward \
+            and self.is_bonus == other.is_bonus
+
+    @staticmethod
+    def create_order_id():
+        return str(uuid.uuid1())
+
+    @classmethod
+    def from_dict(cls, obj_dict):
+        kwargs = copy.deepcopy(obj_dict)
+        kwargs["recipe"] = Recipe.from_dict(obj_dict["recipe"])
+        return cls(**obj_dict)
+
+    def to_dict(self):
+        return {"recipe": self.recipe.to_dict(),
+                "time_to_expire": self.time_to_expire,
+                "expire_penalty":self.expire_penalty,
+                "base_reward":self._base_reward,
+                "linear_time_bonus_reward":self.linear_time_bonus_reward,
+                "order_id": self.order_id,
+                "is_bonus": self.is_bonus}
+
+    def step(self):
+        if self.is_temporary:
+            assert self.time_to_expire > 0
+            self.time_to_expire -= 1
+            if self.time_to_expire == 0:
+                return -self.expire_penalty
+        return 0
+
+    def calculate_reward(self):
+        return self.calculate_future_reward(0)
+
+    def calculate_future_reward(self, timesteps_into_future=0):
+        if not self.is_temporary:
+            result = self.base_reward
+        elif timesteps_into_future > self.time_to_expire:
+            result = 0
+        else:
+            result = self.base_reward + int(self.linear_time_bonus_reward * (self.time_to_expire-timesteps_into_future))
+        return result
+
+    def will_be_expired_in(self, time):
+        return self.is_temporary and self.time_to_expire <= time
+
+
+class OrdersList:
+    def __init__(self, orders=[], orders_to_add=[], add_new_order_every=None, time_to_next_order=None):
+        """
+        list of orders with methods to interact with them
+        orders (list(Order) or list(dict)): initial list of orders
+        add_new_order_every (int): number of timesteps between adding consecutive orders
+        time_to_next_order (int): remaining timesteps number before next order will be added to this OrderList
+        orders_to_add list (list(Order) or list(dict)): list of orders that will be randomly added when time_to_next_order would reach 0
+        """
+        assert add_new_order_every is None or add_new_order_every > 0
+        assert (add_new_order_every is None and time_to_next_order is None) or orders_to_add
+        self.orders = []
+        self.add_orders(orders)
+        self.orders_to_add = []
+        self.add_orders(orders_to_add, list_to_add=self.orders_to_add)
+        self.add_new_order_every = add_new_order_every
+        self.time_to_next_order = time_to_next_order or add_new_order_every
+
+    @property
+    def all_recipes(self):
+        """
+        used to create Recipes config
+        """
+        all_orders = self.orders + self.orders_to_add
+        return list(set([o.recipe for o in all_orders]))
+
+    @property
+    def bonus_recipes(self):
+        all_orders = self.orders + self.orders_to_add
+        return list(set([o.recipe for o in all_orders if o.is_bonus]))
+
+    @property
+    def is_adding_orders(self):
+        return self.add_new_order_every is not None
+
+    @is_adding_orders.setter
+    def is_adding_orders(self, _):
+        raise AttributeError("is_adding_orders param is read-only, edit add_new_order_every instead (None is for not adding orders)")
+
+    @property
+    def contains_temporary_orders(self):
+        return any(o.is_temporary for o in self.orders)
+
+    @property
+    def bonus_orders(self):
+        return [order for order in self.orders if order.is_bonus]
+
+    @bonus_orders.setter
+    def bonus_orders(self, _):
+        raise AttributeError("bonus_orders param is read-only, edit orders instead")
+
+    @property
+    def non_bonus_orders(self):
+        return [order for order in self.orders if not order.is_bonus]
+
+    @non_bonus_orders.setter
+    def non_bonus_orders(self, _):
+        raise AttributeError("non_bonus_orders param is read-only, edit orders instead")
+
+    def __str__(self):
+        return str(self.orders)
+
+    def __repr__(self):
+        return repr(self.to_dict())
+
+    def __hash__(self):
+        return hash((tuple(self.orders), tuple(self.orders_to_add), self.add_new_order_every, self.time_to_next_order))
+
+    def __bool__(self):
+        return bool(self.orders)
+
+    def __eq__(self, other):
+        return isinstance(other, OrdersList) \
+            and OrdersList.orders_iterables_equal(self.orders, other.orders) \
+            and self.add_new_order_every == other.add_new_order_every \
+            and self.time_to_next_order == other.time_to_next_order \
+            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add)
+
+    def __len__(self):
+        return len(self.orders)
+
+    # when use code below decide if orders order should be based on orders_sorted_by_urgency or not
+    #  def __iter__(self):
+    #     return iter(self.orders)
+    # def __getitem__(self, i):
+    #     return self.orders[i]
+    # def __setitem__(self, i, v):
+    #     self.orders[i] = v
+    # def __delitem__(self, i):
+    #     del self.orders[i]
+
+    def __deepcopy__(self, memo):
+        return OrdersList(orders=[copy.deepcopy(o) for o in self.orders],
+                         add_new_order_every=self.add_new_order_every,
+                         time_to_next_order=self.time_to_next_order,
+                         orders_to_add=[copy.deepcopy(o) for o in self.orders_to_add])
+
+    def ids_independent_equal(self, other):
+        return isinstance(other, OrdersList) \
+            and OrdersList.orders_iterables_equal(self.orders, other.orders, ids_independent_equal) \
+            and self.add_new_order_every == other.add_new_order_every \
+            and self.time_to_next_order == other.time_to_next_order \
+            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add, ids_independent_equal)
+
+    @staticmethod
+    def orders_iterables_equal(orders1, orders2, f_equal=lambda x, y: x == y):
+        orders1 = set(orders1)
+        orders2 = set(orders2)
+        if len(orders1) != len(orders2):
+            return False
+        for order1 in orders1:
+            if not any(f_equal(order1, order2) for order2 in orders2):
+                return False
+        return True
+
+    @staticmethod
+    def _order_urgency_sort_key(order, n_timesteps_into_future=0):
+        # higher -> more urgent
+        return (-order.will_be_expired_in(n_timesteps_into_future), order.is_temporary, -(order.time_to_expire or 0), order.is_bonus, order.calculate_reward()+order.expire_penalty)
+
+    def enumerated_orders_sorted_by_urgency(self, n_timesteps_into_future=0):
+        # closer to beginning -> more urgent
+        return list(reversed(sorted(enumerate(self.orders), key=lambda x: OrdersList._order_urgency_sort_key(x[1], n_timesteps_into_future))))
+
+    def orders_sorted_by_urgency(self, n_timesteps_into_future=0):
+        # closer to beginning -> more urgent
+        return [x[1] for x in self.enumerated_orders_sorted_by_urgency(n_timesteps_into_future=n_timesteps_into_future)]
+
+    def get_matching_order(self, order_id=None, recipe=None, temporary_order=None, available_after_n_timesteps=-1, most_urgent=True):
+        order_idx = self.matching_order_index(order_id=order_id, recipe=recipe, temporary_order=temporary_order, available_after_n_timesteps=available_after_n_timesteps, most_urgent=most_urgent)
+        if order_idx is None:
+            return None
+        else:
+            return self.orders[order_idx]
+
+    def matching_order_index(self, order_id=None, recipe=None, temporary_order=None, available_after_n_timesteps=-1, most_urgent=True):
+        """
+        find order index by order_id or by recipe
+        if teporary_order=None find any order, if temporary_order is bool it indicates if we look for only temporary orders or pernament ones
+        available_after_n_timesteps allows to search existing orders that will won't expire for n timesteps
+        """
+        assert recipe is not None or order_id is not None
+        if most_urgent:
+            enumerated_orders = self.enumerated_orders_sorted_by_urgency(available_after_n_timesteps)
+        else:
+            enumerated_orders = enumerate(self.orders)
+
+        for i, order in enumerated_orders:
+            if (temporary_order is None or temporary_order == order.is_temporary) \
+                    and ((not order.is_temporary) or available_after_n_timesteps < order.time_to_expire):
+                if order_id is not None and order.order_id == order_id:
+                    return i
+                if recipe is not None and order.recipe == recipe:
+                    return i
+        else:
+            return None
+
+    def add_order(self, order, list_to_add=None):
+        if list_to_add is None:
+            list_to_add = self.orders
+        if not isinstance(order, Order):
+            order = Order.from_dict(order)
+        if list_to_add == self.orders:
+            assert order.is_temporary or self.get_matching_order(recipe=order.recipe, temporary_order=False) is None, "More than one non-temporary order with the same recipe is not allowed"
+            assert self.get_matching_order(order_id=order.order_id) is None, "More than one order in with the same order_id is not allowed"
+        list_to_add.append(order)
+
+    def add_orders(self, orders, list_to_add=None):
+        for order in orders:
+            self.add_order(order, list_to_add)
+
+    def add_random_orders(self, n=1, replace=False):
+        """
+        add random n orders from orders_to_add
+        """
+        for order in np.random.choice(list(self.orders_to_add), n, replace=replace):
+            order = copy.deepcopy(order)
+            order.order_id = Order.create_order_id()
+            self.add_order(order)
+
+    def remove_order(self, order_id=None, recipe=None, order_idx=None, temporary_order=True, most_urgent=True):
+        """
+        remove order by order_id or by recipe
+        if teporary_order=None remove also pernament orders, if teporary_order=False remove only pernament orders
+        """
+        assert recipe is not None or order_id is not None or order_idx is not None
+        if order_idx is None:
+            order_idx = self.matching_order_index(recipe=recipe, order_id=order_id, temporary_order=temporary_order, most_urgent=most_urgent)
+        if order_idx is None:
+            order = None
+        else:
+            order = self.orders.pop(order_idx)
+        return order
+
+    def fulfill_order(self, recipe):
+        """
+        invoke this method on soup delivery
+        """
+        order_idx = self.matching_order_index(recipe=recipe)
+        if order_idx is None:
+            return None
+        order = self.orders[order_idx]
+        if order.is_temporary:
+            self.remove_order(order_idx=order_idx)
+        return order
+
+    def step(self):
+        """
+        use this method every timestep
+        """
+        reward = 0
+        order_ids_to_remove = []
+        for order in self.orders:
+            reward += order.step()
+            if order.is_expired:
+                order_ids_to_remove.append(order.order_id)
+        
+        for order_id in order_ids_to_remove:
+            self.remove_order(order_id=order_id)
+        
+        if self.is_adding_orders:
+            self.time_to_next_order -= 1
+            if self.time_to_next_order < 1:
+                self.add_random_orders(n=1)
+                self.time_to_next_order = self.add_new_order_every
+        return reward
+
+    @classmethod
+    def from_dict(cls, obj_dict):
+        return cls(**copy.deepcopy(obj_dict))
+
+    def to_dict(self):
+        return {"orders": [o.to_dict() for o in self.orders],
+                "add_new_order_every": self.add_new_order_every,
+                "time_to_next_order": self.time_to_next_order,
+                "orders_to_add": [o.to_dict() for o in self.orders_to_add]}
+
+    @classmethod
+    def from_recipes_lists(cls, all_orders_recipes, bonus_orders_recipes):
+        bonus_orders_recipes_serialized = set([json.dumps(d, sort_keys=True) for d in bonus_orders_recipes])
+        def is_in_bonus_recipes(d):
+            return json.dumps(d, sort_keys=True) in bonus_orders_recipes_serialized
+
+        bonus_orders = [Order(Recipe.from_dict(r), is_bonus=True) for r in bonus_orders_recipes]
+        non_bonus_orders = [Order(Recipe.from_dict(r)) for r in all_orders_recipes if not is_in_bonus_recipes(r)]
+
+        return cls(orders=bonus_orders+non_bonus_orders)
+
+    @staticmethod
+    def dict_to_all_recipes_dicts(d):
+        """
+        used to create Recipes config
+        """
+        all_orders = d.get("orders", []) + d.get("orders_to_add", [])
+        return delete_duplicates([o["recipe"] for o in all_orders])
+
 
 class ObjectState(object):
     """
@@ -595,25 +979,29 @@ class PlayerState(object):
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
-    def __init__(self, players, objects, bonus_orders=[], all_orders=[], timestep=0, **kwargs):
+    def __init__(self, players, objects, all_orders=[], bonus_orders=[], orders_list=None, timestep=0, **kwargs):
         """
         players (list(PlayerState)): Currently active PlayerStates (index corresponds to number)
         objects (dict({tuple:list(ObjectState)})):  Dictionary mapping positions (x, y) to ObjectStates. 
             NOTE: Does NOT include objects held by players (they are in 
             the PlayerState objects).
-        bonus_orders (list(dict)):   Current orders worth a bonus
-        all_orders (list(dict)):     Current orders allowed at all
         timestep (int):  The current timestep of the state
-
+        orders_list (OrdersList or dict):    Current orders list
+        bonus_orders (list(dict)):   Current orders worth a bonus (user) - legacy param, use orders_list instead
+        all_orders (list(dict)):     Current orders allowed at all - legacy param, use orders_list instead
         """
-        bonus_orders = [Recipe.from_dict(order) for order in bonus_orders]
-        all_orders = [Recipe.from_dict(order) for order in all_orders]
+
+        assert not ((all_orders or bonus_orders) and orders_list), "Use either legacy params 'all_orders' and 'bonus_orders' or new one 'orders_list', but not the both"
+        if not orders_list:
+            orders_list = OrdersList.from_recipes_lists(all_orders, bonus_orders)
+        elif not isinstance(orders_list, OrdersList):
+            orders_list = OrdersList(**orders_list)
+        self.orders_list = orders_list
+
         for pos, obj in objects.items():
             assert obj.position == pos
         self.players = tuple(players)
         self.objects = objects
-        self._bonus_orders = bonus_orders
-        self._all_orders = all_orders
         self.timestep = timestep
 
         assert len(set(self.bonus_orders)) == len(self.bonus_orders), "Bonus orders must not have duplicates"
@@ -677,11 +1065,17 @@ class OvercookedState(object):
 
     @property
     def all_orders(self):
-        return sorted(self._all_orders) if self._all_orders else sorted(Recipe.ALL_RECIPES)
+        """
+        returns all recipes from orders
+        """
+        return sorted(self.orders_list.all_recipes)
 
     @property
     def bonus_orders(self):
-        return sorted(self._bonus_orders)
+        """
+        returns all recipes from orders marked as bonus
+        """
+        return sorted(self.orders_list.bonus_recipes)
 
     def has_object(self, pos):
         return pos in self.objects
@@ -705,59 +1099,77 @@ class OvercookedState(object):
         return obj
 
     @classmethod
-    def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
+    def from_players_pos_and_or(cls, players_pos_and_or, orders_list=[], bonus_orders=[], all_orders=[]):
         """
         Make a dummy OvercookedState with no objects based on the passed in player
         positions and orientations and order list
         """
         return cls(
             [PlayerState(*player_pos_and_or) for player_pos_and_or in players_pos_and_or], 
-            objects={}, bonus_orders=bonus_orders, all_orders=all_orders)
+            objects={}, orders_list=orders_list, all_orders=all_orders, bonus_orders=bonus_orders)
 
     @classmethod
-    def from_player_positions(cls, player_positions, bonus_orders=[], all_orders=[]):
+    def from_player_positions(cls, player_positions, orders_list=[], all_orders=[], bonus_orders=[]):
         """
         Make a dummy OvercookedState with no objects and with players facing
         North based on the passed in player positions and order list
         """
         dummy_pos_and_or = [(pos, Direction.NORTH) for pos in player_positions]
-        return cls.from_players_pos_and_or(dummy_pos_and_or, bonus_orders, all_orders)
+        return cls.from_players_pos_and_or(dummy_pos_and_or, orders_list=orders_list, all_orders=all_orders, bonus_orders=bonus_orders)
 
     def deepcopy(self):
         return OvercookedState(
             players=[player.deepcopy() for player in self.players],
             objects={pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
-            bonus_orders=[order.to_dict() for order in self.bonus_orders],
-            all_orders=[order.to_dict() for order in self.all_orders],
+            orders_list=self.orders_list,
             timestep=self.timestep)
 
-    def time_independent_equal(self, other):
-        order_lists_equal = self.all_orders == other.all_orders and self.bonus_orders == other.bonus_orders
+    def time_equal(self, other):
+        return self.timestep == other.timestep
 
+    def players_equal(self, other):
+        return self.players == other.players
+
+    def objects_equal(self, other):
+        return set(self.objects.items()) == set(other.objects.items())
+
+    def order_lists_equal(self, other, ids_independent=False):
+        if ids_independent:
+            return ids_independent_equal(self.orders_list, other.orders_list)
+        else:
+            return self.orders_list == other.orders_list
+
+    def custom_equal(self, other, time_independent=False, ids_independent=False):
         return isinstance(other, OvercookedState) and \
-            self.players == other.players and \
-            set(self.objects.items()) == set(other.objects.items()) and \
-            order_lists_equal
+            self.players_equal(other) and \
+            self.objects_equal(other) and \
+            self.order_lists_equal(other, ids_independent) and \
+            (time_independent or self.time_equal(other))
+
+    def ids_independent_equal(self, other):
+        return self.custom_equal(other, ids_independent=True)
+
+    def time_independent_equal(self, other):
+        return self.custom_equal(other, time_independent=True)
 
     def __eq__(self, other):
-        return self.time_independent_equal(other) and self.timestep == other.timestep
+        return self.custom_equal(other)
 
     def __hash__(self):
-        order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
+        orders_list_hash = hash(self.orders_list)
         return hash(
-            (self.players, tuple(self.objects.values()), order_list_hash)
+            (self.players, tuple(self.objects.values()), orders_list_hash)
         )
 
     def __str__(self):
-        return 'Players: {}, Objects: {}, Bonus orders: {} All orders: {} Timestep: {}'.format( 
-            str(self.players), str(list(self.objects.values())), str(self.bonus_orders), str(self.all_orders), str(self.timestep))
+        return 'Players: {}, Objects: {}, Orders: {} Timestep: {}'.format(
+            str(self.players), str(list(self.objects.values())), str(self.orders_list), str(self.timestep))
 
     def to_dict(self):
         return {
             "players": [p.to_dict() for p in self.players],
             "objects": [obj.to_dict() for obj in self.objects.values()],
-            "bonus_orders": [order.to_dict() for order in self.bonus_orders],
-            "all_orders" : [order.to_dict() for order in self.all_orders],
+            "orders_list" : self.orders_list.to_dict(),
             "timestep" : self.timestep
         }
 
@@ -837,25 +1249,39 @@ class OvercookedGridworld(object):
     TODO: clean the organization of this class further.
     """
 
-
     #########################
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
+    def __init__(self, terrain, start_player_positions, rew_shaping_params=None, layout_name="unnamed_layout", start_orders_list=None, start_all_orders=[], start_bonus_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
         start_player_positions: tuple of positions for both players' starting positions
-        start_bonus_orders: List of recipes dicts that are worth a bonus 
         rew_shaping_params: reward given for completion of specific subgoals
-        all_orders: List of all available order dicts the players can make, defaults to all possible recipes if empy list provided
         num_items_for_soup: Maximum number of ingredients that can be placed in a soup
         order_bonus: Multiplicative factor for serving a bonus recipe
         start_state: Default start state returned by get_standard_start_state
+        start_orders_list: OrdersList dict or object
+        start_bonus_orders: Legacy param, use orders instead, list of recipes dicts that are worth a bonus
+        start_all_orders: Legacy param, use orders instead, list of all available order dicts the players can make, defaults to all possible recipes if empy list provided
         """
-        self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
-        self.start_all_orders = [r.to_dict() for r in Recipe.ALL_RECIPES] if not start_all_orders else start_all_orders
+        assert not (start_bonus_orders and start_orders_list), "Use either legacy param 'start_bonus_orders' or new one 'start_orders_list', but not the both"
+        if not start_orders_list:
+            self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
+            start_all_orders = [r.to_dict() for r in Recipe.ALL_RECIPES] if not start_all_orders else start_all_orders
+            start_orders_list = OrdersList.from_recipes_lists(start_all_orders, start_bonus_orders)
+        elif isinstance(start_orders_list, OrdersList):
+            if not start_all_orders:
+                start_all_orders = [r.to_dict() for r in start_orders_list.all_recipes]
+            self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
+        else:
+            if not start_all_orders:
+                start_all_orders = OrdersList.dict_to_all_recipes_dicts(start_orders_list)
+            self._configure_recipes(start_all_orders, num_items_for_soup, **kwargs)
+            start_orders_list = OrdersList(**start_orders_list)
+
+        self.start_orders_list = start_orders_list
         self.height = len(terrain)
         self.width = len(terrain[0])
         self.shape = (self.width, self.height)
@@ -863,7 +1289,6 @@ class OvercookedGridworld(object):
         self.terrain_pos_dict = self._get_terrain_type_pos_dict()
         self.start_player_positions = start_player_positions
         self.num_players = len(start_player_positions)
-        self.start_bonus_orders = start_bonus_orders
         self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
@@ -872,6 +1297,13 @@ class OvercookedGridworld(object):
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
 
+    @property
+    def start_all_orders(self):
+        return [r.to_dict() for r in self.start_orders_list.all_recipes]
+
+    @property
+    def start_bonus_orders(self):
+        return [r.to_dict() for r in self.start_orders_list.bonus_recipes]
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -950,19 +1382,24 @@ class OvercookedGridworld(object):
     def __eq__(self, other):
         return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
                 self.start_player_positions == other.start_player_positions and \
-                self.start_bonus_orders == other.start_bonus_orders and \
-                self.start_all_orders == other.start_all_orders and \
+                self.start_orders_list == other.start_orders_list and \
                 self.reward_shaping_params == other.reward_shaping_params and \
                 self.layout_name == other.layout_name
     
+    def ids_independent_equal(self, other):
+        return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
+                self.start_player_positions == other.start_player_positions and \
+                ids_independent_equal(self.start_orders_list, other.start_orders_list) and \
+                self.reward_shaping_params == other.reward_shaping_params and \
+                self.layout_name == other.layout_name
+
     def copy(self):
         return OvercookedGridworld(
             terrain=self.terrain_mtx.copy(),
             start_player_positions=self.start_player_positions,
-            start_bonus_orders=self.start_bonus_orders,
+            start_orders_list=copy.deepcopy(self.start_orders_list),
             rew_shaping_params=copy.deepcopy(self.reward_shaping_params),
             layout_name=self.layout_name,
-            start_all_orders=self.start_all_orders
         )
 
     @property
@@ -971,9 +1408,8 @@ class OvercookedGridworld(object):
             "layout_name": self.layout_name,
             "terrain": self.terrain_mtx,
             "start_player_positions": self.start_player_positions,
-            "start_bonus_orders": self.start_bonus_orders,
+            "start_orders_list": self.start_orders_list.to_dict(),
             "rew_shaping_params": copy.deepcopy(self.reward_shaping_params),
-            "start_all_orders" : self.start_all_orders
         }
 
 
@@ -1004,7 +1440,7 @@ class OvercookedGridworld(object):
         if self.start_state:
             return self.start_state
         start_state = OvercookedState.from_player_positions(
-            self.start_player_positions, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders
+            self.start_player_positions, orders_list=copy.deepcopy(self.start_orders_list),
         )
         return start_state
 
@@ -1016,7 +1452,7 @@ class OvercookedGridworld(object):
             else:
                 start_pos = self.start_player_positions
 
-            start_state = OvercookedState.from_player_positions(start_pos, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders)
+            start_state = OvercookedState.from_player_positions(start_pos, orders_list=copy.deepcopy(self.start_orders_list))
 
             if rnd_obj_prob_thresh == 0:
                 return start_state
@@ -1085,6 +1521,8 @@ class OvercookedGridworld(object):
 
         # Finally, environment effects
         self.step_environment_effects(new_state)
+        sparse_expired_orders_reward = new_state.orders_list.step()
+        sparse_env_reward = [sparse_expired_orders_reward]
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
@@ -1092,6 +1530,8 @@ class OvercookedGridworld(object):
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
+            "sparse_env_reward": sparse_env_reward,
+            "sparse_reward_sum": sum(sparse_reward_by_agent) + sum(sparse_env_reward)
         }
         if display_phi:
             assert motion_planner is not None, "motion planner must be defined if display_phi is true"
@@ -1211,21 +1651,22 @@ class OvercookedGridworld(object):
 
         return sparse_reward, shaped_reward
 
-    def get_recipe_value(self, state, recipe, discounted=False, base_recipe=None, potential_params={}):
+    def get_recipe_value(self, state, recipe, discounted=False, base_recipe=None, potential_params={}, steps_into_future=None, include_expire_penalty=True):
         """
-        Return the reward the player should receive for delivering this recipe
-
-        The player receives 0 if recipe not in all_orders, receives base value * order_bonus
-        if recipe is in bonus orders, and receives base value otherwise
+        Return the reward the player should receive for delivering this recipe after 'steps_into_future' timesteps (default None is for enabling calculation of timesteps),
+         by default includes expire penalty as it calculates the comparative value of the order from recipe with the value of letting the order to expire (if it's temporary order)
         """
         if not discounted:
-            if not recipe in state.all_orders:
+            matching_order = state.orders_list.get_matching_order(recipe=recipe, available_after_n_timesteps=steps_into_future or 0)
+            if not matching_order:
                 return 0
-            
-            if not recipe in state.bonus_orders:
-                return recipe.value
+            reward = matching_order.calculate_future_reward(steps_into_future or 0)
+            if matching_order.is_bonus:
+                reward *= self.order_bonus
 
-            return self.order_bonus * recipe.value
+            if include_expire_penalty:
+                reward += matching_order.expire_penalty
+            return reward
         else:
             # Calculate missing ingredients needed to complete recipe
             missing_ingredients = list(recipe.ingredients)
@@ -1234,10 +1675,13 @@ class OvercookedGridworld(object):
                 missing_ingredients.remove(ingredient)
             n_tomatoes = len([i for i in missing_ingredients if i == Recipe.TOMATO])
             n_onions = len([i for i in missing_ingredients if i == Recipe.ONION])
-
-            gamma, pot_onion_steps, pot_tomato_steps = potential_params['gamma'], potential_params['pot_onion_steps'], potential_params['pot_tomato_steps']
-
-            return gamma**recipe.time * gamma**(pot_onion_steps * n_onions) * gamma**(pot_tomato_steps * n_tomatoes) * self.get_recipe_value(state, recipe, discounted=False)
+            if steps_into_future is None:
+                gamma, pot_onion_steps, pot_tomato_steps = potential_params['gamma'], potential_params['pot_onion_steps'], potential_params['pot_tomato_steps']
+                steps_into_future = pot_onion_steps * n_onions + pot_tomato_steps * n_tomatoes + recipe.time
+            else:
+                gamma =  potential_params['gamma']
+            return gamma**steps_into_future * self.get_recipe_value(state, recipe, discounted=False, 
+                steps_into_future=steps_into_future, include_expire_penalty=include_expire_penalty)
 
     def deliver_soup(self, state, player, soup):
         """
@@ -1247,8 +1691,14 @@ class OvercookedGridworld(object):
         assert soup.name == 'soup', "Tried to deliver something that wasn't soup"
         assert soup.is_ready, "Tried to deliever soup that isn't ready"
         player.remove_object()
+        order = state.orders_list.fulfill_order(soup.recipe)
+        if not order:
+            return 0
+        reward = order.calculate_reward()
+        if order.is_bonus:
+            reward *= self.order_bonus
+        return reward
 
-        return self.get_recipe_value(state, soup.recipe)
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
@@ -1536,7 +1986,6 @@ class OvercookedGridworld(object):
             return best_recipe, best_value
         return best_recipe
 
-
     def get_optimal_possible_recipe(self, state, recipe, discounted=False, potential_params={}, return_value=False):
         """
         Return the best possible recipe that can be made starting with ingredients in `recipe`
@@ -1544,18 +1993,25 @@ class OvercookedGridworld(object):
         the recipe values are currently static (i.e. bonus_orders doesn't change). Would need to have cache
         flushed if order dynamics are introduced
         """
-        cache_valid = not discounted or self._prev_potential_params == potential_params
-        if not cache_valid:
+        save_cache = (not state.orders_list.contains_temporary_orders) and (not state.orders_list.is_adding_orders)
+        clear_cache = (discounted and self._prev_potential_params != potential_params) or not save_cache
+
+        if clear_cache:
             if discounted:
                 self._opt_recipe_discount_cache = {}
             else:
                 self._opt_recipe_cache = {}
-
-        if discounted:
-            cache = self._opt_recipe_discount_cache
-            self._prev_potential_params = potential_params
+        
+        if save_cache:
+            if discounted:
+                cache = self._opt_recipe_discount_cache
+            else:
+                cache = self._opt_recipe_cache
         else:
-            cache = self._opt_recipe_cache
+            cache = {}
+
+        if discounted and save_cache:
+            self._prev_potential_params = potential_params
 
         if recipe not in cache:
             # Compute best recipe now and store in cache for later use
@@ -1733,16 +2189,21 @@ class OvercookedGridworld(object):
     def is_potting_optimal(self, state, old_soup, new_soup):
         """
         True if the highest valued soup possible is the same before and after the potting
+        NOTE: It is not work perfectly for dynamic (temporary) orders - it does not take into account:
+            - optimal order of fulfilling orders (always takes most high value in the current moment)
+            - future orders that can be added to order list
+
         """
         old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
         new_recipe = Recipe(new_soup.ingredients)
         old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))
         new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
-        return old_val == new_val
+        return new_val >= old_val
 
     def is_potting_viable(self, state, old_soup, new_soup):
         """
         True if there exists a non-zero reward soup possible from new ingredients
+        NOTE: does not keep care about orders that did not appeared yet
         """
         new_recipe = Recipe(new_soup.ingredients)
         new_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, new_recipe))
@@ -1751,6 +2212,7 @@ class OvercookedGridworld(object):
     def is_potting_catastrophic(self, state, old_soup, new_soup):
         """
         True if no non-zero reward soup is possible from new ingredients
+        NOTE: does not keep care about orders that did not appeared yet
         """
         old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
         new_recipe = Recipe(new_soup.ingredients)
@@ -1761,6 +2223,7 @@ class OvercookedGridworld(object):
     def is_potting_useless(self, state, old_soup, new_soup):
         """
         True if ingredient added to a soup that was already gauranteed to be worth at most 0 points
+        NOTE: does not keep care about orders that did not appeared yet
         """
         old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
         old_val = self.get_recipe_value(state, self.get_optimal_possible_recipe(state, old_recipe))

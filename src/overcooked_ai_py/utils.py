@@ -171,3 +171,14 @@ def read_layout_dict(layout_name):
 
 def is_iterable(obj):
     return isinstance(obj, Iterable)
+
+# based on code from https://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-whilst-preserving-order
+def delete_duplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    def serialize_if_dict_or_list(d):
+        if isinstance(d, list) or isinstance(d, dict):
+            return json.dumps(d, sort_keys=True)
+        else:
+            return d
+    return [x for x in seq if not (serialize_if_dict_or_list(x) in seen or seen_add(serialize_if_dict_or_list(x)))]
