@@ -408,14 +408,14 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                assert len(state.all_orders) == 1, \
+                assert len(state.orders_list) == 1, \
                     "The current mid level action manager only support 3-onion-soup order, but got orders" \
-                    + str(state.all_orders)
-                next_order = list(state.all_orders)[0]
+                    + str(state.orders_list)
+                next_order = state.orders_list.orders_sorted_by_urgency()[0]
 
-                if 'onion' in next_order:
+                if 'onion' in next_order.recipe:
                     motion_goals = am.pickup_onion_actions(counter_objects)
-                elif 'tomato' in next_order:
+                elif 'tomato' in next_order.recipe:
                     motion_goals = am.pickup_tomato_actions(counter_objects)
                 else:
                     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)

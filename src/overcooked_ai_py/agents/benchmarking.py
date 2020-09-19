@@ -187,11 +187,14 @@ class AgentEvaluator(object):
             print("Skipping trajectory consistency checking because MDP was recognized as variable. "
                   "Trajectory consistency checking is not yet supported for variable MDPs.")
             return
-
+        
         _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)
 
         for idx in range(len(trajectories["ep_states"])):
             states, actions, rewards = trajectories["ep_states"][idx], trajectories["ep_actions"][idx], trajectories["ep_rewards"][idx]
+            if states[0].orders_list.is_adding_orders and len(states[0].orders_list.orders_to_add) > 1:
+                print("Skipping trajectory consistency checking for idx %i because orders are added at random" % idx)
+                return
             simulation_env = envs[idx]
 
             assert len(states) == len(actions) == len(rewards), "# states {}\t# actions {}\t# rewards {}".format(
@@ -205,7 +208,7 @@ class AgentEvaluator(object):
 
                 next_state, reward, done, info = simulation_env.step(actions[i])
 
-                assert states[i + 1] == next_state, "States differed (expected vs actual): {}\n\nexpected dict: \t{}\nactual dict: \t{}".format(
+                assert states[i + 1].ids_independent_equal(next_state), "States differed (expected vs actual): {}\n\nexpected dict: \t{}\nactual dict: \t{}".format(
                     simulation_env.display_states(states[i + 1], next_state), states[i+1].to_dict(), next_state.to_dict()
                 )
                 assert rewards[i] == reward, "{} \t {}".format(rewards[i], reward)

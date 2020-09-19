@@ -223,8 +223,7 @@ class OvercookedEnv(object):
         
         if done: self._add_episode_info(env_info)
 
-        timestep_sparse_reward = sum(mdp_infos["sparse_reward_by_agent"])
-        return (next_state, timestep_sparse_reward, done, env_info)
+        return (next_state, mdp_infos["sparse_reward_sum"], done, env_info)
 
     def lossless_state_encoding_mdp(self, state):
         """
@@ -261,7 +260,9 @@ class OvercookedEnv(object):
         events_dict = { k : [ [] for _ in range(self.mdp.num_players) ] for k in EVENT_TYPES }
         rewards_dict = {
             "cumulative_sparse_rewards_by_agent": np.array([0] * self.mdp.num_players),
-            "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
+            "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players),
+            "cumulative_sparse_env_rewards": np.array([0]),
+            "cumulative_sparse_rewards_sum": np.array([0])
         }
         self.game_stats = {**events_dict, **rewards_dict}
 
@@ -292,6 +293,8 @@ class OvercookedEnv(object):
         # TODO: This can be further simplified by having all the mdp_infos copied over to the env_infos automatically 
         env_info["sparse_r_by_agent"] = mdp_infos["sparse_reward_by_agent"]
         env_info["shaped_r_by_agent"] = mdp_infos["shaped_reward_by_agent"]
+        env_info["sparse_r_sum"] = mdp_infos["sparse_reward_sum"]
+        env_info["sparse_env_r"] = mdp_infos["sparse_env_reward"]
         env_info["phi_s"] = mdp_infos["phi_s"] if "phi_s" in mdp_infos else None
         env_info["phi_s_prime"] = mdp_infos["phi_s_prime"] if "phi_s_prime" in mdp_infos else None
         return env_info
@@ -299,8 +302,9 @@ class OvercookedEnv(object):
     def _add_episode_info(self, env_info):
         env_info["episode"] = {
             "ep_game_stats": self.game_stats,
-            "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
+            "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_sum"]),
             "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
+            "ep_sparse_env_r": sum(self.game_stats["cumulative_sparse_env_rewards"]),
             "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
             "ep_shaped_r_by_agent": self.game_stats["cumulative_shaped_rewards_by_agent"],
             "ep_length": self.state.timestep
@@ -314,6 +318,8 @@ class OvercookedEnv(object):
         """
         self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(infos["sparse_reward_by_agent"])
         self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(infos["shaped_reward_by_agent"])
+        self.game_stats["cumulative_sparse_env_rewards"] += np.array(infos["sparse_env_reward"])
+        self.game_stats["cumulative_sparse_rewards_sum"] += np.array([infos["sparse_reward_sum"]])
 
         for event_type, bool_list_by_agent in infos["event_infos"].items():
             # For each event type, store the timestep if it occurred
@@ -378,7 +384,7 @@ class OvercookedEnv(object):
         if include_final_state:
             trajectory.append((s_tp1, (None, None), 0, True, None))
 
-        total_sparse = sum(self.game_stats["cumulative_sparse_rewards_by_agent"])
+        total_sparse = sum(self.game_stats["cumulative_sparse_rewards_sum"])
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
         return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
 
