@@ -1,9 +1,9 @@
-import unittest, os
+import unittest, os, copy
 import json
 import numpy as np
 from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
-from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe
+from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe, Order, OrdersList
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent, RandomAgent
@@ -243,6 +243,447 @@ class TestDirection(unittest.TestCase):
         self.assertEqual(set(all_numbers), set(range(num_directions)))
 
 
+class TestOrder(unittest.TestCase):
+
+    def setUp(self):
+        Recipe.configure({})
+        self.onion_recipe = Recipe(["onion", "onion", "onion"])
+        self.onion_recipe_dict = Recipe(["onion", "onion", "onion"]).to_dict()
+        self.order_kwargs = dict(recipe=self.onion_recipe, time_to_expire=1, expire_penalty=2, base_reward=3,
+            linear_time_bonus_reward=4, order_id="5", is_bonus=True)
+
+
+    def test_init(self):
+        order_from_recipe_obj = Order(self.onion_recipe, order_id="123")
+        order_from_recipe_dict = Order(self.onion_recipe_dict, order_id="123")
+
+        self.assertEqual(order_from_recipe_obj, order_from_recipe_dict,
+            "creation of Order from recipe and recipe dict gives different result")
+        order_from_kwargs = Order(**self.order_kwargs)
+        for k, v in self.order_kwargs.items():
+            self.assertEqual(getattr(order_from_kwargs, k), v)
+
+
+    def test_serialization(self):
+        order = Order(**self.order_kwargs)
+        order_dict = order.to_dict()
+        deserialized_order = Order.from_dict(order_dict)
+        self.assertEqual(order, deserialized_order)
+
+
+    def test_properties(self):
+        default_params_order = order_from_recipe_obj = Order(self.onion_recipe)
+        self.assertEqual(order_from_recipe_obj.recipe, self.onion_recipe)
+
+        pernament_order = Order(self.onion_recipe, time_to_expire=None)
+        self.assertFalse(pernament_order.is_temporary)
+        self.assertFalse(pernament_order.is_expired)
+        temporary_order = Order(self.onion_recipe, time_to_expire=3)
+        self.assertTrue(temporary_order.is_temporary)
+        self.assertFalse(temporary_order.is_expired)
+        expired_order = Order(self.onion_recipe, time_to_expire=0)
+        self.assertTrue(expired_order.is_expired)
+
+        self.assertEqual(default_params_order.base_reward, self.onion_recipe.value)
+        custom_base_reward = 5678
+        base_reward_order = Order(self.onion_recipe, base_reward=custom_base_reward)
+        self.assertEqual(base_reward_order.base_reward, custom_base_reward)
+        base_reward_order.base_reward = custom_base_reward2 = 6789
+        self.assertEqual(base_reward_order.base_reward, custom_base_reward2)
+
+
+    def test_equalities(self):
+        order = Order(self.onion_recipe)
+        order2 = Order(self.onion_recipe)
+        self.assertTrue(order.ids_independent_equal(order2))
+        self.assertNotEqual(order, order2)
+        order3 = Order(self.onion_recipe, time_to_expire=3)
+        self.assertFalse(order.ids_independent_equal(order3))
+        self.assertNotEqual(order, order3)
+        order4 = Order(self.onion_recipe, expire_penalty=4)
+        self.assertFalse(order.ids_independent_equal(order4))
+        self.assertNotEqual(order, order4)
+        order5 = Order(self.onion_recipe, base_reward=5)
+        self.assertFalse(order.ids_independent_equal(order5))
+        self.assertNotEqual(order, order5)
+        order6 = Order(self.onion_recipe, linear_time_bonus_reward=6)
+        self.assertFalse(order.ids_independent_equal(order6))
+        self.assertNotEqual(order, order6)
+        order7 = Order(self.onion_recipe, is_bonus=True)
+        self.assertFalse(order.ids_independent_equal(order7))
+        self.assertNotEqual(order, order7)
+
+
+    def test_calculate_reward(self):
+        timesteps_in_near_future = 3
+        timesteps_in_far_future = 999
+        linear_time_bonus_reward = 2.0
+        temporary_order_expire_time = 12
+        pernament_order = Order(self.onion_recipe, time_to_expire=None)
+        temporary_order = Order(self.onion_recipe, time_to_expire=temporary_order_expire_time, linear_time_bonus_reward=linear_time_bonus_reward)
+
+        self.assertEqual(pernament_order.calculate_reward(), self.onion_recipe.value)
+        self.assertEqual(pernament_order.calculate_reward(), pernament_order.calculate_future_reward(0))
+        self.assertEqual(pernament_order.calculate_reward(), pernament_order.calculate_future_reward(999))
+
+        self.assertEqual(temporary_order.calculate_reward(), self.onion_recipe.value + temporary_order_expire_time * linear_time_bonus_reward )
+        self.assertEqual(temporary_order.calculate_reward(), temporary_order.calculate_future_reward(0))
+        self.assertEqual(temporary_order.base_reward + (temporary_order_expire_time - timesteps_in_near_future)*linear_time_bonus_reward,
+         temporary_order.calculate_future_reward(timesteps_in_near_future))
+        self.assertEqual(0,
+            temporary_order.calculate_future_reward(timesteps_in_far_future))
+
+        pernament_order.base_reward = temporary_order.base_reward = custom_base_reward = 5678
+        self.assertEqual(pernament_order.calculate_reward(), custom_base_reward)
+        self.assertEqual(pernament_order.calculate_reward(), pernament_order.calculate_future_reward(0))
+        self.assertEqual(pernament_order.calculate_reward(), pernament_order.calculate_future_reward(999))
+
+        self.assertEqual(temporary_order.calculate_reward(), custom_base_reward + temporary_order_expire_time * linear_time_bonus_reward)
+        self.assertEqual(temporary_order.calculate_reward(), temporary_order.calculate_future_reward(0))
+        self.assertEqual(temporary_order.base_reward + (temporary_order_expire_time - timesteps_in_near_future)*linear_time_bonus_reward,
+         temporary_order.calculate_future_reward(timesteps_in_near_future))
+        self.assertEqual(0,
+            temporary_order.calculate_future_reward(timesteps_in_far_future))
+
+
+    def test_step(self):
+        pernament_order = Order(self.onion_recipe, time_to_expire=None)
+        for _ in range(100):
+            reward = pernament_order.step()
+            self.assertEqual(reward, 0)
+
+        expiring_order = Order(self.onion_recipe, time_to_expire=8)
+        for i in range(10):
+            if i < 8:
+                reward = expiring_order.step()
+                if i == 8:
+                    self.assertEqual(reward, 0)
+                else:
+                    self.assertEqual(reward, 0)
+            else:
+                self.assertRaises(AssertionError, expiring_order.step)
+
+
+    def test_will_be_expired_in(self):
+        pernament_order = Order(self.onion_recipe, time_to_expire=None)
+        self.assertFalse(pernament_order.will_be_expired_in(9999))
+        expiring_order = Order(self.onion_recipe, time_to_expire=8)
+        self.assertTrue(expiring_order.will_be_expired_in(9))
+        self.assertFalse(pernament_order.will_be_expired_in(7))
+
+
+class TestOrdersList(unittest.TestCase):
+    def setUp(self):
+        Recipe.configure({})
+        self.example_orders = [
+            Order(recipe=Recipe(["onion", "onion", "onion"])),
+            Order(recipe=Recipe(["tomato", "tomato", "tomato"]), is_bonus=True),
+            Order(recipe=Recipe(["onion", "onion"]), time_to_expire=5, expire_penalty=4, base_reward=3, linear_time_bonus_reward=2, is_bonus=True)
+            ]
+        self.example_orders_recipes = [o.recipe for o in self.example_orders]
+        self.example_non_bonus_orders = self.example_orders[:1]
+        self.example_bonus_orders = self.example_orders[1:]
+        self.example_orders_to_add = [
+            Order(recipe=Recipe(["onion", "onion", "tomato"]), time_to_expire=6, expire_penalty=5, base_reward=4, linear_time_bonus_reward=3, is_bonus=True),
+            Order(recipe=Recipe(["onion", "tomato", "tomato"]), time_to_expire=7, expire_penalty=6, base_reward=5, linear_time_bonus_reward=4),
+            Order(recipe=Recipe(["onion", "onion"]), time_to_expire=8, expire_penalty=7, base_reward=6, linear_time_bonus_reward=5, is_bonus=True)
+        ]
+        self.example_orders_to_add_recipes = [o.recipe for o in self.example_orders_to_add]
+        self.example_bonus_recipes = [Recipe(["onion", "onion"]),
+            Recipe(["onion", "onion", "tomato"]),
+            Recipe(["tomato", "tomato", "tomato"])] # copied directly from example_orders and example_orders_to_add
+
+        self.example_orders_list_kwargs = dict(orders=self.example_orders,
+         orders_to_add=self.example_orders_to_add, add_new_order_every=6,
+          time_to_next_order=4
+        )
+        self.example_orders_list = OrdersList(**self.example_orders_list_kwargs)
+        self.empty_orders_list = OrdersList([])
+        self.recipe_outside_orders_list = Recipe(["onion"])
+
+
+    def test_init(self):
+        self.assertCountEqual(self.example_orders, self.example_orders_list.orders)
+        self.assertCountEqual(self.example_orders_to_add, self.example_orders_list.orders_to_add)
+        self.assertEqual(42, OrdersList(add_new_order_every=42, orders_to_add=self.example_orders_to_add).add_new_order_every)
+        self.assertEqual(34, OrdersList(time_to_next_order=34, orders_to_add=self.example_orders_to_add).time_to_next_order)
+
+        self.assertRaises(AssertionError, lambda kwargs: OrdersList(**kwargs), {"add_new_order_every":-1 })
+        self.assertRaises(AssertionError, lambda kwargs: OrdersList(**kwargs), {"add_new_order_every":10, "orders_to_add": []})
+        self.assertRaises(AssertionError, lambda kwargs: OrdersList(**kwargs), {"time_to_next_order":10, "orders_to_add": []})
+
+
+    def test_equalities(self):
+        example_orders_list_copy = copy.deepcopy(self.example_orders_list)
+        for order in example_orders_list_copy.orders:
+            order.order_id = Order.create_order_id()
+        self.assertNotEqual(example_orders_list_copy, self.example_orders_list)
+        self.assertTrue(example_orders_list_copy.ids_independent_equal(self.example_orders_list))
+        example_orders_list_copy.add_new_order_every = 99
+        self.assertFalse(example_orders_list_copy.ids_independent_equal(self.example_orders_list))
+        example_orders_list_copy.add_new_order_every = self.example_orders_list.add_new_order_every
+        example_orders_list_copy.time_to_next_order = 99
+        self.assertFalse(example_orders_list_copy.ids_independent_equal(self.example_orders_list))
+
+
+    def test_properties(self):
+        self.assertCountEqual(self.example_orders_list.all_recipes,
+            set(self.example_orders_to_add_recipes+self.example_orders_recipes))
+        self.assertCountEqual(self.example_bonus_recipes, self.example_orders_list.bonus_recipes)
+
+        self.assertTrue(self.example_orders_list.is_adding_orders)
+        not_adding_orders_kwargs = copy.deepcopy(self.example_orders_list_kwargs)
+        not_adding_orders_kwargs["add_new_order_every"] = None
+        not_adding_orders_list = OrdersList(**not_adding_orders_kwargs)
+        self.assertFalse(not_adding_orders_list.is_adding_orders)
+        self.assertRaises(AttributeError, lambda x: setattr(not_adding_orders_list, "is_adding_orders", x), True)
+
+        self.assertTrue(self.example_orders_list.contains_temporary_orders)
+        not_temporary_orders_list = OrdersList([Order(Recipe(["onion", "onion", "onion"]))])
+        self.assertFalse(not_temporary_orders_list.contains_temporary_orders)
+
+        self.assertCountEqual(self.example_orders_list.bonus_orders, self.example_bonus_orders)
+        self.assertRaises(AttributeError, lambda x: setattr(self.example_orders_list, "bonus_orders", x), self.example_bonus_orders)
+
+        self.assertCountEqual(self.example_orders_list.non_bonus_orders, self.example_non_bonus_orders)
+        self.assertRaises(AttributeError, lambda x: setattr(self.example_orders_list, "non_bonus_orders", x), self.example_non_bonus_orders)
+
+
+    def test_builtin_functions(self):
+        _ = str(self.example_orders_list)
+        _ = repr(self.example_orders_list)
+        _ = hash(self.example_orders_list)
+        self.assertTrue(bool(self.example_orders_list))
+
+        self.assertFalse(bool(self.empty_orders_list))
+        #self.assertCountEqual(list(self.example_orders_list), self.example_orders_list.orders) # testing __iter__
+        self.assertEqual(len(self.example_orders_list), 3)
+        self.assertEqual(self.example_orders_list, copy.deepcopy(self.example_orders_list))
+
+
+    def test_orders_sorting(self):
+        temporary_order = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=2, order_id="123", base_reward=100)
+        pernament_order1 = Order(recipe=Recipe(["onion", "onion", "onion"]), time_to_expire=None, order_id="234", base_reward=50)
+        pernament_order2 = Order(recipe=Recipe(["tomato", "tomato", "onion"]), time_to_expire=None, order_id="345", base_reward=20)
+        orders_list = OrdersList([pernament_order1, temporary_order, pernament_order2])
+        self.assertEqual(temporary_order, orders_list.orders_sorted_by_urgency()[0])
+        self.assertEqual(temporary_order, orders_list.orders_sorted_by_urgency(1)[0])
+        self.assertEqual(1, orders_list.enumerated_orders_sorted_by_urgency(1)[0][0])
+        self.assertEqual(pernament_order1, orders_list.orders_sorted_by_urgency(2)[0])
+        self.assertEqual(0, orders_list.enumerated_orders_sorted_by_urgency(2)[0][0])
+
+        temporary_order1 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=2, order_id="123", base_reward=100)
+        temporary_order2 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=1, order_id="234", base_reward=50)
+        temporary_order3 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=3, order_id="345", base_reward=20)
+        orders_list = OrdersList([temporary_order1, temporary_order2, temporary_order3])
+        self.assertEqual(temporary_order2, orders_list.orders_sorted_by_urgency()[0])
+        self.assertEqual(1, orders_list.enumerated_orders_sorted_by_urgency()[0][0])
+
+        temporary_order1 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=10, order_id="123", base_reward=30)
+        temporary_order2 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=10, order_id="234", base_reward=100)
+        temporary_order3 = Order(recipe=Recipe(["tomato", "onion", "onion"]), time_to_expire=10, order_id="345", base_reward=20)
+        orders_list = OrdersList([temporary_order1, temporary_order2, temporary_order3])
+        self.assertEqual(temporary_order2, orders_list.orders_sorted_by_urgency()[0])
+        self.assertEqual(1, orders_list.enumerated_orders_sorted_by_urgency(2)[0][0])
+        self.assertEqual(temporary_order2, orders_list.orders_sorted_by_urgency(999)[0])
+        self.assertEqual(1, orders_list.enumerated_orders_sorted_by_urgency(999)[0][0])
+
+        default_sorting_f = OrdersList._order_urgency_sort_key
+        new_sorting_f = lambda x, n_timesteps_into_future: x.order_id
+        OrdersList._order_urgency_sort_key = new_sorting_f
+        self.assertEqual(temporary_order3, orders_list.orders_sorted_by_urgency()[0])
+        self.assertEqual(2, orders_list.enumerated_orders_sorted_by_urgency()[0][0])
+        self.assertEqual(temporary_order3, orders_list.orders_sorted_by_urgency(999)[0])
+        self.assertEqual(2, orders_list.enumerated_orders_sorted_by_urgency(999)[0][0])
+        OrdersList._order_urgency_sort_key = default_sorting_f
+
+
+    def test_get_matching_order(self):
+        for i, order in enumerate(self.example_orders):
+            self.assertEqual(i, self.example_orders_list.matching_order_index(recipe=order.recipe))
+            self.assertEqual(order, self.example_orders_list.get_matching_order(recipe=order.recipe))
+
+            self.assertEqual(i, self.example_orders_list.matching_order_index(order_id=order.order_id))
+            self.assertEqual(order, self.example_orders_list.get_matching_order(order_id=order.order_id))
+            for order_temporary in [order.is_temporary, None]:
+                self.assertEqual(i, self.example_orders_list.matching_order_index(recipe=order.recipe, temporary_order=order_temporary))
+                self.assertEqual(order, self.example_orders_list.get_matching_order(recipe=order.recipe, temporary_order=order_temporary))
+
+                self.assertEqual(i, self.example_orders_list.matching_order_index(order_id=order.order_id, temporary_order=order_temporary))
+                self.assertEqual(order, self.example_orders_list.get_matching_order(order_id=order.order_id, temporary_order=order_temporary))
+        order_temporary = not order.is_temporary
+        self.assertIsNone(self.example_orders_list.matching_order_index(recipe=order.recipe, temporary_order=order_temporary))
+        self.assertIsNone(self.example_orders_list.get_matching_order(recipe=order.recipe, temporary_order=order_temporary))
+
+        self.assertIsNone(self.example_orders_list.matching_order_index(order_id=order.order_id, temporary_order=order_temporary))
+        self.assertIsNone(self.example_orders_list.get_matching_order(order_id=order.order_id, temporary_order=order_temporary))
+
+
+    def test_adding_orders(self):
+        orders_list1 = copy.deepcopy(self.empty_orders_list)
+        for i, order in enumerate(self.example_orders):
+            orders_list1.add_order(order)
+            self.assertCountEqual(orders_list1.orders, self.example_orders[:i+1])
+
+        orders_list2 = copy.deepcopy(self.empty_orders_list)
+        orders_list2.add_orders(self.example_orders)
+        self.assertCountEqual(orders_list1.orders, orders_list2.orders)
+
+        orders_list = copy.deepcopy(self.example_orders_list)
+        for i in range(100):
+            orders_list.add_random_orders()
+        self.assertEqual(len(orders_list.orders), len(set([o.order_id for o in orders_list.orders])),
+            "order_ids are not unique when using add_random_orders_method")
+
+        for order_to_add in self.example_orders_to_add:
+            self.assertIsNotNone(orders_list.get_matching_order(recipe=order_to_add.recipe, most_urgent=False),
+                "not every order_to_add was added despite many addings (something wrong with randomness?)")
+
+        # we will assume orders are different by its time_to_expire values
+        orders_to_add_expire_times = set([o.time_to_expire for o in self.example_orders_to_add])
+        assert len(orders_to_add_expire_times) == len(self.example_orders_to_add)
+        assert not any((o.time_to_expire in orders_to_add_expire_times) for o in self.example_orders_list.orders)
+        for i in range(100):
+            orders_list = copy.deepcopy(self.example_orders_list)
+            orders_list.add_random_orders(2, replace=False)
+            self.assertEqual(len(self.example_orders_list)+2, len(orders_list))
+            for order_to_add in self.example_orders_to_add:
+                self.assertTrue(sum(order_to_add.time_to_expire == order.time_to_expire for order in orders_list.orders) < 2,
+                "some order was added more than once despite replace=False")
+
+        added_more_than_once = False
+        for i in range(100):
+            orders_list = copy.deepcopy(self.example_orders_list)
+            orders_list.add_random_orders(2, replace=True)
+            for order_to_add in self.example_orders_to_add:
+                if sum(order_to_add.time_to_expire == order.time_to_expire for order in orders_list.orders) > 1:
+                    added_more_than_once=True
+                    break
+        self.assertTrue(added_more_than_once, "same orders_to_add were never added more than once despite replace=True")
+
+        orders_list = copy.deepcopy(self.empty_orders_list)
+        pernament_order1 = copy.deepcopy(self.example_orders[0])
+        pernament_order1.order_id = "123"
+        pernament_order2 = copy.deepcopy(self.example_orders[0])
+        pernament_order2.order_id = "234"
+        orders_list.add_order(pernament_order1)
+        self.assertRaises(AssertionError, orders_list.add_order, pernament_order2)
+
+        assert self.example_orders[0].recipe != self.example_orders[1].recipe
+        orders_list = copy.deepcopy(self.empty_orders_list)
+        duplicated_order_id = "123"
+        pernament_order1 = copy.deepcopy(self.example_orders[0])
+        pernament_order1.order_id = duplicated_order_id
+        pernament_order2 = copy.deepcopy(self.example_orders[1])
+        pernament_order2.order_id = duplicated_order_id
+        orders_list.add_order(pernament_order1)
+        self.assertRaises(AssertionError, orders_list.add_order, pernament_order2)
+
+    def test_remove_order(self):
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertIsNone(orders_list.remove_order(order_id="unexisting_order_id"))
+        self.assertIsNone(orders_list.remove_order(recipe=self.recipe_outside_orders_list))
+
+        pernament_order = self.example_orders[0]
+        assert not pernament_order.is_temporary
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertIsNone(orders_list.remove_order(recipe=pernament_order.recipe, temporary_order=True))
+        self.assertEqual(pernament_order, orders_list.remove_order(recipe=pernament_order.recipe, temporary_order=False))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertEqual(pernament_order, orders_list.remove_order(recipe=pernament_order.recipe, temporary_order=None))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertIsNone(orders_list.remove_order(order_id=orders_list.orders[0].order_id, temporary_order=True))
+        self.assertEqual(pernament_order, orders_list.remove_order(order_id=orders_list.orders[0].order_id, temporary_order=False))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertEqual(pernament_order, orders_list.remove_order(order_id=orders_list.orders[0].order_id, temporary_order=None))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+
+        temporary_order = self.example_orders[2]
+        assert temporary_order.is_temporary
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertIsNone(orders_list.remove_order(recipe=temporary_order.recipe, temporary_order=False))
+        self.assertEqual(temporary_order, orders_list.remove_order(recipe=temporary_order.recipe, temporary_order=True))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertEqual(temporary_order, orders_list.remove_order(recipe=temporary_order.recipe, temporary_order=None))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertIsNone(orders_list.remove_order(order_id=orders_list.orders[2].order_id, temporary_order=False))
+        self.assertEqual(temporary_order, orders_list.remove_order(order_id=orders_list.orders[2].order_id, temporary_order=True))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        orders_list = copy.deepcopy(self.example_orders_list)
+        self.assertEqual(temporary_order, orders_list.remove_order(order_id=orders_list.orders[2].order_id, temporary_order=None))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+
+
+    def test_order_fulfilling(self):
+        orders_list = copy.deepcopy(self.example_orders_list)
+        pernament_order = self.example_orders[0]
+        assert not pernament_order.is_temporary
+        temporary_order = self.example_orders[2]
+        assert temporary_order.is_temporary
+        self.assertIsNone(orders_list.fulfill_order(recipe=self.recipe_outside_orders_list))
+
+        self.assertEqual(pernament_order, orders_list.fulfill_order(recipe=pernament_order.recipe))
+        self.assertEqual(len(orders_list), len(self.example_orders_list))
+
+        self.assertEqual(temporary_order, orders_list.fulfill_order(recipe=temporary_order.recipe))
+        self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
+        list_with_removed_order = copy.deepcopy(self.example_orders_list)
+        list_with_removed_order.remove_order(recipe=temporary_order.recipe)
+        self.assertTrue(list_with_removed_order.ids_independent_equal(orders_list))
+        self.assertIsNone(orders_list.fulfill_order(recipe=temporary_order.recipe))
+
+
+    def test_step(self):
+        # testing if time_to_next_order resets properly
+        orders_list = copy.deepcopy(self.example_orders_list)
+        first_order_in = orders_list.time_to_next_order
+        for i in range(100):
+            self.assertEqual(orders_list.time_to_next_order%orders_list.add_new_order_every,
+             (first_order_in-i)%orders_list.add_new_order_every)
+            self.assertLessEqual(orders_list.time_to_next_order, orders_list.add_new_order_every)
+            self.assertGreater(orders_list.time_to_next_order, 0)
+            orders_list.step()
+
+        # testing if adding new orders works ok
+        orders_list = OrdersList(orders=[], orders_to_add=[(Order(Recipe(["onion"]), time_to_expire=9999))],
+            add_new_order_every=5)
+        for i in range(100):
+            self.assertEqual(len(orders_list), int(i/orders_list.add_new_order_every))
+            orders_list.step()
+
+        # testing if expiring orders works ok
+        orders_list = copy.deepcopy(self.empty_orders_list)
+        for i in range(1, 51):
+            orders_list.add_order(Order(Recipe(["onion"]), time_to_expire=2*i))
+
+        for i in range(100):
+            self.assertEqual(len(orders_list), 50-int(i/2))
+            orders_list.step()
+
+
+    def test_serialization(self):
+        orders_list_dict = self.example_orders_list.to_dict()
+        deserialized_orders_list = OrdersList.from_dict(orders_list_dict)
+        self.assertEqual(self.example_orders_list, deserialized_orders_list)
+
+
+    def test_from_recipes_list(self):
+        non_bonus_orders_recipes = [Recipe(["onion"]).to_dict(), Recipe(["tomato"]).to_dict()]
+        bonus_orders_recipes = [Recipe(["onion", "onion"]).to_dict(), Recipe(["tomato", "tomato"]).to_dict()]
+        all_orders_recipes = bonus_orders_recipes + non_bonus_orders_recipes
+        orders_list = OrdersList.from_recipes_lists(all_orders_recipes, bonus_orders_recipes)
+        self.assertCountEqual([r.to_dict() for r in orders_list.all_recipes], all_orders_recipes)
+        self.assertCountEqual([r.to_dict() for r in orders_list.bonus_recipes], bonus_orders_recipes)
+
+    def test_dict_to_all_recipes_dicts(self):
+        self.assertCountEqual(OrdersList.dict_to_all_recipes_dicts(self.example_orders_list.to_dict()), [r.to_dict() for r in self.example_orders_list.all_recipes])
+
+
 class TestGridworld(unittest.TestCase):
 
     # TODO: write more smaller targeted tests to be loaded from jsons
@@ -299,7 +740,7 @@ class TestGridworld(unittest.TestCase):
         # save_as_json(actual_start_state.to_dict(), expected_state_path)
 
         expected_start_state = OvercookedState.from_dict(load_from_json(expected_state_path))
-        self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
+        self.assertTrue(actual_start_state.ids_independent_equal(expected_start_state), '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_file_constructor(self):
         mdp = OvercookedGridworld.from_layout_name('corridor')
@@ -307,7 +748,7 @@ class TestGridworld(unittest.TestCase):
             [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)], {},
             all_orders=[{ "ingredients" : ["onion", "onion", "onion"]}])
         actual_start_state = mdp.get_standard_start_state()
-        self.assertEqual(actual_start_state, expected_start_state, '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
+        self.assertTrue(actual_start_state.ids_independent_equal(expected_start_state), '\n' + str(actual_start_state) + '\n' + str(expected_start_state))
 
     def test_actions(self):
         bad_state = OvercookedState(
@@ -353,13 +794,14 @@ class TestGridworld(unittest.TestCase):
             expected_reward = expected['reward']
             
             # Make sure everything lines up (note __eq__ is transitive)
-            self.assertTrue(pred_state.time_independent_equal(expected_state), '\n' + str(pred_state) + '\n' + str(expected_state))
+            self.assertTrue(pred_state.custom_equal(expected_state, time_independent=True, ids_independent=True), '\n' + str(pred_state) + '\n' + str(expected_state))
             self.assertEqual(sparse_reward, expected_reward)
 
         expected_path = os.path.join(TESTING_DATA_DIR, "test_transitions_and_environments", "expected.json")
 
         # NOTE: set 'recompute=True' if deliberately updating state dynamics
         check_transition([n, e], expected_path, recompute=False)
+
 
     def test_mdp_dynamics(self):
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_mdp_dynamics', 'expected.json')
@@ -369,6 +811,7 @@ class TestGridworld(unittest.TestCase):
 
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
         AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
+
 
     def test_mdp_serialization(self):
         # Where to store serialized states -- will be overwritten each timestep
@@ -391,14 +834,209 @@ class TestGridworld(unittest.TestCase):
                 # Advance state
                 joint_action, _ = zip(*random_pair.joint_action(state))
                 state, infos = self.base_mdp.get_state_transition(state, joint_action)
-                sparse_reward += sum(infos['sparse_reward_by_agent'])
-            seed += 1
+                sparse_reward += infos['sparse_reward_sum']
+
 
     def test_four_player_mdp(self):
         try:
             OvercookedGridworld.from_layout_name("multiplayer_schelling")
         except AssertionError as e:
             print("Loading > 2 player map failed with error:", e)
+
+
+    def test_state_orders_list(self):
+        all_orders_dicts = [Recipe(["onion", "onion", "onion"]).to_dict(), Recipe(["tomato", "tomato", "tomato"]).to_dict()]
+        bonus_orders_dicts = [ Recipe(["tomato", "tomato", "tomato"]).to_dict()]
+
+        all_orders = [Recipe.from_dict(d) for d in all_orders_dicts]
+        bonus_orders = [Recipe.from_dict(d) for d in bonus_orders_dicts]
+
+        players = [PlayerState((3, 1), Direction.NORTH), PlayerState((10, 1), Direction.NORTH)]
+        objects = {}
+        state = OvercookedState(players, objects, all_orders=all_orders_dicts)
+        self.assertCountEqual(state.all_orders, all_orders)
+        state = OvercookedState(players, objects, all_orders=all_orders_dicts, bonus_orders=bonus_orders_dicts)
+        self.assertCountEqual(state.bonus_orders, bonus_orders)
+        self.assertCountEqual(state.all_orders, all_orders)
+
+        state2 = OvercookedState(players, objects,
+            orders_list=OrdersList.from_recipes_lists(all_orders_dicts, bonus_orders_dicts))
+        self.assertTrue(state.ids_independent_equal(state2))
+        state3 = OvercookedState(players, objects,
+            orders_list=OrdersList.from_recipes_lists(all_orders_dicts, bonus_orders_dicts).to_dict())
+        self.assertTrue(state.ids_independent_equal(state3))
+
+        state_error_kwargs = {"players": players, "objects": objects, "all_orders": all_orders_dicts, "orders_list": state.orders_list}
+        self.assertRaises(AssertionError, lambda kwargs: OvercookedState(**kwargs), state_error_kwargs)
+        state_error_kwargs = {"players": players, "objects": objects, "bonus_orders": bonus_orders_dicts, "orders_list": state.orders_list}
+        self.assertRaises(AssertionError, lambda kwargs: OvercookedState(**kwargs), state_error_kwargs)
+
+
+    def test_gridworld_orders_list(self):
+        def standardize_recipes_dicts_list_format(dicts_list):
+            return [Recipe.from_dict(r).to_dict() for r in dicts_list]
+
+        terrain = [['X', 'X', 'P', 'X', 'X'],
+                   ['O', ' ', ' ', '2', 'O'],
+                   ['T', '1', ' ', ' ', 'T'],
+                   ['X', 'D', 'P', 'S', 'X']]
+
+        start_all_orders = [
+            { "ingredients" : ["onion"]},
+            { "ingredients" : ["onion", "onion", "onion"]},
+            { "ingredients" : ["onion", "tomato", "onion"]}]
+        start_all_orders = standardize_recipes_dicts_list_format(start_all_orders)
+        start_bonus_orders = [
+            { "ingredients" : ["onion", "tomato", "onion"]}]
+        start_bonus_orders = standardize_recipes_dicts_list_format(start_bonus_orders)
+        orders_list_no_bonus = OrdersList.from_recipes_lists(start_all_orders, [])
+        orders_list = OrdersList.from_recipes_lists(start_all_orders, start_bonus_orders)
+
+        mdp = OvercookedGridworld.from_grid(terrain,
+            base_layout_params={"start_all_orders": start_all_orders})
+        self.assertCountEqual(mdp.start_all_orders, start_all_orders)
+        self.assertCountEqual(mdp.start_bonus_orders, [])
+        self.assertTrue(mdp.start_orders_list.ids_independent_equal(orders_list_no_bonus))
+
+        mdp = OvercookedGridworld.from_grid(terrain,
+            base_layout_params={"start_all_orders": start_all_orders,
+            "start_bonus_orders":start_bonus_orders})
+        self.assertCountEqual(mdp.start_all_orders, start_all_orders)
+        self.assertCountEqual(mdp.start_bonus_orders, start_bonus_orders)
+        self.assertTrue(mdp.start_orders_list.ids_independent_equal(orders_list))
+
+        mdp = OvercookedGridworld.from_grid(terrain,
+            base_layout_params={"start_orders_list": copy.deepcopy(orders_list)})
+        self.assertCountEqual(mdp.start_all_orders, start_all_orders)
+        self.assertCountEqual(mdp.start_bonus_orders, start_bonus_orders)
+        self.assertTrue(mdp.start_orders_list.ids_independent_equal(orders_list))
+
+        self.assertRaises(AssertionError, lambda args: OvercookedGridworld.from_grid(*args),
+        [terrain, {"start_orders_list": copy.deepcopy(orders_list),
+                    "start_bonus_orders": start_all_orders}])
+
+
+    def test_get_recipe_value(self):
+        mdp = OvercookedGridworld.from_layout_name("mdp_test")
+        recipe_outside_orders_list = Recipe(["tomato", "tomato", "tomato"])
+        non_bonus_recipe = [o.recipe for o in mdp.start_orders_list.non_bonus_orders if len(o.recipe.ingredients) > 1][0]
+        almost_non_bonus_recipe = Recipe(non_bonus_recipe.ingredients[:-1])
+        bonus_recipe = mdp.start_orders_list.bonus_orders[0].recipe
+        almost_bonus_recipe = Recipe(bonus_recipe.ingredients[:-1])
+        state = mdp.get_standard_start_state()
+        assert state.orders_list.get_matching_order(recipe=recipe_outside_orders_list) is None
+
+        self.assertEqual(non_bonus_recipe.value, mdp.get_recipe_value(state, non_bonus_recipe))
+        self.assertEqual(non_bonus_recipe.value, mdp.get_recipe_value(state, non_bonus_recipe, steps_into_future=999))
+        self.assertEqual(bonus_recipe.value*mdp.order_bonus, mdp.get_recipe_value(state, bonus_recipe))
+        self.assertEqual(bonus_recipe.value*mdp.order_bonus, mdp.get_recipe_value(state, bonus_recipe, steps_into_future=999))
+        self.assertEqual(0, mdp.get_recipe_value(state, recipe_outside_orders_list))
+        gamma, pot_onion_steps, pot_tomato_steps = 0.99, 5, 10 # these may not represent true values for mdp_test layout
+        potential_params = {"gamma": gamma, "pot_onion_steps": pot_onion_steps, "pot_tomato_steps": pot_tomato_steps}
+        steps_into_future = 20
+        self.assertEqual(gamma**(pot_onion_steps+non_bonus_recipe.time) * non_bonus_recipe.value,
+            mdp.get_recipe_value(state, non_bonus_recipe, discounted=True, base_recipe=almost_non_bonus_recipe,
+            potential_params=potential_params
+        ))
+        self.assertEqual(gamma**steps_into_future * non_bonus_recipe.value,
+            mdp.get_recipe_value(state, non_bonus_recipe, discounted=True, base_recipe=almost_non_bonus_recipe,
+            potential_params=potential_params, steps_into_future=steps_into_future
+        ))
+        self.assertEqual(gamma**(pot_tomato_steps+bonus_recipe.time) * bonus_recipe.value * mdp.order_bonus,
+            mdp.get_recipe_value(state, bonus_recipe, discounted=True, base_recipe=almost_bonus_recipe,
+            potential_params=potential_params
+        ))
+        self.assertEqual(gamma**steps_into_future * bonus_recipe.value * mdp.order_bonus,
+            mdp.get_recipe_value(state, bonus_recipe, discounted=True, base_recipe=almost_bonus_recipe,
+            potential_params=potential_params, steps_into_future=steps_into_future
+        ))
+
+        bonus_order = Order(recipe=bonus_recipe, time_to_expire=30, expire_penalty=120, base_reward=20,
+            linear_time_bonus_reward=3, order_id="123", is_bonus=True)
+        non_bonus_order = Order(recipe=non_bonus_recipe, time_to_expire=30, expire_penalty=100, base_reward=30,
+            linear_time_bonus_reward=4, order_id="234", is_bonus=False)
+
+        orders_list = OrdersList([copy.deepcopy(bonus_order), copy.deepcopy(non_bonus_order)])
+        mdp = OvercookedGridworld.from_layout_name("mdp_test", start_orders_list=orders_list, start_bonus_orders=[], start_all_orders=[])
+        state = mdp.get_standard_start_state()
+
+        for include_expire_penalty in [True, False]:
+            error_msg = "include_expire_penalty was "+str(include_expire_penalty)
+            self.assertEqual(non_bonus_order.calculate_reward()+non_bonus_order.expire_penalty*include_expire_penalty,
+                mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty), error_msg)
+            self.assertEqual(non_bonus_order.calculate_reward()+non_bonus_order.expire_penalty*include_expire_penalty,
+                mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty), error_msg)
+            self.assertEqual(0, mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty, steps_into_future=999), error_msg)
+            self.assertEqual(0, mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty, steps_into_future=999, discounted=True, potential_params=potential_params), error_msg)
+            self.assertEqual(bonus_order.calculate_reward()*mdp.order_bonus+bonus_order.expire_penalty*include_expire_penalty,
+                mdp.get_recipe_value(state, bonus_recipe, include_expire_penalty=include_expire_penalty), error_msg)
+            self.assertEqual(0, mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty, steps_into_future=999), error_msg)
+            self.assertEqual(0, mdp.get_recipe_value(state, non_bonus_recipe, include_expire_penalty=include_expire_penalty, steps_into_future=999, discounted=True, potential_params=potential_params), error_msg)
+
+
+            self.assertEqual(gamma**(pot_onion_steps+non_bonus_recipe.time) *
+                    (non_bonus_order.calculate_future_reward(pot_onion_steps+non_bonus_recipe.time) + non_bonus_order.expire_penalty*include_expire_penalty),
+                mdp.get_recipe_value(state, non_bonus_recipe, discounted=True, base_recipe=almost_non_bonus_recipe,
+                potential_params=potential_params, include_expire_penalty=include_expire_penalty), error_msg)
+            self.assertEqual(gamma**steps_into_future * (non_bonus_order.calculate_future_reward(steps_into_future) + non_bonus_order.expire_penalty*include_expire_penalty),
+                mdp.get_recipe_value(state, non_bonus_recipe, discounted=True, base_recipe=almost_non_bonus_recipe,
+                potential_params=potential_params, include_expire_penalty=include_expire_penalty, steps_into_future=steps_into_future), error_msg)
+            self.assertEqual(gamma**(pot_tomato_steps+bonus_recipe.time) * (bonus_order.calculate_future_reward(pot_tomato_steps+bonus_recipe.time) * mdp.order_bonus + bonus_order.expire_penalty*include_expire_penalty),
+                mdp.get_recipe_value(state, bonus_recipe, discounted=True, base_recipe=almost_bonus_recipe,
+                potential_params=potential_params, include_expire_penalty=include_expire_penalty), error_msg)
+            self.assertEqual(gamma**steps_into_future * (bonus_order.calculate_future_reward(steps_into_future)  * mdp.order_bonus + bonus_order.expire_penalty*include_expire_penalty),
+                mdp.get_recipe_value(state, bonus_recipe, discounted=True, base_recipe=almost_bonus_recipe,
+                potential_params=potential_params, include_expire_penalty=include_expire_penalty, steps_into_future=steps_into_future), error_msg)
+
+
+    def test_get_optimal_possible_recipe_caching(self):
+        # testing only if caching works properly
+        potential_params = {"gamma": 0.99, "pot_onion_steps": 5, "pot_tomato_steps": 10} # these may not represent true values for mdp_test layout
+        potential_params2 = {"gamma": 0.98, "pot_onion_steps": 5, "pot_tomato_steps": 10}
+        temporary_order = Order(Recipe(["tomato", "onion", "onion"]), time_to_expire=6)
+        pernament_order = Order(Recipe(["tomato", "onion", "tomato"]), time_to_expire=None)
+        temporary_orders_list = OrdersList([copy.deepcopy(temporary_order)])
+        assert temporary_orders_list.contains_temporary_orders
+        assert not temporary_orders_list.is_adding_orders
+        adding_orders_list =  OrdersList([copy.deepcopy(pernament_order)], orders_to_add=[copy.deepcopy(temporary_order)], add_new_order_every=10)
+        assert adding_orders_list.is_adding_orders
+        assert not adding_orders_list.contains_temporary_orders
+        def get_cache_field(mdp, discounted):
+            if discounted:
+                return mdp._opt_recipe_discount_cache
+            else:
+                return mdp._opt_recipe_cache
+        def set_cache_field(mdp, discounted, value):
+            if discounted:
+                mdp._opt_recipe_discount_cache = value
+            else:
+                mdp._opt_recipe_cache = value
+        for discounted in [True, False]:
+            error_msg = "discounted "+str(discounted)
+            mdp = OvercookedGridworld.from_layout_name("mdp_test")
+            state = mdp.get_standard_start_state()
+            start_recipe = Recipe(["tomato"])
+            self.assertCountEqual({}, get_cache_field(mdp, discounted), error_msg)
+            _ = mdp.get_optimal_possible_recipe(state, start_recipe, discounted=discounted, potential_params=potential_params)
+            self.assertTrue(get_cache_field(mdp, discounted), error_msg)
+            set_val = {start_recipe: ("some_recipe", "some value")}
+            set_cache_field(mdp, discounted, set_val)
+            self.assertEqual(set_val[start_recipe][0], mdp.get_optimal_possible_recipe(state, start_recipe, discounted=discounted, potential_params=potential_params), "cache was not used, "+error_msg)
+    
+            if discounted:
+                mdp._prev_potential_params = potential_params2
+                self.assertNotEqual(set_val[start_recipe][0], mdp.get_optimal_possible_recipe(state, start_recipe, discounted=discounted, potential_params=potential_params), "cache was used when it should not, "+error_msg)
+
+            mdp = OvercookedGridworld.from_layout_name("mdp_test", start_orders_list=temporary_orders_list, start_bonus_orders=[], start_all_orders=[])
+            state = mdp.get_standard_start_state()
+            _ = mdp.get_optimal_possible_recipe(state, start_recipe, discounted=discounted, potential_params=potential_params)
+            self.assertCountEqual({}, get_cache_field(mdp, discounted), error_msg)
+
+            mdp = OvercookedGridworld.from_layout_name("mdp_test", start_orders_list=adding_orders_list, start_bonus_orders=[], start_all_orders=[])
+            state = mdp.get_standard_start_state()
+            _ = mdp.get_optimal_possible_recipe(state, start_recipe, discounted=discounted, potential_params=potential_params)
+            self.assertCountEqual({}, get_cache_field(mdp, discounted), error_msg)
+
 
     def test_potential_function(self):
         mp = MotionPlanner(self.base_mdp)
@@ -710,6 +1348,7 @@ class TestFeaturizations(unittest.TestCase):
         obs = self.base_mdp.lossless_state_encoding(s)[0]
         self.assertTrue(np.array_equal(obs.shape, self.base_mdp.lossless_state_encoding_shape), "{} vs {}".format(obs.shape, self.base_mdp.lossless_state_encoding_shape))
 
+
     def test_state_featurization_shape(self):
         s = self.base_mdp.get_standard_start_state()
         obs = self.base_mdp.featurize_state(s, self.mlam)[0]
@@ -966,7 +1605,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
             generated_recipes_strings |= {json.dumps(o, sort_keys=True) for o in env.mdp.start_all_orders}
         self.assertTrue(len(generated_recipes_strings) > 3)
         
-        
+
 class TestGymEnvironment(unittest.TestCase):
 
     def setUp(self):

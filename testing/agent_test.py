@@ -89,17 +89,17 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
 
     def test_from_mdp(self):
         for layout_name in self.layout_name_lst:
-            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
-            ae = AgentEvaluator.from_mdp(mdp=orignal_mdp, env_params={"horizon": 400})
+            original_mdp = OvercookedGridworld.from_layout_name(layout_name)
+            ae = AgentEvaluator.from_mdp(mdp=original_mdp, env_params={"horizon": 400})
             ae_mdp = ae.env.mdp
-            self.assertEqual(orignal_mdp, ae_mdp, "mdp with name " + layout_name + " experienced an inconsistency")
+            self.assertTrue(original_mdp.ids_independent_equal(ae_mdp), "mdp with name " + layout_name + " experienced an inconsistency")
 
     def test_from_mdp_params_layout(self):
         for layout_name in self.layout_name_lst:
-            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
+            original_mdp = OvercookedGridworld.from_layout_name(layout_name)
             ae = AgentEvaluator.from_layout_name(mdp_params={"layout_name": layout_name}, env_params={"horizon": 400})
             ae_mdp = ae.env.mdp
-            self.assertEqual(orignal_mdp, ae_mdp, "mdp with name " + layout_name + " experienced an inconsistency")
+            self.assertTrue(original_mdp.ids_independent_equal(ae_mdp), "mdp with name " + layout_name + " experienced an inconsistency")
 
     mdp_gen_params_1 = {
         "inner_shape": (10, 7),
