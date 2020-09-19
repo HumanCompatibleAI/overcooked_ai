@@ -182,6 +182,7 @@ class LayoutGenerator(object):
             all_recipes = Recipe.generate_random_recipes(**all_orders_kwargs)
             mdp_params["start_all_orders"] = [r.to_dict() for r in all_recipes]
         else:
+            Recipe.configure({})
             all_recipes = Recipe.ALL_RECIPES
 
         if mdp_params.get("generate_bonus_orders"):
