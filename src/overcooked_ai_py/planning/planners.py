@@ -63,7 +63,7 @@ class MotionPlanner(object):
         return load_saved_motion_planner(filename)
 
     @staticmethod
-    def from_pickle_or_compute(mdp, counter_goals, custom_filename=None, force_compute=False, info=False, compute_on_unknown_unpickling_error=False):
+    def from_pickle_or_compute(mdp, counter_goals, custom_filename=None, force_compute=False, info=False):
         assert isinstance(mdp, OvercookedGridworld)
 
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_mp.pkl"
@@ -81,12 +81,6 @@ class MotionPlanner(object):
         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
             print("Recomputing motion planner due to:", e)
             return MotionPlanner.compute_mp(filename, mdp, counter_goals)
-        # except Exception as e:
-        #     if compute_on_unknown_unpickling_error:
-        #         print("Recomputing motion planner due to unknown exception:", e)
-        #         return MotionPlanner.compute_mp(filename, mdp, counter_goals)
-        #     else:
-        #         raise
 
         if info:
             print("Loaded MotionPlanner from {}".format(os.path.join(PLANNERS_DIR, filename)))
