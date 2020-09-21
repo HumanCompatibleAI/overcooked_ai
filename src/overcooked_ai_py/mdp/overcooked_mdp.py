@@ -1172,12 +1172,11 @@ class OvercookedGridworld(object):
                 if self.soup_to_be_cooked_at_location(new_state, i_pos):
                     soup = new_state.get_object(i_pos)
                     self.log_start_cooking(events_infos, soup, player_idx)
-                    """
                     if soup.is_full:
                         soup.begin_cooking()
                     """
                     soup.begin_cooking()
-
+                    """
             
             elif terrain_type == 'P' and player.has_object():
 
