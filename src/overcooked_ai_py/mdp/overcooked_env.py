@@ -275,7 +275,7 @@ class OvercookedEnv(object):
         self.game_stats = {**events_dict, **rewards_dict}
         self.cooking_stats = {str(start_cooking_key) + "item_" + str(player_index) : []
                               for start_cooking_key, player_index
-                              in itertools.product(["cooking_1", "cooking_2", "cooking_3"], [0, 1])}
+                              in itertools.product(["cooking_1", "cooking_2", "cooking_3"], list(range(self.mdp.num_players)))}
 
 
 
@@ -340,10 +340,11 @@ class OvercookedEnv(object):
 
     def _update_cooking_stats(self, event_infos, joint_agent_action_info):
         # Record the probability that agents initiate cooking
-        for start_cooking_key, player_index in itertools.product(["cooking_1", "cooking_2", "cooking_3"], [0, 1]):
+        for start_cooking_key, player_index in itertools.product(["cooking_1", "cooking_2", "cooking_3"],
+                                                                 list(range(self.mdp.num_players))):
             if event_infos[start_cooking_key][player_index]:
                 action_info = joint_agent_action_info[player_index]
-                if "action_probs" in action_info:
+                if "action_probs" in action_info and type( action_info["action_probs"][-1]) == list:
                     cooking_prob = action_info["action_probs"][-1]
                     self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)].append(cooking_prob[-1])
                     # print(start_cooking_key, self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)])
