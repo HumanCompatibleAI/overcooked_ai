@@ -272,7 +272,7 @@ class OvercookedEnv(object):
         """Whether the episode is over."""
         return self.state.timestep >= self.horizon or self.mdp.is_terminal(self.state)
 
-    def potential(self, mlam, state=None, gamma=0.99):
+    def potential(self, state=None, gamma=0.99, potential_constants={}):
         """
         Return the potential of the environment's current state, if no state is provided
         Otherwise return the potential of `state`
@@ -282,7 +282,7 @@ class OvercookedEnv(object):
             gamma (float): discount rate
         """
         state = state if state else self.state
-        return self.mdp.potential_function(state, mp=mlam.motion_planner ,gamma=gamma)
+        return self.mdp.potential_function(state, mp=self.mp, gamma=gamma, potential_constants=potential_constants)
 
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """

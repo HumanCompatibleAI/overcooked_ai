@@ -2054,7 +2054,7 @@ class OvercookedGridworld(object):
     # POTENTIAL REWARD SHAPING FN #
     ###############################
 
-    def potential_function(self, state, mp, gamma=0.99):
+    def potential_function(self, state, mp, gamma=0.99, potential_constants={}):
         """
         Essentially, this is the ɸ(s) function.
 
@@ -2107,7 +2107,7 @@ class OvercookedGridworld(object):
             'gamma' : gamma,
             'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
             'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
-            **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
+            **potential_constants if potential_constants else **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
 
