@@ -245,8 +245,8 @@ class LayoutGenerator(object):
 
         padded_grid = Grid(self.outer_shape)
         x_leeway, y_leeway = self.outer_shape - grid.shape
-        starting_x = np.random.randint(0, x_leeway) if x_leeway else 0
-        starting_y = np.random.randint(0, y_leeway) if y_leeway else 0
+        starting_x = np.random.randint(0, x_leeway + 1)
+        starting_y = np.random.randint(0, y_leeway + 1)
 
         for x in range(grid.shape[0]):
             for y in range(grid.shape[1]):
