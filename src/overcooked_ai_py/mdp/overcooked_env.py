@@ -344,8 +344,11 @@ class OvercookedEnv(object):
                                                                  list(range(self.mdp.num_players))):
             if event_infos[start_cooking_key][player_index]:
                 action_info = joint_agent_action_info[player_index]
-                if "action_probs" in action_info and type( action_info["action_probs"][-1]) == list:
-                    cooking_prob = action_info["action_probs"][-1]
+                if "action_probs" in action_info:
+                    cooking_prob = action_info["action_probs"]
+                    # account for GPU / CPU difference
+                    if len(cooking_prob) == 1:
+                        cooking_prob = cooking_prob[0]
                     self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)].append(cooking_prob[-1])
                     # print(start_cooking_key, self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)])
 
