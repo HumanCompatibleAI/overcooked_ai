@@ -2103,11 +2103,12 @@ class OvercookedGridworld(object):
             raise ValueError("Potential function requires Recipe onion and tomato values to work properly")
 
         # Constants needed for potential function
+        potential_constants = potential_constants if potential_constants else POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         potential_params = {
             'gamma' : gamma,
             'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
             'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
-            **potential_constants if potential_constants else **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
+            **potential_constants
         }
         pot_states = self.get_pot_states(state)
 
