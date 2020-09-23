@@ -324,10 +324,10 @@ class Order:
         return self.time_to_expire == 0
 
     def __str__(self):
-        return str(self.to_dict())
+        return str(self.to_dict())[1:-1]
 
     def __repr__(self):
-        return repr(self.to_dict())
+        return repr(self.to_dict())[1:-1]
 
     def __hash__(self):
         return hash((self.recipe, self.time_to_expire, self.expire_penalty, self.order_id, self._base_reward, self.linear_time_bonus_reward, self.is_bonus))
@@ -457,10 +457,10 @@ class OrdersList:
         raise AttributeError("non_bonus_orders param is read-only, edit orders instead")
 
     def __str__(self):
-        return str(self.orders)
+        return str(self.to_dict())[1:-1]
 
     def __repr__(self):
-        return repr(self.to_dict())
+        return repr(self.to_dict())[1:-1]
 
     def __hash__(self):
         return hash((tuple(self.orders), tuple(self.orders_to_add), self.add_new_order_every, self.time_to_next_order))
@@ -679,6 +679,9 @@ class ObjectState(object):
         return self.name in ['onion', 'tomato', 'dish']
 
     def deepcopy(self):
+        return copy.deepcopy(self)
+
+    def __deepcopy__(self, memo):
         return ObjectState(self.name, self.position)
 
     def __eq__(self, other):
@@ -840,9 +843,12 @@ class SoupState(ObjectState):
             raise ValueError("Cannot cook a soup that is already done")
         self._cooking_tick += 1
 
-    def deepcopy(self):
+    def __deepcopy__(self, memo):
         return SoupState(self.position, [ingredient.deepcopy() for ingredient in self._ingredients], self._cooking_tick)
-    
+
+    def deepcopy(self):
+        return copy.deepcopy(self)
+
     def to_dict(self):
         info_dict = super(SoupState, self).to_dict()
         ingrdients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
@@ -945,8 +951,7 @@ class PlayerState(object):
             self.get_object().position = new_position
 
     def deepcopy(self):
-        new_obj = None if self.held_object is None else self.held_object.deepcopy()
-        return PlayerState(self.position, self.orientation, new_obj)
+        return copy.deepcopy(self)
 
     def __eq__(self, other):
         return isinstance(other, PlayerState) and \
@@ -961,6 +966,10 @@ class PlayerState(object):
         return '{} facing {} holding {}'.format(
             self.position, self.orientation, str(self.held_object))
     
+    def __deepcopy__(self, memo):
+        new_obj = None if self.held_object is None else self.held_object.deepcopy()
+        return PlayerState(self.position, self.orientation, new_obj)
+
     def to_dict(self):
         return {
             "position": self.position,
@@ -992,10 +1001,14 @@ class OvercookedState(object):
         """
 
         assert not ((all_orders or bonus_orders) and orders_list), "Use either legacy params 'all_orders' and 'bonus_orders' or new one 'orders_list', but not the both"
-        if not orders_list:
-            orders_list = OrdersList.from_recipes_lists(all_orders, bonus_orders)
-        elif not isinstance(orders_list, OrdersList):
+
+        if isinstance(orders_list, OrdersList):
+            pass
+        elif isinstance(orders_list, dict):
             orders_list = OrdersList(**orders_list)
+        else:
+            orders_list = OrdersList.from_recipes_lists(all_orders, bonus_orders)
+
         self.orders_list = orders_list
 
         for pos, obj in objects.items():
@@ -1118,11 +1131,7 @@ class OvercookedState(object):
         return cls.from_players_pos_and_or(dummy_pos_and_or, orders_list=orders_list, all_orders=all_orders, bonus_orders=bonus_orders)
 
     def deepcopy(self):
-        return OvercookedState(
-            players=[player.deepcopy() for player in self.players],
-            objects={pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
-            orders_list=self.orders_list,
-            timestep=self.timestep)
+        return copy.deepcopy(self)
 
     def time_equal(self, other):
         return self.timestep == other.timestep
@@ -1160,6 +1169,13 @@ class OvercookedState(object):
         return hash(
             (self.players, tuple(self.objects.values()), orders_list_hash)
         )
+
+    def __deepcopy__(self, memo):
+        return OvercookedState(
+            players=[player.deepcopy() for player in self.players],
+            objects={pos:obj.deepcopy() for pos, obj in self.objects.items()},
+            orders_list=copy.deepcopy(self.orders_list),
+            timestep=self.timestep)
 
     def __str__(self):
         return 'Players: {}, Objects: {}, Orders: {} Timestep: {}'.format(
@@ -1657,6 +1673,8 @@ class OvercookedGridworld(object):
          by default includes expire penalty as it calculates the comparative value of the order from recipe with the value of letting the order to expire (if it's temporary order)
         """
         if not discounted:
+            if not recipe:
+                return 0
             matching_order = state.orders_list.get_matching_order(recipe=recipe, available_after_n_timesteps=steps_into_future or 0)
             if not matching_order:
                 return 0
