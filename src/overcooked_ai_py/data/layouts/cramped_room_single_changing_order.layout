@@ -1,0 +1,28 @@
+{
+    "grid":  """XXPXX
+                O  2T
+                X1  X
+                XDXSX""",
+    "start_orders_list": {'orders': [],
+        'add_new_order_every': 30,
+        'time_to_next_order': 1,
+        'orders_to_add': [{'recipe': {'ingredients': ('onion', 'onion', 'onion')},
+        'time_to_expire': 30,
+        'expire_penalty': 0,
+        'base_reward': None,
+        'linear_time_bonus_reward': 1,
+        'order_id': None,
+        'is_bonus': False},
+        {'recipe': {'ingredients': ('tomato', 'tomato', 'tomato')},
+        'time_to_expire': 30,
+        'expire_penalty': 0,
+        'base_reward': None,
+        'linear_time_bonus_reward': 1,
+        'order_id': None,
+        'is_bonus': False}]},
+    "tomato_value" : 10,
+    "onion_value" : 15,
+    "tomato_time" : 10,
+    "onion_time" :10,
+    "rew_shaping_params": None
+}

@@ -1,0 +1,40 @@
+{
+    "grid":  """XXPXX
+                O  2T
+                X1  X
+                XDXSX""",
+    "start_orders_list": {
+        "orders": [{"recipe": {"ingredients": ["onion", "onion", "onion"]},
+             "expire_penalty": 0,
+             "base_reward": None,
+             "linear_time_bonus_reward": 1,
+             "order_id": "123",
+             "is_bonus": False}, 
+             {"recipe": {"ingredients": ["tomato", "tomato", "tomato"]}, 
+             "expire_penalty": 0, 
+             "base_reward": None,
+             "linear_time_bonus_reward": 1,
+             "order_id": "234",
+             "is_bonus": False}],
+        "add_new_order_every": 200, 
+        "time_to_next_order": 1,
+        "orders_to_add":[
+            {"recipe": {"ingredients": ["onion", "onion", "onion"]},
+             "time_to_expire": 200, 
+             "expire_penalty": 0,
+             "base_reward": None,
+             "linear_time_bonus_reward": 1,
+             "is_bonus": True}, 
+             {"recipe": {"ingredients": ["tomato", "tomato", "tomato"]}, 
+             "time_to_expire": 200, 
+             "expire_penalty": 0, 
+             "base_reward": None,
+             "linear_time_bonus_reward": 1,
+             "is_bonus": True}]
+    },
+    "tomato_value": 10,
+    "onion_value": 15,
+    "tomato_time": 10,
+    "onion_time": 10,
+    "rew_shaping_params": None
+}
