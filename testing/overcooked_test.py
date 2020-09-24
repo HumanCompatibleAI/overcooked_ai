@@ -1,4 +1,4 @@
-import unittest, os
+import unittest, os, shutil
 import json
 import numpy as np
 from math import factorial
@@ -35,8 +35,17 @@ class TestRecipe(unittest.TestCase):
 
         self.recipes = [self.r1, self.r2, self.r3, self.r4, self.r5, self.r6]
 
+        self.pickle_temp_dir = os.path.join(TESTING_DATA_DIR, 'recipes')
+
+        if not os.path.exists(self.pickle_temp_dir):
+            os.makedirs(self.pickle_temp_dir)
+
     def tearDown(self):
         Recipe.configure({})
+
+        if os.path.exists(self.pickle_temp_dir):
+            shutil.rmtree(self.pickle_temp_dir)
+            
 
     def test_eq(self):
 
@@ -52,6 +61,21 @@ class TestRecipe(unittest.TestCase):
         self.assertIs(self.r3, self.r4)
         self.assertIs(self.r4, self.r5)
         self.assertFalse(self.r6 is self.r1, "different recipes cached to same value")
+
+    def test_serialization(self):
+        loaded_recipes = []
+
+        # Save and then load every recipe instance
+        for i, recipe in enumerate(self.recipes):
+            pickle_path = os.path.join(self.pickle_temp_dir, 'recipe_{}'.format(i))
+            save_pickle(recipe, pickle_path)
+            loaded = load_pickle(pickle_path)
+            loaded_recipes.append(loaded)
+        
+        # Ensure loaded recipes equal corresponding original recipe
+        for original, loaded in zip(self.recipes, loaded_recipes):
+            self.assertEqual(original, loaded)
+
 
     def test_value(self):
         # TODO
