@@ -25,9 +25,11 @@ class Recipe:
     _configured = False
     _conf = {}
     
-    def __new__(cls, ingredients):
+    def __new__(cls, ingredients=None):
         if not cls._configured:
             raise ValueError("Recipe class must be configured before recipes can be created")
+        if ingredients is None: # it is used for unpickling objects containing recipes
+            return super(Recipe, cls).__new__(cls)
         # Some basic argument verification
         if not ingredients or not hasattr(ingredients, '__iter__') or len(ingredients) == 0:
             raise ValueError("Invalid input recipe. Must be ingredients iterable with non-zero length")
@@ -43,6 +45,8 @@ class Recipe:
         return cls.ALL_RECIPES_CACHE[key]
 
     def __init__(self, ingredients):
+        if ingredients is None: # it is used for unpickling objects containing recipes
+            ingredients = tuple()
         self._ingredients = ingredients
 
     def __int__(self):
@@ -54,6 +58,9 @@ class Recipe:
         encoding = num_onions + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_tomatoes
 
         return mixed_mask * encoding * mixed_shift + encoding
+
+    # def __setstate__(self):
+    # TODO: If unpickled recipes act weird copying here some logic from __new__ maybe could help
 
     def __hash__(self):
         return hash(self.ingredients)
