@@ -43,10 +43,10 @@ class Recipe:
         return cls.ALL_RECIPES_CACHE[key]
 
     def __init__(self, ingredients):
-        self._ingredients = (ingredients,)
+        self._ingredients = ingredients
 
     def __getnewargs__(self):
-        return self._ingredients
+        return (self._ingredients,)
 
     def __int__(self):
         num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
