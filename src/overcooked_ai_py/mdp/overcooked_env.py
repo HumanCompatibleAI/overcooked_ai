@@ -93,8 +93,11 @@ class OvercookedEnv(object):
     @property
     def mp(self):
         if self._mp is None:
-            self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
-                                                            force_compute=False)
+            if self._mlam is not None:
+                self._mp = self.mlam.motion_planner
+            else:
+                self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
+                                                                force_compute=False)
         return self._mp
 
     @staticmethod
@@ -236,7 +239,7 @@ class OvercookedEnv(object):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.horizon, self.mlam)
+        return self.mdp.featurize_state(state, self.mlam, self.horizon)
 
     def reset(self, regen_mdp=True, outside_info={}):
         """
