@@ -4,7 +4,7 @@ from overcooked_ai_py.utils import generate_temporary_file_path, classproperty
 from overcooked_ai_py.static import GRAPHICS_DIR, FONTS_DIR
 from overcooked_ai_py.mdp.layout_generator import EMPTY, COUNTER, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
 from overcooked_ai_py.visualization.visualization_utils import show_image_in_ipython
-from overcooked_ai_py.visualization.pygame_utils import MultiFramePygameImage, run_static_resizeable_window, vstack_surfaces, scale_surface_by_factor, scale_surface_to_size
+from overcooked_ai_py.visualization.pygame_utils import MultiFramePygameImage, run_static_resizeable_window, vstack_surfaces, scale_surface_by_factor, blit_on_new_surface_of_size
 from overcooked_ai_py.mdp.actions import Direction
 
 roboto_path = os.path.join(FONTS_DIR, "Roboto-Regular.ttf")
@@ -143,7 +143,7 @@ class StateVisualizer:
         result_surface_size = (self.width or rendered_surface.get_width(), self.height or rendered_surface.get_height())
         
         if result_surface_size != rendered_surface.get_size():
-            result_surface = scale_surface_to_size(rendered_surface, result_surface_size, background_color=self.background_color)
+            result_surface = blit_on_new_surface_of_size(rendered_surface, result_surface_size, background_color=self.background_color)
         else:
             result_surface = rendered_surface
 
