@@ -40,6 +40,9 @@ class Recipe:
     def __init__(self, ingredients):
         self._ingredients = ingredients
 
+    def __getnewargs__(self):
+        return (self._ingredients,)
+
     def __int__(self):
         num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
         num_onions = len([_ for _ in self.ingredients if _ == Recipe.ONION])
@@ -1953,7 +1956,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlam):
+    def featurize_state(self, overcooked_state, mlam, horizon=400):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
