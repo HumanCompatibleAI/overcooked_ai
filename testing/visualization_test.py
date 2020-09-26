@@ -3,17 +3,25 @@ import numpy as np
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState
 from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
-from overcooked_ai_py.utils import load_from_json
+from overcooked_ai_py.utils import load_from_json, generate_temporary_file_path
 from overcooked_ai_py.mdp.overcooked_mdp import Recipe
 from utils import TESTING_DATA_DIR
 
+def get_file_count(directory_path):
+    path, dirs, files = next(os.walk(directory_path))
+    return len(files)
 
 state_visualizer_dir = os.path.join(TESTING_DATA_DIR, "test_state_visualizer")
+example_img_path = generate_temporary_file_path(prefix="overcooked_visualized_state_", extension=".png")
+
 
 def test_render_state_from_dict(test_dict):
     input_dict = copy.deepcopy(test_dict)
     test_dict = copy.deepcopy(test_dict)
     test_dict["kwargs"]["state"] = OvercookedState.from_dict(test_dict["kwargs"]["state"])
+    # check only if it raise error or not, for image fidelity render_state check is used
+    StateVisualizer(**test_dict["config"]).display_rendered_state(img_path=example_img_path, **test_dict["kwargs"])
+
     actual_result = pygame.surfarray.array3d(StateVisualizer(**test_dict["config"]).render_state(**test_dict["kwargs"]))
     expected_result = np.load(os.path.join(state_visualizer_dir, test_dict["result_array_filename"]))
     if not actual_result.shape == expected_result.shape:
@@ -36,11 +44,8 @@ def test_render_state_from_dict(test_dict):
             (wrong_x, wrong_y) = wrong_coord = wrong_coordinate_list[i]
             print("%s\t%s\t%s" %(str(wrong_coord), str(expected_result[wrong_x, wrong_y]), str(actual_result[wrong_x, wrong_y])))
         print("test_dict", json.dumps(input_dict))
-        StateVisualizer(**test_dict["config"]).display_rendered_state(img_path="/tmp/actual_image.png",**test_dict["kwargs"])
-
         return False
     print("test with: ", input_dict["result_array_filename"], "is ok")
-
     return True
 
 class TestStateVisualizer(unittest.TestCase):
@@ -60,16 +65,16 @@ class TestStateVisualizer(unittest.TestCase):
 
         visualizer.configure(**configure_config)
         self.assertEqual(configure_config["tile_size"], visualizer.tile_size)
-        
+
         StateVisualizer.configure_defaults(**configure_defaults_config)
         self.assertEqual(configure_defaults_config["tile_size"], StateVisualizer.DEFAULT_VALUES["tile_size"])
         self.assertEqual(configure_defaults_config["tile_size"], StateVisualizer().tile_size)
-        
+
         invalid_kwargs = {"invalid_argument": 123}
         self.assertRaises(AssertionError,  StateVisualizer, **invalid_kwargs)
         self.assertRaises(AssertionError,  StateVisualizer.configure_defaults, **invalid_kwargs)
         self.assertRaises(AssertionError,  visualizer.configure, **invalid_kwargs)
-        
+
     def test_properties(self):
         visualizer = StateVisualizer(tile_size=30, hud_interline_size=7, hud_font_size=26)
         self.assertEqual(visualizer.scale_by_factor,  2)
@@ -92,6 +97,31 @@ class TestStateVisualizer(unittest.TestCase):
         # testing some states from trajectory hoping it can find unexpected bugs
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_various.json")):
             self.assertTrue(test_render_state_from_dict(d))
+
+    def test_default_hud_data_from_trajectories(self):
+        traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json') # NOTE: for test purposes reward is added here despite there was no soup delivery in trajectory
+        test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
+        hud_data_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'expected_default_hud_data_from_trajectories.json')
+        expected_hud_data = load_from_json(hud_data_path)
+        result_hud_data = StateVisualizer().default_hud_data_from_trajectories(test_trajectory)
+        self.assertEqual(json.dumps(result_hud_data, sort_keys=True),
+            json.dumps(expected_hud_data, sort_keys=True))
+
+    def test_trajectory_visualization(self):
+        traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json')
+        test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
+        expected_images_num = len(test_trajectory["ep_states"][0])
+        assert expected_images_num == 10
+
+        result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, ipython_display=False)
+        self.assertEqual(get_file_count(result_img_directory_path), expected_images_num)
+
+        custom_img_directory_path =  generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
+        self.assertNotEqual(custom_img_directory_path, result_img_directory_path)
+        result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, img_directory_path=custom_img_directory_path, ipython_display=False)
+        self.assertEqual(custom_img_directory_path, result_img_directory_path)
+        self.assertEqual(get_file_count(result_img_directory_path), expected_images_num)
+
 
 if __name__ == '__main__':
     unittest.main()
