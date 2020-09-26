@@ -1,6 +1,6 @@
 import itertools, math
 import numpy as np
-
+from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
 
 
@@ -412,8 +412,14 @@ class GreedyHumanModel(Agent):
                     "The current mid level action manager only support 3-onion-soup order, but got orders" \
                     + str(state.all_orders)
                 next_order = list(state.all_orders)[0]
-
-                if 'onion' in next_order:
+                soups_ready_to_cook_key = '{}_items'.format(len(next_order.ingredients))
+                soups_ready_to_cook = pot_states_dict[soups_ready_to_cook_key]
+                if soups_ready_to_cook:
+                    only_pot_states_ready_to_cook = defaultdict(list)
+                    only_pot_states_ready_to_cook[soups_ready_to_cook_key] = soups_ready_to_cook
+                    # we want to cook only soups that has same len as order
+                    motion_goals = am.start_cooking_actions(only_pot_states_ready_to_cook)
+                elif 'onion' in next_order:
                     motion_goals = am.pickup_onion_actions(counter_objects)
                 elif 'tomato' in next_order:
                     motion_goals = am.pickup_tomato_actions(counter_objects)
