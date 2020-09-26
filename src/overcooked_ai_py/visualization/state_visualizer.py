@@ -85,14 +85,16 @@ class StateVisualizer:
         StateVisualizer._check_config_validity(kwargs)
         for param_name, param_value in copy.deepcopy(kwargs).items():
             setattr(self, param_name, param_value)
-        
+
     def display_rendered_state(self, state, hud_data=None, grid=None, img_path=None, ipython_display=False, window_display=False):
         """
         renders state as image
+        state (OvercookedState): state to render
+        hud_data (dict): dict with hud data, keys are used for string that describes after using _key_to_hud_text on them
+        grid (iterable): 2d map of the layout, when not supplied take grid from object attribute NOTE: when grid in both method param and object atribute is no supplied it will raise an error
         img_path (str): if it is not None save image to specific path
         ipython_display (bool): if True render state in ipython cell, if img_path is None create file with randomized name in /tmp directory
         window_display (bool): if True render state into pygame window
-        initial_scale_factor(float or int, int is recommended): how much increase size of the result image/window
         """
         assert window_display or img_path or ipython_display # without any of this param nothing happen when calling this function
         surface = self.render_state(state, grid, hud_data)
