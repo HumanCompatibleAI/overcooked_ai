@@ -108,6 +108,7 @@ class TestStateVisualizer(unittest.TestCase):
             json.dumps(expected_hud_data, sort_keys=True))
 
     def test_trajectory_visualization(self):
+        # we don't have good way to check slider automatically so its mostly test for basic stuff like numer of outputed images, if using method raises error etc.
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json')
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
         expected_images_num = len(test_trajectory["ep_states"][0])
@@ -116,7 +117,7 @@ class TestStateVisualizer(unittest.TestCase):
         result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, ipython_display=False)
         self.assertEqual(get_file_count(result_img_directory_path), expected_images_num)
 
-        custom_img_directory_path =  generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
+        custom_img_directory_path = generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
         self.assertNotEqual(custom_img_directory_path, result_img_directory_path)
         result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, img_directory_path=custom_img_directory_path, ipython_display=False)
         self.assertEqual(custom_img_directory_path, result_img_directory_path)
