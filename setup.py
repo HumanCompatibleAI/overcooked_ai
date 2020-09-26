@@ -25,6 +25,7 @@ setup(name='overcooked_ai',
         'tqdm',
         'gym',
         'ipython',
-        'pygame'
+        'pygame',
+        "ipywidgets"
       ]
     )
