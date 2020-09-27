@@ -249,6 +249,7 @@ class GreedyHumanModel(Agent):
 
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
     in which an individual agent cannot complete the task on their own.
+    Will work only in environments where the only order is 3 onion soup.
     """
 
     def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
@@ -408,7 +409,7 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                assert len(state.all_orders) == 1, \
+                assert len(state.all_orders) == 1 and list(state.all_orders[0].ingredients) == ["onion", "onion", "onion"], \
                     "The current mid level action manager only support 3-onion-soup order, but got orders" \
                     + str(state.all_orders)
                 next_order = list(state.all_orders)[0]
@@ -419,12 +420,16 @@ class GreedyHumanModel(Agent):
                     only_pot_states_ready_to_cook[soups_ready_to_cook_key] = soups_ready_to_cook
                     # we want to cook only soups that has same len as order
                     motion_goals = am.start_cooking_actions(only_pot_states_ready_to_cook)
-                elif 'onion' in next_order:
-                    motion_goals = am.pickup_onion_actions(counter_objects)
-                elif 'tomato' in next_order:
-                    motion_goals = am.pickup_tomato_actions(counter_objects)
                 else:
-                    motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects)
+                # it does not make sense to have tomato logic when the only possible order is 3 onion soup (see assertion above)
+                # elif 'onion' in next_order:
+                #     motion_goals = am.pickup_onion_actions(counter_objects)
+                # elif 'tomato' in next_order:
+                #     motion_goals = am.pickup_tomato_actions(counter_objects)
+                # else:
+                #     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
+
 
         else:
             player_obj = player.get_object()
