@@ -98,6 +98,11 @@ class TestStateVisualizer(unittest.TestCase):
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_various.json")):
             self.assertTrue(test_render_state_from_dict(d))
 
+    def test_generated_layout_states(self):
+        # testing some states from trajectory hoping it can find unexpected bugs
+        for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_generated_layout.json")):
+            self.assertTrue(test_render_state_from_dict(d))
+
     def test_default_hud_data_from_trajectories(self):
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json') # NOTE: for test purposes reward is added here despite there was no soup delivery in trajectory
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
