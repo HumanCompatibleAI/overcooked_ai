@@ -2,6 +2,7 @@ import itertools, math
 import numpy as np
 
 from overcooked_ai_py.mdp.actions import Action
+from collections import defaultdict
 
 
 class Agent(object):
@@ -318,7 +319,7 @@ class GreedyHumanModel(Agent):
 
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
-        return chosen_action, {"action_probs": action_probs}
+        return chosen_action, {"action_probs": [action_probs]}
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
         """
@@ -408,17 +409,19 @@ class GreedyHumanModel(Agent):
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                assert len(state.all_orders) == 1, \
+                assert len(state.all_orders) == 1 and list(state.all_orders[0].ingredients) == ["onion", "onion", "onion"], \
                     "The current mid level action manager only support 3-onion-soup order, but got orders" \
                     + str(state.all_orders)
                 next_order = list(state.all_orders)[0]
-
-                if 'onion' in next_order:
-                    motion_goals = am.pickup_onion_actions(counter_objects)
-                elif 'tomato' in next_order:
-                    motion_goals = am.pickup_tomato_actions(counter_objects)
+                soups_ready_to_cook_key = '{}_items'.format(len(next_order.ingredients))
+                soups_ready_to_cook = pot_states_dict[soups_ready_to_cook_key]
+                if soups_ready_to_cook:
+                    only_pot_states_ready_to_cook = defaultdict(list)
+                    only_pot_states_ready_to_cook[soups_ready_to_cook_key] = soups_ready_to_cook
+                    # we want to cook only soups that has same len as order
+                    motion_goals = am.start_cooking_actions(only_pot_states_ready_to_cook)
                 else:
-                    motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects)
 
         else:
             player_obj = player.get_object()

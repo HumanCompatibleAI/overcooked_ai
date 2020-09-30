@@ -78,7 +78,8 @@ class OvercookedEnv(object):
         self.mlam_params = mlam_params
         self.start_state_fn = start_state_fn
         self.info_level = info_level
-        self.reset(outside_info=initial_info)
+        self.initial_info = initial_info
+        self.reset(outside_info=self.initial_info)
         if self.horizon >= MAX_HORIZON and self.info_level > 0:
             print("Environment has (near-)infinite horizon and no terminal states. \
                 Reduce info level of OvercookedEnv to not see this message.")
@@ -259,6 +260,9 @@ class OvercookedEnv(object):
                                  you need to have a "initial_info" dictionary with the same keys in the "env_params"
         """
         if regen_mdp:
+            # if there is no outside info, use the initial info
+            if outside_info == {}:
+                outside_info = self.initial_info
             self.mdp = self.mdp_generator_fn(outside_info)
             self._mlam = None
             self._mp = None
