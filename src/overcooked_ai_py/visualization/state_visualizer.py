@@ -1,11 +1,11 @@
 import pygame
-import os, copy
+import os, copy, math
 from overcooked_ai_py.utils import generate_temporary_file_path, classproperty, cumulative_rewards_from_rew_list
 from overcooked_ai_py.static import GRAPHICS_DIR, FONTS_DIR
 from overcooked_ai_py.mdp.layout_generator import EMPTY, COUNTER, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
 from overcooked_ai_py.visualization.visualization_utils import show_image_in_ipython, show_ipython_images_slider
 from overcooked_ai_py.visualization.pygame_utils import MultiFramePygameImage, run_static_resizeable_window, vstack_surfaces, scale_surface_by_factor, blit_on_new_surface_of_size
-from overcooked_ai_py.mdp.actions import Direction
+from overcooked_ai_py.mdp.actions import Direction, Action
 
 roboto_path = os.path.join(FONTS_DIR, "Roboto-Regular.ttf")
 
@@ -15,6 +15,9 @@ class StateVisualizer:
     OBJECTS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'objects.png'), os.path.join(GRAPHICS_DIR, 'objects.json'))
     SOUPS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'soups.png'), os.path.join(GRAPHICS_DIR, 'soups.json'))
     CHEFS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'chefs.png'), os.path.join(GRAPHICS_DIR, 'chefs.json'))
+    ARROW_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'arrow.png'))
+    INTERACT_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'interact.png'))
+    STAY_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'stay.png'))
     UNSCALED_TILE_SIZE = 15
     DEFAULT_VALUES = {
         "height": None, # if None use grid_width - NOTE: can chop down hud if hud is wider than grid
@@ -41,7 +44,8 @@ class StateVisualizer:
         "cooking_timer_system_font_name": None,
         "cooking_timer_font_color": (255, 0, 0), # red
         "grid": None,
-        "background_color": (155, 101, 0) # color of empty counter
+        "background_color": (155, 101, 0), # color of empty counter
+        "is_rendering_action_probs": True # whatever represent visually on the grid what actions some given agent would make
     }
     TILE_TO_FRAME_NAME = {
         EMPTY: "floor",
@@ -98,7 +102,7 @@ class StateVisualizer:
         return [StateVisualizer.default_hud_data(state, score=scores[i])
             for i, state in enumerate(trajectories["ep_states"][trajectory_idx])]
 
-    def display_rendered_trajectory(self, trajectories, trajectory_idx=0,  hud_data=None, img_directory_path=None, img_extension=".png", img_prefix="", ipython_display=True):
+    def display_rendered_trajectory(self, trajectories, trajectory_idx=0,  hud_data=None, action_probs=None, img_directory_path=None, img_extension=".png", img_prefix="", ipython_display=True):
         """
         saves images of every timestep from trajectory in img_directory_path (or temporary directory if not path is not specified)
         trajectories (dict): trajectories dict, same format as used by AgentEvaluator
@@ -106,6 +110,7 @@ class StateVisualizer:
         img_path (str): img_directory_path - path to directory where consequtive images will be saved
         ipython_display(bool): if True render slider with rendered states
         hud_data(list(dict)): hud data for every timestep
+        action_probs(list(list((list(float))))): action probs for every player and timestep acessed in the way action_probs[timestep][player][action]
         """
         states = trajectories["ep_states"][trajectory_idx]
         grid = trajectories["mdp_params"][trajectory_idx]["terrain"]
@@ -115,6 +120,9 @@ class StateVisualizer:
             else:
                 hud_data = [None] * len(states)
 
+        if action_probs is None:
+            action_probs = [None] * len(states)
+
         if not img_directory_path:
             img_directory_path = generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
         os.makedirs(img_directory_path, exist_ok=True)
@@ -122,14 +130,14 @@ class StateVisualizer:
         for i, state in enumerate(states):
             img_name = img_prefix + str(i) + img_extension
             img_path = os.path.join(img_directory_path, img_name)
-            img_pathes.append(self.display_rendered_state(state=state, hud_data=hud_data[i], grid=grid, img_path=img_path, ipython_display=False, window_display=False))
+            img_pathes.append(self.display_rendered_state(state=state, hud_data=hud_data[i], action_probs=action_probs[i], grid=grid, img_path=img_path, ipython_display=False, window_display=False))
 
         if ipython_display:
             return show_ipython_images_slider(img_pathes, "timestep")
 
         return img_directory_path
 
-    def display_rendered_state(self, state, hud_data=None, grid=None, img_path=None, ipython_display=False, window_display=False):
+    def display_rendered_state(self, state, hud_data=None, action_probs=None, grid=None, img_path=None, ipython_display=False, window_display=False):
         """
         renders state as image
         state (OvercookedState): state to render
@@ -138,9 +146,10 @@ class StateVisualizer:
         img_path (str): if it is not None save image to specific path
         ipython_display (bool): if True render state in ipython cell, if img_path is None create file with randomized name in /tmp directory
         window_display (bool): if True render state into pygame window
+        action_probs(list(list(float))): action probs for every player acessed in the way action_probs[player][action]
         """
         assert window_display or img_path or ipython_display, "specify at least one of the ways to output result state image: window_display, img_path, or ipython_display"
-        surface = self.render_state(state, grid, hud_data)
+        surface = self.render_state(state, grid, hud_data, action_probs=action_probs)
 
         if img_path is None and ipython_display:
             img_path = generate_temporary_file_path(prefix="overcooked_visualized_state_", extension=".png")
@@ -156,9 +165,9 @@ class StateVisualizer:
 
         return img_path
 
-    def render_state(self, state, grid, hud_data=None):
+    def render_state(self, state, grid, hud_data=None, action_probs=None):
         """
-        returns surface with rendered game state scaled by initial_scale_factor,
+        returns surface with rendered game state scaled to selected size,
         decoupled from display_rendered_state function to make testing easier
         """
         pygame.init()
@@ -168,12 +177,17 @@ class StateVisualizer:
         self._render_grid(grid_surface, grid)
         self._render_players(grid_surface, state.players)
         self._render_objects(grid_surface, state.objects, grid)       
+
         if self.scale_by_factor != 1:
             grid_surface = scale_surface_by_factor(grid_surface, self.scale_by_factor)
 
         # render text after rescaling as text looks bad when is rendered small resolution and then rescalled to bigger one
         if self.is_rendering_cooking_timer:
             self._render_cooking_timers(grid_surface, state.objects, grid)
+
+        # arrows does not seem good when rendered in very small resolution
+        if self.is_rendering_action_probs and action_probs is not None:
+            self._render_actions_probs(grid_surface, state.players, action_probs)
 
         if self.is_rendering_hud and hud_data:
             hud_width = self.width or grid_surface.get_width()
@@ -369,3 +383,54 @@ class StateVisualizer:
 
     def _calculate_hud_height(self, hud_data):
         return self.hud_margin_top + len(hud_data) * self.hud_line_height + self.hud_margin_bottom
+
+    def _render_on_tile_position(self, scaled_grid_surface, source_surface, tile_position, horizontal_align="left", vertical_align="top"):
+        assert vertical_align in ["top", "center", "bottom"]
+        left_x, top_y = self._position_in_scaled_pixels(tile_position)
+        if horizontal_align == "left":
+            x = left_x
+        elif horizontal_align == "center":
+            x = left_x + (self.tile_size - source_surface.get_width())/2
+        elif horizontal_align == "right":
+            x = left_x + self.tile_size - source_surface.get_width()
+        else:
+            raise ValueError("horizontal_align can have one of the values: "+str(["left", "center", "right"]))
+
+        if vertical_align == "top":
+            y = top_y
+        elif vertical_align == "center":
+            y = top_y + (self.tile_size - source_surface.get_height())/2
+        elif vertical_align == "bottom":
+            y = top_y + self.tile_size - source_surface.get_height()
+        else:
+            raise ValueError("vertical_align can have one of the values: "+str(["top", "center", "bottom"]))
+
+        scaled_grid_surface.blit(source_surface, (x, y))
+
+    def _render_actions_probs(self, surface, players, action_probs):
+        direction_to_rotation = {Direction.NORTH:0, Direction.WEST:90 , Direction.SOUTH:180, Direction.EAST:270}
+        direction_to_aligns = {
+            Direction.NORTH: {"horizontal_align": "center", "vertical_align":"bottom"},
+            Direction.WEST: {"horizontal_align": "right", "vertical_align":"center"},
+            Direction.SOUTH: {"horizontal_align": "center", "vertical_align":"top"},
+            Direction.EAST: {"horizontal_align": "left", "vertical_align":"center"}}
+
+        rescaled_arrow = pygame.transform.scale(self.ARROW_IMG, (self.tile_size, self.tile_size))
+        # divide width by math.sqrt(2) to always fit both interact icon and stay icon into single tile
+        rescaled_interact = pygame.transform.scale(self.INTERACT_IMG, (int(self.tile_size/math.sqrt(2)), self.tile_size))
+        rescaled_stay = pygame.transform.scale(self.STAY_IMG, (int(self.tile_size/math.sqrt(2)), self.tile_size))
+        for player, probs in zip(players, action_probs):
+            if probs is not None:
+                for action in Action.ALL_ACTIONS:
+                    # use math sqrt to make probability proportional to area of the image
+                    size = math.sqrt(probs[Action.ACTION_TO_INDEX[action]])
+                    if action == "interact":
+                        img = pygame.transform.rotozoom(rescaled_interact, 0, size)
+                        self._render_on_tile_position(surface, img, player.position, horizontal_align="left", vertical_align="center")
+                    elif action == Action.STAY:
+                        img = pygame.transform.rotozoom(rescaled_stay, 0, size)
+                        self._render_on_tile_position(surface, img, player.position, horizontal_align="right", vertical_align="center")
+                    else:
+                        position = Action.move_in_direction(player.position, action)
+                        img =  pygame.transform.rotozoom(rescaled_arrow, direction_to_rotation[action], size)
+                        self._render_on_tile_position(surface, img, position, **direction_to_aligns[action])

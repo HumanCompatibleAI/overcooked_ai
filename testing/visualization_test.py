@@ -1,6 +1,7 @@
 import unittest, os, pygame, copy, json
 import numpy as np
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+from overcooked_ai_py.agents.agent import RandomAgent
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState
 from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
 from overcooked_ai_py.utils import load_from_json, generate_temporary_file_path
@@ -112,14 +113,19 @@ class TestStateVisualizer(unittest.TestCase):
         self.assertEqual(json.dumps(result_hud_data, sort_keys=True),
             json.dumps(expected_hud_data, sort_keys=True))
 
+    def test_action_probs_display(self):
+        for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_action_probs_display.json")):
+            self.assertTrue(test_render_state_from_dict(d))
+
     def test_trajectory_visualization(self):
         # we don't have good way to check slider automatically so its mostly test for basic stuff like numer of outputed images, if using method raises error etc.
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json')
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
         expected_images_num = len(test_trajectory["ep_states"][0])
         assert expected_images_num == 10
+        action_probs = [ [RandomAgent(all_actions=True).action(state)[1]["action_probs"]]*2 for state in test_trajectory["ep_states"][0]]
 
-        result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, ipython_display=False)
+        result_img_directory_path = StateVisualizer().display_rendered_trajectory(test_trajectory, action_probs=action_probs, ipython_display=False)
         self.assertEqual(get_file_count(result_img_directory_path), expected_images_num)
 
         custom_img_directory_path = generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
