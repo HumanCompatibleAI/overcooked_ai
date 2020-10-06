@@ -1,6 +1,6 @@
 import itertools, math
 import numpy as np
-
+from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
 from collections import defaultdict
 
@@ -250,6 +250,7 @@ class GreedyHumanModel(Agent):
 
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
     in which an individual agent cannot complete the task on their own.
+    Will work only in environments where the only order is 3 onion soup.
     """
 
     def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
