@@ -458,6 +458,26 @@ class GreedyHumanModel(Agent):
 
         return motion_goals
 
+class SampleAgent(Agent):
+    """ Agent that samples action using action_probs of multiple agents
+    """
+    def __init__(self, agents, agents_weights="uniform"):
+        if agents_weights == "uniform":
+            agents_weights = [1.0/len(agents)]*len(agents)
+        assert len(agents_weights) == len(agents)
+        self.weights = np.array(agents_weights)
+        self.agents = agents
+
+    def action(self, state):
+        action_probs = np.zeros(Action.NUM_ACTIONS)
+        for agent, weight in zip(self.agents, self.weights):
+            action_probs += np.array(agent.action(state)[1]["action_probs"])*weight
+        return Action.sample(action_probs), {"action_probs": action_probs}
+    """
+    """
+
+def add_random_play_to_agent(agent, random_play_fraction=0.1, does_random_interactions=False):
+    return SampleAgent([agent, RandomAgent(all_actions=does_random_interactions)], agents_weights=[1-random_play_fraction, random_play_fraction])
 
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
 # class CoupledPlanningAgent(Agent):
