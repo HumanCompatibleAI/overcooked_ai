@@ -45,7 +45,7 @@ class OvercookedEnv(object):
     """
 
     TIMESTEP_TRAJ_KEYS = ["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"]
-    EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "cooking_stats", "metadatas"]
+    EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "metadatas"]
     DEFAULT_TRAJ_KEYS = TIMESTEP_TRAJ_KEYS + EPISODE_TRAJ_KEYS + ["metadatas"]
 
 
@@ -216,13 +216,8 @@ class OvercookedEnv(object):
         """
         assert not self.is_done()
         if joint_agent_action_info is None: joint_agent_action_info = [{}, {}]
+        next_state, mdp_infos = self.mdp.get_state_transition(self.state, joint_action, display_phi, self.mp)
 
-        if not display_phi:
-            next_state, mdp_infos = self.mdp.get_state_transition(self.state, joint_action)
-        else:
-            next_state, mdp_infos = self.mdp.get_state_transition(self.state, joint_action, display_phi, self.mp)
-
-        self._update_cooking_stats(mdp_infos["event_infos"], joint_agent_action_info)
         # Update game_stats
         self._update_game_stats(mdp_infos)
 
@@ -277,11 +272,6 @@ class OvercookedEnv(object):
             "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
         }
         self.game_stats = {**events_dict, **rewards_dict}
-        self.cooking_stats = {str(start_cooking_key) + "item_" + str(player_index) : []
-                              for start_cooking_key, player_index
-                              in itertools.product(["cooking_1", "cooking_2", "cooking_3"], list(range(self.mdp.num_players)))}
-
-
 
     def is_done(self):
         """Whether the episode is over."""
@@ -340,21 +330,6 @@ class OvercookedEnv(object):
             for idx, event_by_agent in enumerate(event_occurred_by_idx):
                 if event_by_agent:
                     self.game_stats[event_type][idx].append(self.state.timestep)
-
-
-    def _update_cooking_stats(self, event_infos, joint_agent_action_info):
-        # Record the probability that agents initiate cooking
-        for start_cooking_key, player_index in itertools.product(["cooking_1", "cooking_2", "cooking_3"],
-                                                                 list(range(self.mdp.num_players))):
-            if event_infos[start_cooking_key][player_index]:
-                action_info = joint_agent_action_info[player_index]
-                if "action_probs" in action_info:
-                    cooking_prob = action_info["action_probs"]
-                    # account for GPU / CPU difference
-                    if len(cooking_prob) == 1:
-                        cooking_prob = cooking_prob[0]
-                    self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)].append(cooking_prob[-1])
-                    # print(start_cooking_key, self.cooking_stats[str(start_cooking_key) + "item_" + str(player_index)])
 
 
     ####################
@@ -450,7 +425,6 @@ class OvercookedEnv(object):
             trajectories["ep_lengths"].append(time_taken)
             trajectories["mdp_params"].append(self.mdp.mdp_params)
             trajectories["env_params"].append(self.env_params)
-            trajectories["cooking_stats"].append(self.cooking_stats)
             trajectories["metadatas"].append(metadata_fn(rollout_info))
 
             # we do not need to regenerate MDP if we are trying to generate a series of rollouts using the same MDP

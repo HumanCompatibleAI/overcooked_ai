@@ -808,11 +808,6 @@ EVENT_TYPES = [
     'soup_delivery',
     'soup_drop',
 
-    # Cooking events
-    'cooking_1',
-    'cooking_2',
-    'cooking_3',
-
     # Potting events
     'optimal_onion_potting',
     'optimal_tomato_potting',
@@ -1174,7 +1169,6 @@ class OvercookedGridworld(object):
                 # Cooking soup
                 if self.soup_to_be_cooked_at_location(new_state, i_pos):
                     soup = new_state.get_object(i_pos)
-                    self.log_start_cooking(events_infos, soup, player_idx)
                     soup.begin_cooking()
             
             elif terrain_type == 'P' and player.has_object():
@@ -1625,14 +1619,6 @@ class OvercookedGridworld(object):
     ################################
     # EVENT LOGGING HELPER METHODS #
     ################################
-
-    def log_start_cooking(self, events_infos, soup, player_index):
-        """Player interact with a non-empty pot to start cooking"""
-        start_cooking_key = "cooking_" + str(len(soup.ingredients))
-        if start_cooking_key not in events_infos:
-            raise ValueError("Unknown event {}".format(start_cooking_key))
-        events_infos[start_cooking_key][player_index] = True
-
 
     def log_object_potting(self, events_infos, state, old_soup, new_soup, obj_name, player_index):
         """Player added an ingredient to a pot"""
