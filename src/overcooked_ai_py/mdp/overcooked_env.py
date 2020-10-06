@@ -1,7 +1,6 @@
 import gym, tqdm
 import time
 import numpy as np
-import itertools
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
@@ -307,7 +306,6 @@ class OvercookedEnv(object):
     def _add_episode_info(self, env_info):
         env_info["episode"] = {
             "ep_game_stats": self.game_stats,
-            # "ep_cooking_stats": self.cooking_stats,
             "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
             "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
             "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
