@@ -2,7 +2,6 @@ import itertools, math
 import numpy as np
 from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
-from collections import defaultdict
 
 
 class Agent(object):
