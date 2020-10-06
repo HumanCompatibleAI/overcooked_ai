@@ -171,3 +171,18 @@ def read_layout_dict(layout_name):
 
 def is_iterable(obj):
     return isinstance(obj, Iterable)
+
+def invoke_until_result_satisfies_contition(condition, max_tries=None, exception=Exception):
+    ''' decorator; runs function until condition is satisfied or when number of tries reach max_tries (then it raises exception)
+    '''
+    def result_decorator(f):
+        def result_f(*args, **kwargs):
+            tries = 0
+            while (not max_tries or tries < max_tries):
+                result = f(*args, **kwargs)
+                if condition(result):
+                    return result
+                tries += 1
+            raise exception
+        return result_f
+    return result_decorator

@@ -1,7 +1,7 @@
 import numpy as np
 
 import random, copy
-from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform
+from overcooked_ai_py.utils import rnd_int_uniform, rnd_uniform, invoke_until_result_satisfies_contition
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
 
@@ -23,6 +23,8 @@ def mdp_fn_random_choice(mdp_fn_choices):
     assert type(mdp_fn_choices) is list and len(mdp_fn_choices) > 0
     return random.choice(mdp_fn_choices)
 
+class LayoutGenerationError(Exception):
+    pass
 
 """
 size_bounds: (min_layout_size, max_layout_size)
@@ -97,12 +99,16 @@ class LayoutGenerator(object):
 
     @staticmethod
     def mdp_gen_fn_from_dict(
-            mdp_params, outer_shape=None, mdp_params_schedule_fn=None
+            mdp_params, outer_shape=None, mdp_params_schedule_fn=None, filter_function=None,
+            max_searched_layouts=100
     ):
         """
         mdp_params: one set of fixed mdp parameter used by the enviroment
         outer_shape: outer shape of the environment
-        mdp_params_schedule_fn: the schedule for varying mdp params
+        mdp_params_schedule_fn: the schedule for varying mdp params,
+        filter_function: if not None this method generates layouts and returns first one satisfying specified condition - checks if filter_function(lg.generate_padded_mdp) return True
+        max_searched_layouts: if lg.generate_padded_mdp returns n layouts failing filter_function without any example that passes the function raises LayoutGenerationError
+            used to break infinity loops when condition is (almost) impossible to satisfy
         """
         # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
         if outer_shape is None:
@@ -120,7 +126,10 @@ class LayoutGenerator(object):
                                            "always use the schedule_fn if it exist"
                 mdp_pg = MDPParamsGenerator(params_schedule_fn=mdp_params_schedule_fn)
             lg = LayoutGenerator(mdp_pg, outer_shape)
-            mdp_fn = lg.generate_padded_mdp
+            if filter_function is None:
+                mdp_fn = lg.generate_padded_mdp
+            else:
+                mdp_fn = invoke_until_result_satisfies_contition(condition=filter_function, max_tries=max_searched_layouts, exception=LayoutGenerationError("Cannot create layout satisfying condition in given number of tries"))(lg.generate_padded_mdp)
         return mdp_fn
 
     def generate_padded_mdp(self, outside_information={}):
