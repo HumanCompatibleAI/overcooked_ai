@@ -9,8 +9,9 @@ from overcooked_ai_py.mdp.layout_generator import LayoutGenerator, ONION_DISPENS
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent, RandomAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS, MotionPlanner
-from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir, load_from_json, save_as_json
+from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir, load_from_json, save_as_json, invoke_until_result_satisfies_contition
 from utils import TESTING_DATA_DIR, generate_serialized_trajectory
+from overcooked_ai_py.mdp.layout_metrics import non_self_play_difficulty, random_plays_difficulty
 
 START_ORDER_LIST = ["any"]
 n, s = Direction.NORTH, Direction.SOUTH
@@ -21,6 +22,54 @@ P, Obj = PlayerState, ObjectState
 def comb(n, k):
     return factorial(n) / (factorial(n - k) * factorial(k))
 
+class TestUtils(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_invoke_until_result_satisfies_contition(self):
+        expected_count = 4
+        condition = lambda x: x >= expected_count
+        @invoke_until_result_satisfies_contition(condition=condition, max_tries=10)
+        def return_count(counter=[1]): # because counter variable is mutable it is saved between function invokes
+            counter[0] += 1
+            return counter[0]
+        self.assertEqual(expected_count, return_count())
+
+        @invoke_until_result_satisfies_contition(condition=condition, max_tries=None, exception=Exception("some text"))
+        def return_count(counter=[1]): # because counter variable is mutable it is saved between function invokes
+            counter[0] += 1
+            return counter[0]
+        self.assertEqual(expected_count, return_count())
+
+        error = AssertionError
+        @invoke_until_result_satisfies_contition(condition=condition, max_tries=2, exception=error)
+        def return_count(counter=[1]): # because counter variable is mutable it is saved between function invokes
+            counter[0] += 1
+            return counter[0]
+        self.assertRaises(error, return_count)
+
+    def test_layout_metrics(self):
+        mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        env_params = {"horizon": 3}
+        self.assertIsNone(non_self_play_difficulty(mdp=mdp, env_params=env_params))
+        self.assertIsNone(random_plays_difficulty(mdp=mdp, env_params=env_params))
+
+        env_params = {"horizon": 500}
+        number_returned = False
+        for i in range(100): # needs to run more than once because of randomness
+            result = non_self_play_difficulty(mdp=mdp, env_params=env_params)
+            if result is not None:
+                number_returned = True
+                break
+        self.assertTrue(number_returned)
+
+        number_returned = False
+        for i in range(100): # needs to run more than once because of randomness
+            result = random_plays_difficulty(mdp=mdp, env_params=env_params)
+            if result is not None:
+                number_returned = True
+                break
+        self.assertTrue(number_returned)
 
 class TestRecipe(unittest.TestCase):
 
