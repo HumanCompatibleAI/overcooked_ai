@@ -319,7 +319,7 @@ class GreedyHumanModel(Agent):
 
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
-        return chosen_action, {"action_probs": [action_probs]}
+        return chosen_action, {"action_probs": action_probs}
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
         """
