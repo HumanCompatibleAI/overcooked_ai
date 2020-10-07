@@ -20,7 +20,7 @@ class AgentEvaluator(object):
     pickleable. We should think about possible improvements/what makes most sense to do here.
     """
 
-    def __init__(self, env_params, mdp_fn, force_compute=False, mlam_params=NO_COUNTERS_PARAMS):
+    def __init__(self, env_params, mdp_fn, force_compute=False, mlam_params=NO_COUNTERS_PARAMS, debug=False):
         """
         env_params (dict): params for creation of an OvercookedEnv
         mdp_fn (callable function): a function that can be used to create mdp
