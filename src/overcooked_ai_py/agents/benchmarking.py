@@ -71,7 +71,8 @@ class AgentEvaluator(object):
         num_mdp = env_params['num_mdp']
         assert type(num_mdp) == int and num_mdp > 0, "invalid number of mdp: " + str(num_mdp)
         # the initial_info is fed in to make sure the mdp_fn has the information to generate the mdp_lst
-        mdp_lst = [mdp_fn_naive(env_params["initial_info"]) for _ in range(num_mdp)]
+        initial_info = env_params["initial_info"] if "initial_info" in env_params else {}
+        mdp_lst = [mdp_fn_naive(initial_info) for _ in range(num_mdp)]
         return AgentEvaluator.from_mdp_lst(mdp_lst=mdp_lst, env_params=env_params,
                                            force_compute=force_compute, mlam_params=mlam_params, debug=debug)
 
