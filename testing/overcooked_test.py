@@ -1,4 +1,4 @@
-import unittest, os
+import unittest, os, shutil
 import json
 import numpy as np
 from math import factorial
@@ -35,8 +35,17 @@ class TestRecipe(unittest.TestCase):
 
         self.recipes = [self.r1, self.r2, self.r3, self.r4, self.r5, self.r6]
 
+        self.pickle_temp_dir = os.path.join(TESTING_DATA_DIR, 'recipes')
+
+        if not os.path.exists(self.pickle_temp_dir):
+            os.makedirs(self.pickle_temp_dir)
+
     def tearDown(self):
         Recipe.configure({})
+
+        if os.path.exists(self.pickle_temp_dir):
+            shutil.rmtree(self.pickle_temp_dir)
+            
 
     def test_eq(self):
 
@@ -52,6 +61,21 @@ class TestRecipe(unittest.TestCase):
         self.assertIs(self.r3, self.r4)
         self.assertIs(self.r4, self.r5)
         self.assertFalse(self.r6 is self.r1, "different recipes cached to same value")
+
+    def test_serialization(self):
+        loaded_recipes = []
+
+        # Save and then load every recipe instance
+        for i, recipe in enumerate(self.recipes):
+            pickle_path = os.path.join(self.pickle_temp_dir, 'recipe_{}'.format(i))
+            save_pickle(recipe, pickle_path)
+            loaded = load_pickle(pickle_path)
+            loaded_recipes.append(loaded)
+        
+        # Ensure loaded recipes equal corresponding original recipe
+        for original, loaded in zip(self.recipes, loaded_recipes):
+            self.assertEqual(original, loaded)
+
 
     def test_value(self):
         # TODO
@@ -702,7 +726,7 @@ class TestFeaturizations(unittest.TestCase):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlam = MediumLevelActionManager.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
-        self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
+        self.greedy_human_model_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
         np.random.seed(0)
 
     def test_lossless_state_featurization_shape(self):
@@ -716,7 +740,7 @@ class TestFeaturizations(unittest.TestCase):
         self.assertTrue(np.array_equal(obs.shape, self.base_mdp.featurize_state_shape), "{} vs {}".format(obs.shape, self.base_mdp.featurize_state_shape))
 
     def test_lossless_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_states"]]
         
         pickle_path = os.path.join(TESTING_DATA_DIR, "test_lossless_state_featurization", "expected")
@@ -728,7 +752,7 @@ class TestFeaturizations(unittest.TestCase):
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
         featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam) for state in ep_states] for ep_states in trajs["ep_states"]]
         pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected')
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
