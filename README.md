@@ -88,5 +88,5 @@ One can adapt a version of [this file](https://github.com/HumanCompatibleAI/huma
 
 ## Further Issues and questions
 
-If you have issues or questions, don't hesitate to contact either [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu or [Nathan Miller](https://github.com/nathan-miller23) at nathan_miller23@berkeley.edu
+If you have issues or questions, don't hesitate to contact either [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu, [Nathan Miller](https://github.com/nathan-miller23) at nathan_miller23@berkeley.edu, [Mesut Xiaocheng Yang](https://github.com/mesutyang97) at xiaocheng.yang@berkeley.edu, [Bartłomiej Mielnicki](https://github.com/bmielnicki) at mienlnicki05@gmail.com
 
