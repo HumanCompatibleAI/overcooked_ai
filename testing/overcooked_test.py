@@ -872,7 +872,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.4)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         num_game = 1000
-        num_counter = len(env.mdp.get_counter_locations())
+        num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
 
         for _ in range(num_game):
@@ -888,7 +888,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         num_game = 1000
-        num_counter = len(env.mdp.get_counter_locations())
+        num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
 
@@ -910,7 +910,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         num_game = 1000
-        num_counter = len(env.mdp.get_counter_locations())
+        num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
         cumm_soup_1 = 0
@@ -937,7 +937,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1, soup_2_litter=0.15, soup_3_litter=0.12)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         num_game = 2000
-        num_counter = len(env.mdp.get_counter_locations())
+        num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
         cumm_soup_1 = 0

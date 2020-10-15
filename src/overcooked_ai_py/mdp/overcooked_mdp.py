@@ -1084,7 +1084,7 @@ class OvercookedGridworld(object):
 
             objects = {}
             # For each counter, add a litter object with prob rnd_obj_prob_thresh
-            for counter_loc in self.get_counter_locations():
+            for counter_loc in self.get_reachable_counter_locations():
                 p = np.random.rand()
                 if p < litter_thresh:
                     # Different objects have different probabilities
@@ -1423,6 +1423,17 @@ class OvercookedGridworld(object):
 
     def get_counter_locations(self):
         return list(self.terrain_pos_dict['X'])
+
+    def get_reachable_counter_locations(self):
+        reachable_counter_locations = []
+        empty_locations = self.get_valid_player_positions()
+        for counter_loc in self.get_counter_locations():
+            for d in Direction.ALL_DIRECTIONS:
+                adj_pos = Action.move_in_direction(counter_loc, d)
+                if adj_pos in empty_locations:
+                    reachable_counter_locations.append(counter_loc)
+                    break
+        return reachable_counter_locations
 
     @property
     def num_pots(self):
