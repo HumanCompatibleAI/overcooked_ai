@@ -2,7 +2,7 @@ import itertools, copy
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, read_layout_dict
+from overcooked_ai_py.utils import pos_distance, read_layout_dict, weighted_random_by_dct, normalize
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -1051,6 +1051,53 @@ class OvercookedGridworld(object):
                         )
                     else:
                         player.set_object(ObjectState(obj, player.position))
+            return start_state
+        return start_state_fn
+
+    def get_litter_start_state_fn(self, onion_litter=0.0, dish_litter=0.0, soup_1_litter=0.0, soup_2_litter=0.0, soup_3_litter=0.0):
+        """
+        Arguments:
+            onion_litter (float): percentage of counter that should be littered by onion
+            dish_litter (float): percentage of counter that should be littered by dish
+            soup_1_litter (float): percentage of counter that should be littered by 1-onion-soup
+            soup_2_litter (float): percentage of counter that should be littered by 2-onion-soup
+            soup_3_litter (float): percentage of counter that should be littered by 3-onion-soup
+        """
+
+        litter_prob = {
+            "onion": onion_litter,
+            "dish": dish_litter,
+            "soup_1": soup_1_litter,
+            "soup_2": soup_2_litter,
+            "soup_3": soup_3_litter
+        }
+        # total probability of having a litter on counter
+        litter_thresh = sum(litter_prob.values())
+        assert litter_thresh <= 1, "litter_thresh should be smaller than 1, but got %d" % litter_thresh
+
+        # normalize for easier sampling
+        litter_prob = normalize(litter_prob)
+
+        def start_state_fn():
+            start_pos = self.start_player_positions
+            start_state = OvercookedState.from_player_positions(start_pos, bonus_orders=self.start_bonus_orders, all_orders=self.start_all_orders)
+
+            objects = {}
+            # For each counter, add a litter object with prob rnd_obj_prob_thresh
+            for counter_loc in self.get_counter_locations():
+                p = np.random.rand()
+                if p < litter_thresh:
+                    # Different objects have different probabilities
+                    obj = weighted_random_by_dct(litter_prob)
+                    # handling soup
+                    if len(obj) > 5 and obj[:4] == "soup":
+                        n = int(obj[-1])
+                        # currently only support onion-only soup
+                        obj_instance = SoupState.get_soup(counter_loc, num_onions=n, finished=True)
+                    else:
+                        obj_instance = ObjectState(obj, counter_loc)
+                    objects[counter_loc] = obj_instance
+            start_state.objects = objects
             return start_state
         return start_state_fn
 

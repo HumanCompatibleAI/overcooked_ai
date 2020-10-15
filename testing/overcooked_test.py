@@ -867,6 +867,109 @@ class TestOvercookedEnvironment(unittest.TestCase):
             curr_terrain = env.state.all_objects_list
             self.assertFalse(np.array_equal(start_state, curr_terrain))
 
+    def test_onion_littering(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.4)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        num_game = 1000
+        num_counter = len(env.mdp.get_counter_locations())
+        cumm_onion = 0
+
+        for _ in range(num_game):
+            env.reset()
+            all_object_lst = env.state.all_objects_list
+            for object in all_object_lst:
+                assert object.name == "onion", "item that is not onion is generated"
+                cumm_onion += 1
+        self.assertAlmostEqual(0.4, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.4 of counters occupied by onion")
+
+    def test_onion_and_dish_littering(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        num_game = 1000
+        num_counter = len(env.mdp.get_counter_locations())
+        cumm_onion = 0
+        cumm_dish = 0
+
+        for _ in range(num_game):
+            env.reset()
+            all_object_lst = env.state.all_objects_list
+            for object in all_object_lst:
+                if object.name == "onion":
+                    cumm_onion += 1
+                elif object.name == "dish":
+                    cumm_dish += 1
+                else:
+                    raise NotImplementedError("%s encountered, when expecting onion or dish" % object.name)
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
+
+    def test_onion_and_dish_and_soup_littering(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        num_game = 1000
+        num_counter = len(env.mdp.get_counter_locations())
+        cumm_onion = 0
+        cumm_dish = 0
+        cumm_soup_1 = 0
+
+        for _ in range(num_game):
+            env.reset()
+            all_object_lst = env.state.all_objects_list
+            for object in all_object_lst:
+                if object.name == "onion":
+                    cumm_onion += 1
+                elif object.name == "dish":
+                    cumm_dish += 1
+                elif object.name == "soup":
+                    cumm_soup_1 += 1
+                    assert len(object.ingredients) == 1
+                else:
+                    raise NotImplementedError("%s encountered, when expecting onion or dish or soup" % object.name)
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
+        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
+
+    def test_onion_and_dish_and_soup_littering(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1, soup_2_litter=0.15, soup_3_litter=0.12)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        num_game = 2000
+        num_counter = len(env.mdp.get_counter_locations())
+        cumm_onion = 0
+        cumm_dish = 0
+        cumm_soup_1 = 0
+        cumm_soup_2 = 0
+        cumm_soup_3 = 0
+
+        for _ in range(num_game):
+            env.reset()
+            all_object_lst = env.state.all_objects_list
+            for object in all_object_lst:
+                if object.name == "onion":
+                    cumm_onion += 1
+                elif object.name == "dish":
+                    cumm_dish += 1
+                elif object.name == "soup":
+                    num_ing = len(object.ingredients)
+                    if num_ing == 1:
+                        cumm_soup_1 += 1
+                    elif num_ing == 2:
+                        cumm_soup_2 += 1
+                    elif num_ing == 3:
+                        cumm_soup_3 += 1
+                    else:
+                        raise NotImplementedError("soup with %d ingrdients encountered, whereas the maximum is 3" % num_ing)
+                else:
+                    raise NotImplementedError("%s encountered, when expecting onion or dish or soup" % object.name)
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
+        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
+        self.assertAlmostEqual(0.15, cumm_soup_2/(num_counter * num_game), delta=0.01, msg="Should have 0.15 of counters occupied by soup_2")
+        self.assertAlmostEqual(0.12, cumm_soup_3/(num_counter * num_game), delta=0.01, msg="Should have 0.12 of counters occupied by soup_1")
+
     def test_failing_rnd_layout(self):
         with self.assertRaises(TypeError):
             mdp_gen_params = {"None": None}

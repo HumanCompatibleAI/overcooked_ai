@@ -1,9 +1,8 @@
 import io, json, pickle, pstats, cProfile, os
 import numpy as np
-from numpy import nan
+import random
 from collections import defaultdict
 from pathlib import Path
-from collections.abc import Iterable
 from overcooked_ai_py.static import LAYOUTS_DIR
 from collections.abc import Iterable
 
@@ -171,3 +170,17 @@ def read_layout_dict(layout_name):
 
 def is_iterable(obj):
     return isinstance(obj, Iterable)
+
+def weighted_random_by_dct(dct):
+    rand_val = random.random()
+    total = 0
+    for k, v in dct.items():
+        total += v
+        if rand_val <= total:
+            return k
+    assert False, 'unreachable'
+
+
+def normalize(dct):
+    factor = 1/sum(dct.values())
+    return{x: dct[x] * factor for x in dct}
