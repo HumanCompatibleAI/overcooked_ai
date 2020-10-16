@@ -75,9 +75,11 @@ class OvercookedEnv(object):
         self.horizon = horizon
         self._mlam = None
         self._mp = None
+        self.mdp = None
         self.mlam_params = mlam_params
         assert not (start_state_fn and litter_params), "litter params will change start state fn, and thus we can't have both"
         if litter_params:
+            # this extra layer of shelding is necessary to define the function without self.mdp being initialized
             self.start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(self.mdp, **litter_params)()
         else:
             self.start_state_fn = start_state_fn
