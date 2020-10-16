@@ -52,7 +52,7 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1, initial_info={}):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1, initial_info={}, litter_params=None):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
@@ -61,6 +61,7 @@ class OvercookedEnv(object):
         info_level (int):               Change amount of logging
         num_mdp (int):                  the number of mdp if we are using a list of mdps
         initial_info (dict):            the initial outside information feed into the generator function
+        litter_params (dict):           the parameter that controls how much litter is there in the initial state
 
         TODO: Potentially make changes based on this discussion
         https://github.com/HumanCompatibleAI/overcooked_ai/pull/22#discussion_r416786847
@@ -75,7 +76,11 @@ class OvercookedEnv(object):
         self._mlam = None
         self._mp = None
         self.mlam_params = mlam_params
-        self.start_state_fn = start_state_fn
+        assert not (start_state_fn and litter_params), "litter params will change start state fn, and thus we can't have both"
+        if litter_params:
+            self.start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(self.mdp, **litter_params)()
+        else:
+            self.start_state_fn = start_state_fn
         self.info_level = info_level
         self.initial_info = initial_info
         self.reset(outside_info=self.initial_info)

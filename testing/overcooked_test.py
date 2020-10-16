@@ -849,7 +849,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_starting_position_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=True, rnd_obj_prob_thresh=0.0)
+        start_state_fn = OvercookedGridworld.get_random_start_state_fn(self.base_mdp, random_start_pos=True, rnd_obj_prob_thresh=0.0)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         start_state = env.state.players_pos_and_or
         for _ in range(3):
@@ -859,7 +859,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_starting_obj_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=False, rnd_obj_prob_thresh=0.8)
+        start_state_fn = lambda : OvercookedGridworld.get_random_start_state_fn(self.base_mdp, random_start_pos=False, rnd_obj_prob_thresh=0.8)
         env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
         start_state = env.state.all_objects_list
         for _ in range(3):
@@ -868,10 +868,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
             self.assertFalse(np.array_equal(start_state, curr_terrain))
 
     def test_onion_littering(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.4)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
-        num_game = 1000
+        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = lambda : OvercookedGridworld.get_litter_start_state_fn(base_mdp, onion_litter=0.4)()
+        env = OvercookedEnv.from_mdp(base_mdp, start_state_fn)
+        num_game = 4000
         num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
 
@@ -884,10 +884,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.assertAlmostEqual(0.4, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.4 of counters occupied by onion")
 
     def test_onion_and_dish_littering(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
-        num_game = 1000
+        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(base_mdp, onion_litter=0.3, dish_litter=0.2)()
+        env = OvercookedEnv.from_mdp(base_mdp, start_state_fn)
+        num_game = 4000
         num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
@@ -906,10 +906,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
 
     def test_onion_and_dish_and_soup_littering(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
-        num_game = 1000
+        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(base_mdp, onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1)()
+        env = OvercookedEnv.from_mdp(base_mdp, start_state_fn)
+        num_game = 4000
         num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
@@ -932,11 +932,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
         self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
 
-    def test_onion_and_dish_and_soup_littering(self):
-        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        start_state_fn = self.base_mdp.get_litter_start_state_fn(onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1, soup_2_litter=0.15, soup_3_litter=0.12)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
-        num_game = 2000
+    def test_onion_and_dish_and_soup_more_littering(self):
+        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(base_mdp, onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1, soup_2_litter=0.15, soup_3_litter=0.12)()
+        env = OvercookedEnv.from_mdp(base_mdp, start_state_fn)
+        num_game = 4000
         num_counter = len(env.mdp.get_reachable_counter_locations())
         cumm_onion = 0
         cumm_dish = 0
@@ -969,6 +969,87 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
         self.assertAlmostEqual(0.15, cumm_soup_2/(num_counter * num_game), delta=0.01, msg="Should have 0.15 of counters occupied by soup_2")
         self.assertAlmostEqual(0.12, cumm_soup_3/(num_counter * num_game), delta=0.01, msg="Should have 0.12 of counters occupied by soup_1")
+
+
+    def test_onion_and_dish_and_soup_more_littering_display(self):
+        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        start_state_fn = lambda: OvercookedGridworld.get_litter_start_state_fn(base_mdp, onion_litter=0.3, dish_litter=0.2, soup_1_litter=0.1, soup_2_litter=0.15, soup_3_litter=0.12)()
+        env = OvercookedEnv.from_mdp(base_mdp, start_state_fn)
+        num_game = 5
+
+        for _ in range(num_game):
+            env.reset()
+            print(env.mdp.state_string(env.state))
+            print("-----------------------------------")
+
+    def test_random_layout_littering_env(self):
+        mdp_gen_params = {"inner_shape": (5, 4),
+                          "prop_empty": 0.95,
+                          "prop_feats": 0.1,
+                          "start_all_orders": [
+                              {"ingredients": ["onion", "onion", "onion"]}
+                          ],
+                          "display": False
+                          }
+
+        onion_litter = 0.3
+        dish_litter = 0.1
+        soup_1_litter = 0.02
+        soup_2_litter = 0.02
+        soup_3_litter = 0.02
+
+        litter_params = {
+            "onion_litter": onion_litter,
+            "dish_litter": dish_litter,
+            "soup_1_litter": soup_1_litter,
+            "soup_2_litter": soup_2_litter,
+            "soup_3_litter": soup_3_litter
+        }
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params, outer_shape=(5, 4))
+        env_param = DEFAULT_ENV_PARAMS.copy()
+        env_param["litter_params"] = litter_params
+        env = OvercookedEnv(mdp_fn, **env_param)
+        num_game = 10
+
+        for _ in range(num_game):
+            env.reset()
+            print(env.mdp.state_string(env.state))
+            print("-----------------------------------")
+
+
+    def test_random_layout_littering_env_null(self):
+        mdp_gen_params = {"inner_shape": (5, 4),
+                          "prop_empty": 0.95,
+                          "prop_feats": 0.1,
+                          "start_all_orders": [
+                              {"ingredients": ["onion", "onion", "onion"]}
+                          ],
+                          "display": False
+                          }
+
+        onion_litter = 0.0
+        dish_litter = 0.0
+        soup_1_litter = 0.0
+        soup_2_litter = 0.0
+        soup_3_litter = 0.0
+
+        litter_params = {
+            "onion_litter": onion_litter,
+            "dish_litter": dish_litter,
+            "soup_1_litter": soup_1_litter,
+            "soup_2_litter": soup_2_litter,
+            "soup_3_litter": soup_3_litter
+        }
+        mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params, outer_shape=(5, 4))
+        env_param = DEFAULT_ENV_PARAMS.copy()
+        env_param["litter_params"] = litter_params
+        env = OvercookedEnv(mdp_fn, **env_param)
+        num_game = 10
+        for _ in range(num_game):
+            env.reset()
+            print(env.mdp.state_string(env.state))
+            print("-----------------------------------")
+
 
     def test_failing_rnd_layout(self):
         with self.assertRaises(TypeError):
