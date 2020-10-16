@@ -1,6 +1,7 @@
 import random
 import copy
 import numpy as np
+from overcooked_ai_py.mdp.actions import Action
 INTERACT_TRANSITION_COST = 2
 
 INFINITY = np.inf
@@ -18,6 +19,15 @@ def midpoint(point_0, point_1):
 
 class OvercookedSearchNode:
     def __init__(self, primary_idx, agent_0_loc, agent_1_loc, agent_0_path, agent_1_path, num_counter_ops):
+        """
+        Search node used in UCS
+        Arguments:
+            primary_idx (int): the index of the agent that is moving in the search process
+            agent_0_loc (tuple of length 2): the location of agent 0
+            agent_1_loc (tuple of length 2): the location of agent 1
+            agent_0_path (list of variable length): the cummulative list of locations traversed by agent 0
+            agent_1_path (list of variable length): the cummulative list of locations traversed by agent 1
+        """
         self.primary_idx = primary_idx
         self.agent_0_loc = agent_0_loc
         self.agent_1_loc = agent_1_loc
@@ -57,6 +67,12 @@ class OvercookedSearchNode:
             self.agent_1_loc = self.primary_path()[-2]
 
     def update_primary_agent_loc(self, new_primary_agent_loc, new_secondary_agent_loc=UNDEFIND_LOCATION):
+        """
+        This function is mostly used when generating successors of a search node
+        Arguments:
+            new_primary_agent_loc (tuple of length 2): the new location of the primary agent
+            new_secondary_agent_loc (tuple of length 2): the new location of th secondary agent
+        """
         if self.primary_idx == 0:
             self.agent_0_loc = new_primary_agent_loc
             if new_secondary_agent_loc != UNDEFIND_LOCATION:
@@ -71,9 +87,11 @@ class OvercookedSearchNode:
             self.agent_0_path += [new_secondary_agent_loc]
 
     def to_tuple(self):
+        # convert the entire node nodes to a hashable tuple
         return tuple([self.primary_idx, self.agent_0_loc, self.agent_1_loc, self.agent_0_path, self.agent_1_path, self.num_counter_ops])
 
     def hash_key(self, at_goal=False):
+        # produce a hash key to be used when returned by the UCS
         # if the primary_agent_loc is at goal, use the location before that for physical location
         if at_goal:
             self.correct_primary_agent_loc()
@@ -108,8 +126,16 @@ class OvercookedSearchNode:
 
         return successor_node
 
+    def extract_motion_plan_from_path(self):
+        """
+        return:
+
+        """
+
     def __str__(self):
+        # string representation of search node in UCS
         output = ""
+        output += "primary agent: " + str(self.primary_idx) + "\n"
         output += "locations: " + str(self.agent_0_loc) + " " + str(self.agent_1_loc) + "\n"
         output += "path 0: " + str(self.agent_0_path) + "\n"
         output += "path 1: " + str(self.agent_1_path) + "\n"
@@ -120,6 +146,17 @@ class OvercookedSearchNode:
 class OvercookedMetaSearchNode:
     def __init__(self, primary_idx, agent_0_loc, agent_1_loc, pot_loc, agent_0_path_dict, agent_1_path_dict,
                  num_counter_ops):
+        """
+        Search Node used for a composition of medium level tasks (picking up an onion, dishing a soup, etc)
+        Arguments:
+            primary_idx (int): the index of the agent that is moving in the search process
+            agent_0_loc (tuple of length 2): the location of agent 0
+            agent_1_loc (tuple of length 2): the location of agent 1
+            agent_0_path_dict (dictionary of list of variable length):
+                keys: medium levthe cummulative list of locations traversed by agent 0
+            agent_1_path_dict (dictionary of list of variable length): the cummulative list of locations traversed by agent 1
+
+        """
         self.primary_idx = primary_idx
         self.agent_0_loc = agent_0_loc
         self.agent_1_loc = agent_1_loc
@@ -133,11 +170,19 @@ class OvercookedMetaSearchNode:
         self.agent_1_path_dict[task_name] = agent_1_path_task
 
     def update_pot_loc(self, pot_loc):
+        # update the target pot when starting to make a plan to cook soups
         if self.pot_loc and self.pot_loc != pot_loc:
             raise NotImplementedError("cannot switch pot halfway through")
         self.pot_loc = pot_loc
 
     def update_from_search_node(self, task_name, search_node: OvercookedSearchNode, pot_loc=None):
+        """
+        This function is mostly used when generating successors of a meta search node.
+        It will parse information from the lower level search node returned by UCS
+        Arguments:
+            task_name (str): the name of the medium level task carried out by the search_node
+            search_node (OvercookedSearchNode): the resulting search node returned by UCS
+        """
         updated_meta_search_node = self.copy()
         updated_meta_search_node.primary_idx = search_node.primary_idx
         updated_meta_search_node.agent_0_loc = search_node.agent_0_loc
@@ -149,6 +194,7 @@ class OvercookedMetaSearchNode:
         return updated_meta_search_node
 
     def hash_key(self):
+        # the hash code for the meta search node
         return tuple([self.agent_0_loc, self.agent_1_loc, self.pot_loc, self.primary_idx])
 
     def agent_positions(self):
@@ -167,10 +213,11 @@ class OvercookedMetaSearchNode:
 
     def __str__(self):
         output = ""
+        output += "primary agent: " + str(self.primary_idx) + "\n"
         output += "locations: " + str(self.agent_0_loc) + " " + str(self.agent_1_loc) + "\n"
         output += "pot: " + str(self.pot_loc) + "\n"
-        output += "path 0: " + str(self.agent_0_path_dict) + "\n"
-        output += "path 1: " + str(self.agent_1_path_dict) + "\n"
+        output += "path dict 0: " + str(self.agent_0_path_dict) + "\n"
+        output += "path dict 1: " + str(self.agent_1_path_dict) + "\n"
         output += "num counter operations: " + str(self.num_counter_ops) + "\n"
         return output
 
@@ -255,12 +302,13 @@ def shortest_walk_dist(walk_graph, start_loc, goal_loc, terrain_mtx, debug=False
 
 def uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_locations, start_agent_idx, goal_loc):
     """
-    :param walk_graph: the dictionary representation of the walking graph (reachable by walking)
-    :param handover_graph: the dictionary representation of the handover graph (reachable by placing on counter)
-    :param terrain_mtx: matrix representation of the grid world. Does not include information about agents
-    :param agent_locations: tuple of tuple, locations of agents
-    :param start_agent_idx: the agent starting to act first
-    :param goal_loc: the location we would like to reach
+    Arguments:
+        walk_graph: the dictionary representation of the walking graph (reachable by walking)
+        handover_graph: the dictionary representation of the handover graph (reachable by placing on counter)
+        terrain_mtx: matrix representation of the grid world. Does not include information about agents
+        agent_locations: tuple of tuple, locations of agents
+        start_agent_idx: the agent starting to act first
+        goal_loc: the location we would like to reach
     :return: dictionary of
         {number of counter_operations: [length of the path, the ending physical location, the path itself]}
         note: the number of counter_operations should always be even because it takes 1 to drop something down,
@@ -450,8 +498,21 @@ def graph_from_terrain(terrain_mtx):
     return walk_graph, handover_graph
 
 
-
-def perform_meta_action(feature_locations, prev_meta_dict, walk_graph, handover_graph, terrain_mtx, task_name, both_idx=False, is_potting=False, is_dishing=False):
+def perform_meta_action(feature_locations, prev_meta_dict, walk_graph, handover_graph, terrain_mtx, task_name,
+                        both_idx=False, is_potting=False, is_dishing=False):
+    """
+    This function perform one meta action from the previous meta node, recorded in prev_meta_dict
+    Arguments:
+       feature_locations (list of tuples): the locations of destination features for this meta action
+       prev_meta_dict (dict): a dictionary of meta nodes up to this point
+       walk_graph (dict): walk graph found by graph_from_terrain
+       handover_graph (dict): handover graph found by graph_from_terrain
+       terrain_mtx (list of list): matrix for the terrain
+       task_name (str): name of the meta action
+       both_idx (bool): whether this action can be performed by agents at both agent, and not just the primary agent
+       is_potting (bool): whether we need to update the pot location when create the new meta node
+       is_dishing (bool): whether we are using the pot_loc as the goal for the motion plan
+    """
     new_dict = {}
     for f_location in feature_locations:
         for backward_meta_hash in prev_meta_dict.keys():
@@ -463,7 +524,7 @@ def perform_meta_action(feature_locations, prev_meta_dict, walk_graph, handover_
                     start_idx_lst = [0, 1]
                 else:
                     start_idx_lst = [backward_meta_node.primary_idx]
-
+                # if we are dishing a cooked soup, the distination has to be the current pot location
                 if is_dishing:
                     f_location = backward_meta_node.pot_loc
 
@@ -488,9 +549,9 @@ def perform_meta_action(feature_locations, prev_meta_dict, walk_graph, handover_
 
 def terrain_analysis(terrain_mtx, silent = True):
     """
-    :param terrain_mtx: 2 dimensional terrain matrix which represent the grid
+    Arguments:
+    terrain_mtx (list of list): 2 dimensional terrain matrix which represent the grid
         details for conventions can be found at overcooked_ai_py.mdp.layout_generator
-    :return:
     """
 
     def get_feature_locations(terrain_mtx, feature):
