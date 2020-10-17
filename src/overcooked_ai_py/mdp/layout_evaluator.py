@@ -128,9 +128,14 @@ class OvercookedSearchNode:
 
     def extract_motion_plan_from_path(self):
         """
-        return:
-
+        return: the list of actions that will be used to fulfill the path for both agents
         """
+        agent_0_actions = []
+        agent_1_actions = []
+        # TODO: look for things in from overcooked_ai_py.mdp.actions.Action
+
+        return agent_0_actions, agent_1_actions
+
 
     def __str__(self):
         # string representation of search node in UCS
@@ -143,7 +148,7 @@ class OvercookedSearchNode:
         return output
 
 
-class OvercookedMetaSearchNode:
+class OvercookedMLASearchNode:
     def __init__(self, primary_idx, agent_0_loc, agent_1_loc, pot_loc, agent_0_path_dict, agent_1_path_dict,
                  num_counter_ops):
         """
@@ -177,31 +182,31 @@ class OvercookedMetaSearchNode:
 
     def update_from_search_node(self, task_name, search_node: OvercookedSearchNode, pot_loc=None):
         """
-        This function is mostly used when generating successors of a meta search node.
+        This function is mostly used when generating successors of a mla search node.
         It will parse information from the lower level search node returned by UCS
         Arguments:
             task_name (str): the name of the medium level task carried out by the search_node
             search_node (OvercookedSearchNode): the resulting search node returned by UCS
         """
-        updated_meta_search_node = self.copy()
-        updated_meta_search_node.primary_idx = search_node.primary_idx
-        updated_meta_search_node.agent_0_loc = search_node.agent_0_loc
-        updated_meta_search_node.agent_1_loc = search_node.agent_1_loc
-        updated_meta_search_node.append_path_for_task(task_name, search_node.agent_0_path, search_node.agent_1_path)
-        updated_meta_search_node.num_counter_ops += search_node.num_counter_ops
+        updated_mla_search_node = self.copy()
+        updated_mla_search_node.primary_idx = search_node.primary_idx
+        updated_mla_search_node.agent_0_loc = search_node.agent_0_loc
+        updated_mla_search_node.agent_1_loc = search_node.agent_1_loc
+        updated_mla_search_node.append_path_for_task(task_name, search_node.agent_0_path, search_node.agent_1_path)
+        updated_mla_search_node.num_counter_ops += search_node.num_counter_ops
         if pot_loc:
-            updated_meta_search_node.update_pot_loc(pot_loc)
-        return updated_meta_search_node
+            updated_mla_search_node.update_pot_loc(pot_loc)
+        return updated_mla_search_node
 
     def hash_key(self):
-        # the hash code for the meta search node
+        # the hash code for the mla search node
         return tuple([self.agent_0_loc, self.agent_1_loc, self.pot_loc, self.primary_idx])
 
     def agent_positions(self):
         return tuple([self.agent_0_loc, self.agent_1_loc])
 
     def copy(self):
-        return OvercookedMetaSearchNode(
+        return OvercookedMLASearchNode(
             self.primary_idx,
             self.agent_0_loc,
             self.agent_1_loc,
@@ -498,53 +503,52 @@ def graph_from_terrain(terrain_mtx):
     return walk_graph, handover_graph
 
 
-def perform_meta_action(feature_locations, prev_meta_dict, walk_graph, handover_graph, terrain_mtx, task_name,
+def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, terrain_mtx, task_name,
                         both_idx=False, is_potting=False, is_dishing=False):
     """
-    This function perform one meta action from the previous meta node, recorded in prev_meta_dict
+    This function perform one mla action from the previous mla node, recorded in prev_mla_dict
     Arguments:
-       feature_locations (list of tuples): the locations of destination features for this meta action
-       prev_meta_dict (dict): a dictionary of meta nodes up to this point
+       feature_locations (list of tuples): the locations of destination features for this mla action
+       prev_mla_dict (dict): a dictionary of mla nodes up to this point
        walk_graph (dict): walk graph found by graph_from_terrain
        handover_graph (dict): handover graph found by graph_from_terrain
        terrain_mtx (list of list): matrix for the terrain
-       task_name (str): name of the meta action
+       task_name (str): name of the mla action
        both_idx (bool): whether this action can be performed by agents at both agent, and not just the primary agent
-       is_potting (bool): whether we need to update the pot location when create the new meta node
+       is_potting (bool): whether we need to update the pot location when create the new mla node
        is_dishing (bool): whether we are using the pot_loc as the goal for the motion plan
     """
     new_dict = {}
     for f_location in feature_locations:
-        for backward_meta_hash in prev_meta_dict.keys():
-            for backward_meta_node in prev_meta_dict[backward_meta_hash]:
+        for backward_mla_hash in prev_mla_dict.keys():
+            for backward_mla_node in prev_mla_dict[backward_mla_hash]:
                 # For this part, it doesn't matter who is picking up the dish
-                agent_positions = backward_meta_node.agent_positions()
+                agent_positions = backward_mla_node.agent_positions()
                 # give the option to let both agents participat in a task if it does not rely on primary agent having something
                 if both_idx:
                     start_idx_lst = [0, 1]
                 else:
-                    start_idx_lst = [backward_meta_node.primary_idx]
+                    start_idx_lst = [backward_mla_node.primary_idx]
                 # if we are dishing a cooked soup, the distination has to be the current pot location
                 if is_dishing:
-                    f_location = backward_meta_node.pot_loc
+                    f_location = backward_mla_node.pot_loc
 
                 for start_idx in start_idx_lst:
                     # Also, there is nothing to be handed over, so passing in empty dictionary
                     options = uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_positions, start_idx, f_location)
                     for ending_hash_i in options.keys():
                         for forward_node in options[ending_hash_i]:
-                            # we only update the pot location in the meta node if we are potting onion
+                            # we only update the pot location in the mla node if we are potting onion
                             if is_potting:
-                                forward_meta_node = backward_meta_node.update_from_search_node(task_name, forward_node, f_location)
+                                forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node, f_location)
                             else:
-                                forward_meta_node = backward_meta_node.update_from_search_node(task_name, forward_node)
-                            forward_meta_hash = forward_meta_node.hash_key()
+                                forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node)
+                            forward_mla_hash = forward_mla_node.hash_key()
 
-                            if forward_meta_hash not in new_dict.keys():
-                                new_dict[forward_meta_hash] = []
-                            new_dict[forward_meta_hash].append(forward_meta_node)
+                            if forward_mla_hash not in new_dict.keys():
+                                new_dict[forward_mla_hash] = []
+                            new_dict[forward_mla_hash].append(forward_mla_node)
     return new_dict
-
 
 
 def terrain_analysis(terrain_mtx, silent = True):
@@ -626,10 +630,10 @@ def terrain_analysis(terrain_mtx, silent = True):
     key: (p0_loc, p1_loc, pot_loc, )
 
     """
-    starting_meta_search_node = OvercookedMetaSearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0)
+    starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0)
     possible_starting_agents_positions = {
         # format: p0 location, p1 location,
-        starting_meta_search_node.hash_key(): [starting_meta_search_node]
+        starting_mla_search_node.hash_key(): [starting_mla_search_node]
     }
 
     if not silent:
@@ -637,7 +641,7 @@ def terrain_analysis(terrain_mtx, silent = True):
 
     # first we need the onions
     onion_dispenser_locations = get_feature_locations(terrain_mtx, 'O')
-    possible_onion_agent_positions = perform_meta_action(
+    possible_onion_agent_positions = perform_mla(
         onion_dispenser_locations,
         possible_starting_agents_positions,
         walk_graph,
@@ -663,7 +667,7 @@ def terrain_analysis(terrain_mtx, silent = True):
 
     # then we need to put the onion to the pot
     pot_locations = get_feature_locations(terrain_mtx, 'P')
-    possible_agents_and_cooking_pot_positions = perform_meta_action(
+    possible_agents_and_cooking_pot_positions = perform_mla(
         pot_locations,
         possible_onion_agent_positions,
         walk_graph,
@@ -689,7 +693,7 @@ def terrain_analysis(terrain_mtx, silent = True):
     # then we need to pick up the dish from a dispenser
     dish_dispenser_locations = get_feature_locations(terrain_mtx, 'D')
     possible_dish_agent_and_cooking_pot_positions = {}
-    possible_dish_agent_and_cooking_pot_positions = perform_meta_action(
+    possible_dish_agent_and_cooking_pot_positions = perform_mla(
         dish_dispenser_locations,
         possible_agents_and_cooking_pot_positions,
         walk_graph,
@@ -712,7 +716,7 @@ def terrain_analysis(terrain_mtx, silent = True):
         print("*************************************")
 
     # then we need to return the dish to the cooked pot
-    possible_agent_and_cooked_dished_pot_positions = perform_meta_action(
+    possible_agent_and_cooked_dished_pot_positions = perform_mla(
         [None], # this should be ignored anyway
         possible_dish_agent_and_cooking_pot_positions,
         walk_graph,
@@ -736,7 +740,7 @@ def terrain_analysis(terrain_mtx, silent = True):
 
     # In the end, we need to deliver the meal to the serving point
     serving_locations = get_feature_locations(terrain_mtx, 'S')
-    possible_agents_served_positions = perform_meta_action(
+    possible_agents_served_positions = perform_mla(
         serving_locations,
         possible_agent_and_cooked_dished_pot_positions,
         walk_graph,
