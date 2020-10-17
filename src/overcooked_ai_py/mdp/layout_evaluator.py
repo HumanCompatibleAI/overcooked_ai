@@ -7,14 +7,36 @@ INTERACT_TRANSITION_COST = 2
 INFINITY = np.inf
 
 # the location for secondary agent as we are moving the primary agent
-UNDEFIND_LOCATION = "UND"
+UNDEFIND_LOCATION = "UND_L"
 
+# the undefined action
+UNDEFIND_ACTION = "UND_A"
 
 import heapq
 
 
 def midpoint(point_0, point_1):
     return tuple([(point_0[0] + point_1[0])//2, (point_0[1] + point_1[1])//2])
+
+def path_to_actions(path_0, path_1, terrain_mtx):
+    """
+    Arguments:
+        path_0 (list): a list of tuble for locations of agent 0
+        path_1 (list): a list of tuble for locations of agent 1
+        terrain_mtx (list of list): the terrain matrix. You might need this to identify counters / pots, etc.
+    return:
+        the list of actions that will be used to fulfill the path
+    """
+    assert len(path_0) == len(path_1), "input path should have the same length. Please check the SearchNode for this"
+    actions_0 = []
+    actions_1 = []
+    # TODO: look for things in from overcooked_ai_py.mdp.actions.Action
+    # TODO: please note that the 0th and 1st index are flipped in the output Please refer to Action class
+    # TODO: be sure to account for the case where a counter is used in the middle of a path (and inbounding interact)
+    # TODO: we are processing both agents in parallel because we need to pad both agent's
+
+    assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
+    return actions_0, actions_1
 
 
 class OvercookedSearchNode:
@@ -66,7 +88,7 @@ class OvercookedSearchNode:
         else:
             self.agent_1_loc = self.primary_path()[-2]
 
-    def update_primary_agent_loc(self, new_primary_agent_loc, new_secondary_agent_loc=UNDEFIND_LOCATION):
+    def update_primary_agent_loc(self, new_primary_agent_loc, new_secondary_agent_loc=UNDEFIND_LOCATION, secondary_path_UDF=False):
         """
         This function is mostly used when generating successors of a search node
         Arguments:
@@ -78,13 +100,21 @@ class OvercookedSearchNode:
             if new_secondary_agent_loc != UNDEFIND_LOCATION:
                 self.agent_1_loc = new_secondary_agent_loc
             self.agent_0_path += [new_primary_agent_loc]
-            self.agent_1_path += [new_secondary_agent_loc]
+            # if we want to override the path update to UDF, we can still do this
+            if secondary_path_UDF:
+                self.agent_1_path += [UNDEFIND_LOCATION]
+            else:
+                self.agent_1_path += [new_secondary_agent_loc]
         else:
             self.agent_1_loc = new_primary_agent_loc
             if new_secondary_agent_loc != UNDEFIND_LOCATION:
                 self.agent_0_loc = new_secondary_agent_loc
             self.agent_1_path += [new_primary_agent_loc]
-            self.agent_0_path += [new_secondary_agent_loc]
+            # if we want to override the path update to UDF, we can still do this
+            if secondary_path_UDF:
+                self.agent_0_path += [UNDEFIND_LOCATION]
+            else:
+                self.agent_0_path += [new_secondary_agent_loc]
 
     def to_tuple(self):
         # convert the entire node nodes to a hashable tuple
@@ -115,7 +145,7 @@ class OvercookedSearchNode:
             # change control
             successor_node.primary_idx = 1 - self.primary_idx
             # interact to get the item from the counter
-            successor_node.update_primary_agent_loc(primary_agent_new_loc, counter_opposite_loc)
+            successor_node.update_primary_agent_loc(primary_agent_new_loc, counter_opposite_loc, True)
             # increment the counter_ops (1 drop off, 1 pickup)
             successor_node.num_counter_ops += 2
             return successor_node
@@ -125,17 +155,6 @@ class OvercookedSearchNode:
             successor_node.update_primary_agent_loc(primary_agent_new_loc)
 
         return successor_node
-
-    def extract_motion_plan_from_path(self):
-        """
-        return: the list of actions that will be used to fulfill the path for both agents
-        """
-        agent_0_actions = []
-        agent_1_actions = []
-        # TODO: look for things in from overcooked_ai_py.mdp.actions.Action
-
-        return agent_0_actions, agent_1_actions
-
 
     def __str__(self):
         # string representation of search node in UCS
@@ -323,9 +342,6 @@ def uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_locations
     walk_graph_copy = copy.deepcopy(walk_graph)
     handover_graph_copy = copy.deepcopy(handover_graph)
 
-    # print("start agent location", agent_locations, "agent who act first is ", start_agent_idx)
-    # print("goal", goal_loc, "of type", terrain_mtx[goal_loc[0]][goal_loc[1]])
-
     l, w = len(terrain_mtx), len(terrain_mtx[0])
 
     for agent_loc in agent_locations:
@@ -353,13 +369,22 @@ def uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_locations
                 return True
         return False
     fringe = PriorityQueue()
+
+    # we would like to start the secondary agent's path on UND
+    if start_agent_idx == 0:
+        path_0 = [agent_locations[0]]
+        path_1 = [UNDEFIND_LOCATION]
+    else:
+        path_0 = [UNDEFIND_LOCATION]
+        path_1 = [agent_locations[1]]
+
     # All search nodes have the form (LOCATION, OTHER_AGENT_LOCATION, PATH, TOTAL_WALK_COST, COUNTER_OPERATION)
     startNode = OvercookedSearchNode(
         start_agent_idx,
         agent_locations[0],
         agent_locations[1],
-        [agent_locations[0]],
-        [agent_locations[1]],
+        path_0,
+        path_1,
         0
     )
     fringe.push(startNode, 0)
