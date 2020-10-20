@@ -120,6 +120,16 @@ class TestMotionExtractor(unittest.TestCase):
             [UNDEFIND_ACTION, UNDEFIND_ACTION, 'interact', (0, -1), 'interact']
         ))
 
+    def test_dish_serving(self):
+        # this tests counter handover in the other direction
+        # this tests the border cases for remove_extra_action
+        path_0 = ['UND_L', (1, 2), (1, 3), (2, 3), (3, 3)]
+        path_1 = [(1, 1), (1, 2), 'UND_L', 'UND_L', 'UND_L']
+        self.assertEqual(path_to_actions(path_0, path_1, self.divided_mtx), (
+            [UNDEFIND_ACTION, UNDEFIND_ACTION, 'interact', (0, 1), 'interact'],
+            [(1, 0), 'interact', UNDEFIND_ACTION, UNDEFIND_ACTION, UNDEFIND_ACTION]
+        ))
+
     def test_dish_pickup_1(self):
         # this test abbreviation of additional movement because of natural agent facing
         path_0 = ['UND_L', 'UND_L', 'UND_L']
