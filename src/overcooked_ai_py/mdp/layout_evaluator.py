@@ -18,6 +18,48 @@ import heapq
 def midpoint(point_0, point_1):
     return tuple([(point_0[0] + point_1[0])//2, (point_0[1] + point_1[1])//2])
 
+def add_action_from_location(curr_loc, next_loc, actions):
+    """
+    Arguments:
+        curr_loc (tuple): a tuple for the current location of the agent (x, y)
+        next_loc (tuple): a tuple for the next location of the agent (x, y)
+            UNDEFIND_LOCATION if the agent is currently at the end of its path
+    This function modifies the action list to include the relevant action given the two locations
+    """
+
+    # case where both curr_loc and next_loc are valid locations
+    if curr_loc != UNDEFIND_LOCATION and next_loc != UNDEFIND_LOCATION:
+        # if previous action was undefined, then we are picking up from a counter
+        # replace the undefined action with the interact action
+        if len(actions) > 0 and actions[len(actions) - 1] == UNDEFIND_ACTION:
+            actions[len(actions) - 1] = 'interact'
+        else:
+            actions.append((next_loc[1] - curr_loc[1], next_loc[0] - curr_loc[0]))
+    # case where agent is at the end of its path
+    elif curr_loc != UNDEFIND_LOCATION:
+        actions.append('interact')
+    # case where current location is undefined (location before picking up from counter)
+    elif next_loc != UNDEFIND_LOCATION:
+        actions.append(UNDEFIND_ACTION)
+    # both current and next locations are undefined
+    else:
+        return
+
+def remove_extra_action(actions):
+    """
+    Arguments:
+        actions (list): a list of tuples containing valid movement actions including interact
+    return:
+        updated list of actions with extra actions removed
+    """
+    # case to check if should remove second to last because no turn in place exists
+    if len(actions) > 2:
+        last_movement_action = actions[len(actions) - 2]
+        second_last_movement_action = actions[len(actions) - 3]
+        if last_movement_action == second_last_movement_action:
+            return actions[:len(actions) - 2] + actions[len(actions) - 1:]
+    return actions
+
 def path_to_actions(path_0, path_1, terrain_mtx):
     """
     Arguments:
@@ -30,13 +72,52 @@ def path_to_actions(path_0, path_1, terrain_mtx):
     assert len(path_0) == len(path_1), "input path should have the same length. Please check the SearchNode for this"
     actions_0 = []
     actions_1 = []
-    # TODO: look for things in from overcooked_ai_py.mdp.actions.Action
-    # TODO: please note that the 0th and 1st index are flipped in the output Please refer to Action class
-    # TODO: be sure to account for the case where a counter is used in the middle of a path (and inbounding interact)
-    # TODO: we are processing both agents in parallel because we need to pad both agent's
+
+    # fill in both action lists with actions of movement and interacting
+    for index in range(len(path_0)):
+
+        # Set current and next locations to determine action
+        curr_loc_0 = path_0[index]
+        curr_loc_1 = path_1[index]
+        next_loc_0 = UNDEFIND_LOCATION
+        next_loc_1 = UNDEFIND_LOCATION
+
+        if index != (len(path_0) - 1):
+            next_loc_0 = path_0[index + 1]
+            next_loc_1 = path_1[index + 1]
+
+        add_action_from_location(curr_loc_0, next_loc_0, actions_0)
+        add_action_from_location(curr_loc_1, next_loc_1, actions_1)
+
+    # remove unnecessary action at second to last spot if no in place turning required
+    actions_0 = remove_extra_action(actions_0)
+    actions_1 = remove_extra_action(actions_1)
+
+    # padding the two agent's action lists
+
+    # case where agent 0 did not do anything
+    if len(actions_0) == 0:
+        actions_0 = [UNDEFIND_ACTION] * len(actions_1)
+    # case where agent 1 did not do anything
+    elif len(actions_1) == 0:
+        actions_1 = [UNDEFIND_ACTION] * len(actions_0)
+    # case where counter was used by both agents
+    else:
+        # case where agent 0 is picking up from the counter
+        if actions_0[0] == 'interact':
+            temp_len = len(actions_0)
+            actions_0 = [UNDEFIND_ACTION] * len(actions_1) + actions_0
+            actions_1 = actions_1 + [UNDEFIND_ACTION] * temp_len
+        # case where agent 1 is picking up from the counter
+        elif actions_1[0] == 'interact':
+            temp_len = len(actions_1)
+            actions_1 = [UNDEFIND_ACTION] * len(actions_0) + actions_1
+            actions_0 = actions_0 + [UNDEFIND_ACTION] * temp_len
 
     assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
     return actions_0, actions_1
+
+
 
 
 class OvercookedSearchNode:
