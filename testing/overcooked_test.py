@@ -726,7 +726,7 @@ class TestFeaturizations(unittest.TestCase):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlam = MediumLevelActionManager.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
-        self.rnd_agent_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
+        self.greedy_human_model_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
         np.random.seed(0)
 
     def test_lossless_state_featurization_shape(self):
@@ -740,7 +740,7 @@ class TestFeaturizations(unittest.TestCase):
         self.assertTrue(np.array_equal(obs.shape, self.base_mdp.featurize_state_shape), "{} vs {}".format(obs.shape, self.base_mdp.featurize_state_shape))
 
     def test_lossless_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_states"]]
         
         pickle_path = os.path.join(TESTING_DATA_DIR, "test_lossless_state_featurization", "expected")
@@ -752,7 +752,7 @@ class TestFeaturizations(unittest.TestCase):
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
-        trajs = self.env.get_rollouts(self.rnd_agent_pair, num_games=5)
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
         featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam) for state in ep_states] for ep_states in trajs["ep_states"]]
         pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected')
         # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
