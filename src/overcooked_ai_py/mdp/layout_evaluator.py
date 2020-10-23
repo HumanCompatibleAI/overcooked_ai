@@ -117,7 +117,30 @@ def path_to_actions(path_0, path_1, terrain_mtx):
     assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
     return actions_0, actions_1
 
+def connect_action_path(action_paths):
+    """
+        Arguments:
+            action_paths (list of lists): a list of action paths to connect together
+        return:
+            connected action paths
+            currently just concatenates paths regardless of undefined actions
+        TODO: fill in undefined actions
+    """
+    total_path = []
+    for path in action_paths:
+        total_path += path
+    return total_path
+
 def calculate_entropy_of_path(path, ro):
+    """
+        Arguments:
+            path (list): a list of tuble for locations of agent 0
+            ro: parameter used in calculation of entropy
+        return:
+            the calculated entropy of the path
+            entropy of a sequence of one action 'a' repeated 'n' times is -ln(n) + ln(ro)
+            total entropy is the sum of all the sequences in the path
+    """
     total_entropy = 0
     const_entropy = np.log(ro)
     curr_length = 1
@@ -129,6 +152,7 @@ def calculate_entropy_of_path(path, ro):
         if action == curr_action:
             curr_length += 1
         else:
+            # if the sequence of actions that is ending is undefined, then we don't add the entropy
             if curr_action == UNDEFIND_ACTION:
                 curr_length = 1
                 curr_action = action
@@ -138,7 +162,7 @@ def calculate_entropy_of_path(path, ro):
             curr_length = 1
             curr_action = action
 
-    # add entropy for last sequence of actions
+    # add entropy for last sequence of actions if the last sequence is undefined
     if curr_action != UNDEFIND_ACTION:
         entropy = -np.log(curr_length) + const_entropy
         total_entropy += entropy
@@ -747,9 +771,6 @@ def terrain_analysis(terrain_mtx, silent = True):
 
     stage_score = []
 
-    player_1_action_path = []
-    player_2_action_path = []
-
     p0_i, p0_j = p0_starting
     p1_i, p1_j = p1_starting
     terrain_mtx_rep = copy.deepcopy(terrain_mtx)
@@ -896,5 +917,35 @@ def terrain_analysis(terrain_mtx, silent = True):
             for rep in possible_agents_served_positions[k]:
                 print(str(rep))
         print("*************************************")
-    return stage_score
+
+    # list to store all possible full action paths for each player
+    player_1_action_paths = []
+    player_2_action_paths = []
+
+    for key in possible_agents_served_positions:
+        for rep in possible_agents_served_positions[key]:
+
+            # for each possible end mla node we find all the location paths from all the mlas
+            loc_path_0 = list(rep.agent_0_path_dict.values())
+            loc_path_1 = list(rep.agent_1_path_dict.values())
+
+            act_path_0 = []
+            act_path_1 = []
+
+            # for each mla location path we convert it to actions and add that to our list of action_lists for this node
+            for i in range(len(loc_path_0)):
+                act_paths = path_to_actions(loc_path_0[i], loc_path_1[i], terrain_mtx)
+                act_path_0.append(act_paths[0])
+                act_path_1.append(act_paths[1])
+
+            # we add the full action_list for this end node to our list of all possible action paths for each player
+            player_1_action_paths.append(connect_action_path(act_path_0))
+            player_2_action_paths.append(connect_action_path(act_path_1))
+
+    return_dict = {}
+    return_dict['stage score'] = stage_score
+    return_dict['player 1 action paths'] = player_1_action_paths
+    return_dict['player 2 action paths'] = player_2_action_paths
+
+    return return_dict
 

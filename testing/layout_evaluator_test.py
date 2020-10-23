@@ -145,7 +145,7 @@ class TestEntropyComparison(unittest.TestCase):
         self.divided_mtx_basic = [
             ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
             ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
-            ['D', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
             ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
             ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '1', 'X'],
             ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
@@ -157,7 +157,7 @@ class TestEntropyComparison(unittest.TestCase):
         self.divided_mtx_center_counter = [
             ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
             ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
-            ['D', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
             ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
             ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', '1', 'X'],
             ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
@@ -170,7 +170,7 @@ class TestEntropyComparison(unittest.TestCase):
         self.divided_mtx_keyhole_maze = [
             ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
             ['X', ' ', 'X', ' ', ' ', ' ', ' ', 'X', ' ', 'X'],
-            ['D', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
             ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
             ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', '1', 'X'],
             ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
@@ -181,6 +181,7 @@ class TestEntropyComparison(unittest.TestCase):
         ]
 
     def test_entropy_calculation(self):
+        # This tests the calculate_entropy_of_path helper function
         ro = 5
 
         path = [(0, 1), (0, 1), (1, 0), 'interact']
@@ -192,6 +193,76 @@ class TestEntropyComparison(unittest.TestCase):
         self.assertAlmostEqual(calculate_entropy_of_path(path, ro), entropy)
         self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_end, ro), entropy)
         self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_start, ro), entropy)
+
+    def test_entropy_comparison_onion_dropoff(self):
+        # This tests how entropy compares for the onion pickup task for three different layouts
+
+        basic = [(-1, 0), (-1, 0), (-1, 0), (-1, 0), (-1, 0), (-1, 0), (-1, 0), \
+                 (0, -1), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1), 'interact']
+        counter = [(0, -1), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1), (-1, 0),\
+                   (-1, 0), (-1, 0), (-1, 0), (-1, 0), (-1, 0), (-1, 0), (0, -1), 'interact']
+        maze = [(0, 1), (-1, 0), (-1, 0), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1), \
+                (0, -1), (0, -1), (-1, 0), (-1, 0), (-1, 0), (0, 1), (0, 1), (0, 1), \
+                (0, 1), (0, 1), (0, 1), (0, 1), (-1, 0), (-1, 0), (0, -1), (0, -1), \
+                (0, -1), (0, -1), (0, -1),(0, -1), (0, -1), 'interact']
+
+        # checks that the hard coded action paths above are accurate and end in the correct spots
+        start_loc = [8, 7]
+        end_loc_with_turn = [1, 0]
+        end_loc_wo_turn = [1, 1]
+
+        curr_loc = start_loc.copy()
+        for action in basic:
+            if action != 'interact':
+                curr_loc[0] += action[0]
+                curr_loc[1] += action[1]
+        self.assertEqual(end_loc_wo_turn, curr_loc, 'basic')
+
+        curr_loc = start_loc.copy()
+        for action in counter:
+            if action != 'interact':
+                curr_loc[0] += action[0]
+                curr_loc[1] += action[1]
+        self.assertEqual(end_loc_with_turn, curr_loc, 'counter')
+
+        curr_loc = start_loc.copy()
+        for action in maze:
+            if action != 'interact':
+                curr_loc[0] += action[0]
+                curr_loc[1] += action[1]
+        self.assertEqual(end_loc_wo_turn, curr_loc, 'maze')
+
+        # assembles the three paths into a list and sets our parameter ro
+        paths_to_compare = {'basic': basic, 'counter': counter, 'maze': maze}
+        ro = 5
+
+        # calculate and save entropies of each path
+        entropies = {}
+        for path in paths_to_compare:
+            entropies[path] = calculate_entropy_of_path(paths_to_compare[path], ro)
+
+        print(entropies)
+
+    def test_entropy_full_path(self):
+        # this tests the entropy comparison for the first foundn full path for both agents
+    
+        # assembles terrains into a list to reduce repetitive code
+        terrains = {'basic': self.divided_mtx_basic, 'counter': self.divided_mtx_center_counter, 'maze': self.divided_mtx_keyhole_maze}
+        paths = {}
+        entropies = {}
+        ro = 5
+
+        # analyzes the terrain and retrieves the first possible full action path (first is chosen for simplicity)
+        for terrain in terrains:
+            analysis = terrain_analysis(terrains[terrain])
+            paths[terrain] = (analysis['player 1 action paths'][0], analysis['player 2 action paths'][0])
+
+        # calculates and stores the entropies of each full action path
+        for path in paths:
+            entropies[path] = calculate_entropy_of_path(paths[path][0], ro) + \
+                              calculate_entropy_of_path(paths[path][1], ro)
+
+        print(entropies)
 
 
 
