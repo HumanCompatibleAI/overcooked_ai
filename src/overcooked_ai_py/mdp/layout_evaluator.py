@@ -117,6 +117,34 @@ def path_to_actions(path_0, path_1, terrain_mtx):
     assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
     return actions_0, actions_1
 
+def calculate_entropy_of_path(path, ro):
+    total_entropy = 0
+    const_entropy = np.log(ro)
+    curr_length = 1
+    curr_action = path[0]
+
+    # calculate and add entropy for each sequence of actions
+
+    for action in path[1:]:
+        if action == curr_action:
+            curr_length += 1
+        else:
+            if curr_action == UNDEFIND_ACTION:
+                curr_length = 1
+                curr_action = action
+                continue
+            entropy = -np.log(curr_length) + const_entropy
+            total_entropy += entropy
+            curr_length = 1
+            curr_action = action
+
+    # add entropy for last sequence of actions
+    if curr_action != UNDEFIND_ACTION:
+        entropy = -np.log(curr_length) + const_entropy
+        total_entropy += entropy
+
+    return total_entropy
+
 
 
 
@@ -718,6 +746,9 @@ def terrain_analysis(terrain_mtx, silent = True):
         p1_starting = (p1_starting_pre[1], p1_starting_pre[0])
 
     stage_score = []
+
+    player_1_action_path = []
+    player_2_action_path = []
 
     p0_i, p0_j = p0_starting
     p1_i, p1_j = p1_starting

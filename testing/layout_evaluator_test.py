@@ -1,6 +1,7 @@
 import unittest
+import numpy as np
 from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_actions, \
-    UNDEFIND_ACTION, remove_extra_action, add_action_from_location
+    UNDEFIND_ACTION, remove_extra_action, add_action_from_location, calculate_entropy_of_path
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
 
@@ -138,6 +139,62 @@ class TestMotionExtractor(unittest.TestCase):
             [UNDEFIND_ACTION, UNDEFIND_ACTION],
             [(0, 1), 'interact']
         ))
+
+class TestEntropyComparison(unittest.TestCase):
+    def setUp(self):
+        self.divided_mtx_basic = [
+            ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['D', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '1', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'O'],
+            ['X', ' ', '2', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', 'X', 'D', 'X', 'X', 'X', 'X', 'S', 'X', 'X']
+        ]
+        self.divided_mtx_center_counter = [
+            ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
+            ['X', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['D', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', '1', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'X'],
+            ['X', ' ', 'X', 'X', 'X', 'X', 'X', 'X', ' ', 'O'],
+            ['X', ' ', '2', ' ', ' ', ' ', ' ', ' ', ' ', 'X'],
+            ['X', 'X', 'D', 'X', 'X', 'X', 'X', 'S', 'X', 'X']
+        ]
+
+        self.divided_mtx_keyhole_maze = [
+            ['X', 'P', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'],
+            ['X', ' ', 'X', ' ', ' ', ' ', ' ', 'X', ' ', 'X'],
+            ['D', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', '1', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'O'],
+            ['X', ' ', '2', ' ', 'X', 'X', ' ', ' ', ' ', 'X'],
+            ['X', 'X', 'D', 'X', 'X', 'X', 'X', 'S', 'X', 'X']
+        ]
+
+    def test_entropy_calculation(self):
+        ro = 5
+
+        path = [(0, 1), (0, 1), (1, 0), 'interact']
+        path_undefined_at_end = [(0, 1), (0, 1), (1, 0), 'interact', 'UND_A', 'UND_A']
+        path_undefined_at_start = ['UND_A', 'UND_A', (0, 1), (0, 1), (1, 0), 'interact']
+
+        entropy = -np.log(2) - np.log(1) - np.log(1) + 3 * np.log(ro)
+
+        self.assertAlmostEqual(calculate_entropy_of_path(path, ro), entropy)
+        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_end, ro), entropy)
+        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_start, ro), entropy)
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
