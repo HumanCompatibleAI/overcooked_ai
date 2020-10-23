@@ -44,24 +44,26 @@ def create_chart_html(events_data, chart_settings=None,  chart_box_id=None, lege
     css_strings = []
     if chart_settings.get("use_default_css_file"):
         css_strings.append(load_visualization_file_as_str("event_chart_default.css"))
+        del chart_settings["use_default_css_file"]
     if chart_settings.get("custom_css_path"):
         css_strings.append(load_text_file(chart_settings["custom_css_path"]))
+        del chart_settings["custom_css_path"]
     if chart_settings.get("custom_css_string"):
         css_strings.append(chart_settings["custom_css_string"])
+        del chart_settings["custom_css_string"]
     css_string = "\n/* new css string */\n".join(css_strings)
-    # delete unused settings, especially custom_css_string as it can be big
-    del chart_settings["use_default_css_file"]
-    del chart_settings["custom_css_path"]
-    del chart_settings["custom_css_string"]
     
+
+
     chart_box_id = chart_box_id or "chart-div-" + str(uuid.uuid1())
     legends_box_id = legends_box_id or "legends-div-" + str(uuid.uuid1())
-    js_text_template = Template(load_visualization_file_as_str("event_chart.js"))
-    js_text = js_text_template.substitute({'data': json.dumps(events_data), 'chart_box_id': "#"+chart_box_id,
-     'legends_box_id': "#"+legends_box_id, 'settings': json.dumps(chart_settings)})
+    js_string = load_visualization_file_as_str("render_event_chart.js")
+    js_string += Template(load_visualization_file_as_str("run_event_chart.js")).substitute(
+        {'data': json.dumps(events_data), 'chart_box_id': "#"+chart_box_id,
+        'legends_box_id': "#"+legends_box_id, 'settings': json.dumps(chart_settings)})
 
     html_template = Template(load_visualization_file_as_str("event_chart.html"))
 
-    return html_template.substitute({'css_text': css_string, 'js_text': js_text, 'chart_box_id': chart_box_id,
+    return html_template.substitute({'css_text': css_string, 'js_text': js_string, 'chart_box_id': chart_box_id,
      'legends_box_id': legends_box_id})
 

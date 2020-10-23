@@ -35,6 +35,13 @@ def extract_events(trajectories, traj_idx=0, cumulative_events_description=[]):
                 holding_events.append(holding_event(events, player_num, len(game_states)-1, player.held_object.to_dict()))
         return holding_events
 
+    def end_of_episode_event(game_states):
+        # event used for determining size of x axis
+        event =  {
+            "timestep": len(game_states)-1,
+            "action": "end_of_episode"
+            }
+        return event
 
     def get_cumulative_events(events, last_timestep, cumulative_events_desription):
         """
@@ -96,10 +103,10 @@ def extract_events(trajectories, traj_idx=0, cumulative_events_description=[]):
     
     events += get_holding_events(events, ep_states)
 
-    
     if cumulative_events_description:
         events += get_cumulative_events(events, len(ep_states), cumulative_events_description)
 
+    events.append(end_of_episode_event(ep_states))
     # clearing possible numpy data types from data to allow json.dumps of the data
     events = [{k:numpy_to_native(v) for k,v in event.items()} for event in events]
     
