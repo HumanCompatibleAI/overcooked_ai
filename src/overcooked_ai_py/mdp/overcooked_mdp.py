@@ -1056,7 +1056,7 @@ class OvercookedGridworld(object):
         return start_state_fn
 
     @ staticmethod
-    def get_litter_start_state_fn(mdp, onion_litter=0.0, dish_litter=0.0, soup_1_litter=0.0, soup_2_litter=0.0, soup_3_litter=0.0):
+    def get_litter_start_state_fn(mdp, onion_litter=0.0, dish_litter=0.0, soup_1_litter=0.0, soup_2_litter=0.0, soup_3_litter=0.0, pot_litter=0.0):
         """
         Arguments:
             onion_litter (float): percentage of counter that should be littered by onion
@@ -1064,6 +1064,7 @@ class OvercookedGridworld(object):
             soup_1_litter (float): percentage of counter that should be littered by 1-onion-soup
             soup_2_litter (float): percentage of counter that should be littered by 2-onion-soup
             soup_3_litter (float): percentage of counter that should be littered by 3-onion-soup
+            pot_litter (float): percentage of time a suboptimal soup is in the pot
         """
 
         litter_prob = {
@@ -1089,6 +1090,17 @@ class OvercookedGridworld(object):
             start_state = OvercookedState.from_player_positions(start_pos, bonus_orders=mdp.start_bonus_orders, all_orders=mdp.start_all_orders)
 
             objects = {}
+            # For each pot, little a pot with add a random amount of onions with prob pot_litter
+            # Begin the soup cooking with probability pot_litter
+            pots = mdp.get_pot_states(start_state)["empty"]
+            for pot_loc in pots:
+                p = np.random.rand()
+                if p < pot_litter:
+                    n = int(np.random.randint(low=1, high=4))
+                    q = np.random.rand()
+                    cooking_tick = 0 if q < pot_litter else -1
+                    objects[pot_loc] = SoupState.get_soup(pot_loc, num_onions=n, cooking_tick=cooking_tick)
+
             # For each counter, add a litter object with prob rnd_obj_prob_thresh
             for counter_loc in mdp.get_reachable_counter_locations():
                 p = np.random.rand()
