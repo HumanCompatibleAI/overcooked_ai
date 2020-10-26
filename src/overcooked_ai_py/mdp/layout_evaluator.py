@@ -12,6 +12,8 @@ UNDEFIND_LOCATION = "UND_L"
 # the undefined action
 UNDEFIND_ACTION = "UND_A"
 
+ENTROPY_RO = 5
+
 import heapq
 
 
