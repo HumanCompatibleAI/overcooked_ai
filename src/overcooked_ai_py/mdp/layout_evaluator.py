@@ -337,6 +337,11 @@ class OvercookedMLASearchNode:
         self.agent_0_path_dict[task_name] = agent_0_path_task
         self.agent_1_path_dict[task_name] = agent_1_path_task
 
+    def total_path_length(self):
+        # the total path length of this
+        return sum([len(self.agent_0_path_dict[task]) for task in self.agent_0_path_dict.keys()])
+
+
     def update_pot_loc(self, pot_loc):
         # update the target pot when starting to make a plan to cook soups
         if self.pot_loc and self.pot_loc != pot_loc:
@@ -608,8 +613,10 @@ def walk_graph_from_terrain(terrain_mtx):
 
 def graph_from_terrain(terrain_mtx):
     """
-    :param terrain_mtx: the terrain matrix
-    :return: a walk_graph, in format of
+    Arguments:
+        terrain_mtx: the terrain matrix
+    Return:
+         a walk_graph, in format of
         {current_loc : [[next_loc_0, 1, counter_op_0], [next_loc_1, 1, counter_op_1]...], ...}
         handover_graph, in format of
         {current_loc: [next_loc_0, next_loc_1, ...], ...}
@@ -673,7 +680,7 @@ def graph_from_terrain(terrain_mtx):
 
 
 def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, terrain_mtx, task_name,
-                        both_idx=False, is_potting=False, is_dishing=False):
+                        both_idx=False, is_potting=False, is_dishing=False, best_only=False):
     """
     This function perform one mla action from the previous mla node, recorded in prev_mla_dict
     Arguments:
@@ -686,6 +693,7 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
        both_idx (bool): whether this action can be performed by agents at both agent, and not just the primary agent
        is_potting (bool): whether we need to update the pot location when create the new mla node
        is_dishing (bool): whether we are using the pot_loc as the goal for the motion plan
+       best_only (bool): only keeping the best path at each of the forward_mla_hash
     """
     new_dict = {}
     for f_location in feature_locations:
@@ -715,16 +723,26 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
                             forward_mla_hash = forward_mla_node.hash_key()
 
                             if forward_mla_hash not in new_dict.keys():
-                                new_dict[forward_mla_hash] = []
-                            new_dict[forward_mla_hash].append(forward_mla_node)
+                                new_dict[forward_mla_hash] = [forward_mla_node]
+                            else:
+                                if not best_only:
+                                    new_dict[forward_mla_hash].append(forward_mla_node)
+                                else:
+                                    # retrieve the previous entry
+                                    forward_mla_node_prev = new_dict[forward_mla_hash][0]
+                                    # if the current node's path length is lower, we will replace it
+                                    if forward_mla_node.total_path_length() < forward_mla_node_prev.total_path_length():
+                                        new_dict[forward_mla_hash] = [forward_mla_node]
     return new_dict
 
 
-def terrain_analysis(terrain_mtx, silent = True):
+def terrain_analysis(terrain_mtx, silent=True, best_only=False):
     """
     Arguments:
-    terrain_mtx (list of list): 2 dimensional terrain matrix which represent the grid
-        details for conventions can be found at overcooked_ai_py.mdp.layout_generator
+        terrain_mtx (list of list): 2 dimensional terrain matrix which represent the grid
+            details for conventions can be found at overcooked_ai_py.mdp.layout_generator
+        silent (bool): whether to print the details
+        best_only (bool): whether to only consider the best mla_node at each mla_hash
     """
 
     def get_feature_locations(terrain_mtx, feature):
@@ -756,12 +774,6 @@ def terrain_analysis(terrain_mtx, silent = True):
     walk_graph, handover_graph = graph_from_terrain(terrain_mtx)
 
     empty_locations = get_feature_locations(terrain_mtx, ' ')
-    """
-    print("WALK GRAPH")
-    print(walk_graph)
-    print("HANDOVER GRAPH")
-    print(handover_graph)  
-    """
 
     if start_player_positions[0] == None:
         p0_starting = random.choice(empty_locations)
@@ -796,7 +808,7 @@ def terrain_analysis(terrain_mtx, silent = True):
     # keep track of the (position of the agent) and lowest walking cost for each counter operation cost so far
     """
     Format:
-    key: (p0_loc, p1_loc, pot_loc, )
+    key: (p0_loc, p1_loc, pot_loc, num_counter_operation)
 
     """
     starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0)
@@ -817,7 +829,8 @@ def terrain_analysis(terrain_mtx, silent = True):
         {},
         terrain_mtx,
         "onion_pickup",
-        both_idx=True
+        both_idx=True,
+        best_only=best_only
     )
 
     if len(possible_onion_agent_positions) > 0:
@@ -843,7 +856,8 @@ def terrain_analysis(terrain_mtx, silent = True):
         handover_graph,
         terrain_mtx,
         "onion_drop",
-        is_potting=True
+        is_potting=True,
+        best_only=best_only
     )
 
     if len(possible_agents_and_cooking_pot_positions) > 0:
@@ -857,11 +871,11 @@ def terrain_analysis(terrain_mtx, silent = True):
             print(k)
             for rep in possible_agents_and_cooking_pot_positions[k]:
                 print(str(rep))
+            print("----")
         print("*************************************")
 
     # then we need to pick up the dish from a dispenser
     dish_dispenser_locations = get_feature_locations(terrain_mtx, 'D')
-    possible_dish_agent_and_cooking_pot_positions = {}
     possible_dish_agent_and_cooking_pot_positions = perform_mla(
         dish_dispenser_locations,
         possible_agents_and_cooking_pot_positions,
@@ -869,7 +883,8 @@ def terrain_analysis(terrain_mtx, silent = True):
         {},
         terrain_mtx,
         "dish_pickup",
-        both_idx=True
+        both_idx=True,
+        best_only=best_only
     )
 
     if len(possible_dish_agent_and_cooking_pot_positions) > 0:
@@ -882,6 +897,7 @@ def terrain_analysis(terrain_mtx, silent = True):
             print(k)
             for rep in possible_dish_agent_and_cooking_pot_positions[k]:
                 print(str(rep))
+            print("----")
         print("*************************************")
 
     # then we need to return the dish to the cooked pot
@@ -892,7 +908,8 @@ def terrain_analysis(terrain_mtx, silent = True):
         handover_graph,
         terrain_mtx,
         "dishing_soup",
-        is_dishing=True
+        is_dishing=True,
+        best_only=best_only
     )
 
     if len(possible_agent_and_cooked_dished_pot_positions) > 0:
@@ -905,6 +922,7 @@ def terrain_analysis(terrain_mtx, silent = True):
             print(k)
             for rep in possible_agent_and_cooked_dished_pot_positions[k]:
                 print(str(rep))
+            print("----")
         print("*************************************")
 
     # In the end, we need to deliver the meal to the serving point
@@ -915,7 +933,8 @@ def terrain_analysis(terrain_mtx, silent = True):
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "serving"
+        "serving",
+        best_only=best_only
     )
     if len(possible_agents_served_positions) > 0:
         stage_score.append(1)
@@ -927,11 +946,13 @@ def terrain_analysis(terrain_mtx, silent = True):
             print(k)
             for rep in possible_agents_served_positions[k]:
                 print(str(rep))
+            print("----")
         print("*************************************")
 
     # list to store all possible full action paths for each player
     player_1_action_paths = []
     player_2_action_paths = []
+    pairs_of_action_paths_by_total_length = {}
 
     for key in possible_agents_served_positions:
         for rep in possible_agents_served_positions[key]:
@@ -950,13 +971,34 @@ def terrain_analysis(terrain_mtx, silent = True):
                 act_path_1.append(act_paths[1])
 
             # we add the full action_list for this end node to our list of all possible action paths for each player
-            player_1_action_paths.append(connect_action_path(act_path_0))
-            player_2_action_paths.append(connect_action_path(act_path_1))
+            connected_action_path_0 = connect_action_path(act_path_0)
+            connected_action_path_1 = connect_action_path(act_path_1)
+            player_1_action_paths.append(connected_action_path_0)
+            player_2_action_paths.append(connected_action_path_1)
+
+            # categorize the paths by its total length
+            pair_of_action_paths = [connected_action_path_0, connected_action_path_1]
+            assert len(connected_action_path_0) == len(connected_action_path_1)
+            total_length = len(connected_action_path_0)
+            if total_length not in pairs_of_action_paths_by_total_length:
+                pairs_of_action_paths_by_total_length[total_length] = [pair_of_action_paths]
+            else:
+                pairs_of_action_paths_by_total_length[total_length].append(pair_of_action_paths)
 
     return_dict = {}
     return_dict['stage score'] = stage_score
     return_dict['player 1 action paths'] = player_1_action_paths
     return_dict['player 2 action paths'] = player_2_action_paths
+    return_dict['pairs of action paths by total length'] = pairs_of_action_paths_by_total_length
 
     return return_dict
+
+
+def stats_from_analaysis(terrain_mtx, best_only=True):
+    dic = terrain_analysis(terrain_mtx, best_only=best_only)
+    pairs_of_action_paths_by_total_length = dic['pairs of action paths by total length']
+    stats_by_length = {}
+    for total_length in sorted(pairs_of_action_paths_by_total_length.keys()):
+        stats_by_length[total_length] = pairs_of_action_paths_by_total_length[total_length]
+    return stats_by_length
 

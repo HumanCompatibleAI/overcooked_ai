@@ -3,17 +3,7 @@ import numpy as np
 from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_actions, \
     UNDEFIND_ACTION, remove_extra_action, add_action_from_location, calculate_entropy_of_path, \
     ENTROPY_RO
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
-
-# class TestSimpleEvaluation(unittest.TestCase):
-#
-#     def setUp(self):
-#         self.cramped_room_terrain_mtx = OvercookedGridworld.from_layout_name("cramped_room").terrain_mtx
-#         print(self.cramped_room_terrain_mtx)
-#
-#     def test_0(self):
-#         terrain_analysis(self.cramped_room_terrain_mtx, False)
 
 class TestHandoverEvaluation(unittest.TestCase):
 
@@ -359,6 +349,7 @@ class TestEntropyComparison(unittest.TestCase):
                               calculate_entropy_of_path(paths[path][1], ENTROPY_RO)
 
         print(entropies)
+
 
 
 
