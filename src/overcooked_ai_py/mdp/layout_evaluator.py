@@ -17,8 +17,17 @@ ENTROPY_RO = 5
 import heapq
 
 
-def midpoint(point_0, point_1):
-    return tuple([(point_0[0] + point_1[0])//2, (point_0[1] + point_1[1])//2])
+def midpoint(point_0, point_1, terrain_matrix):
+    if point_0[0] == point_1[0] or point_0[1] == point_1[1]:
+        return tuple([(point_0[0] + point_1[0])//2, (point_0[1] + point_1[1])//2])
+    else:
+        # handling the diagonal handover
+        if terrain_matrix[point_0[0]][point_1[1]] == "X":
+            return tuple([point_0[0], point_1[1]])
+        elif terrain_matrix[point_1[0]][point_0[1]] == "X":
+            return tuple([point_1[0], point_0[1]])
+        else:
+            raise NotImplementedError("neither of the diagonal entries has a counter")
 
 def add_action_from_location(curr_loc, next_loc, actions):
     """
@@ -271,10 +280,10 @@ class OvercookedSearchNode:
             self.agent_1_path, self.num_counter_ops
         )
 
-    def successor(self, primary_agent_new_loc, counter_opposite_loc=None):
+    def successor(self, primary_agent_new_loc, counter_opposite_loc=None, terrain_mtx=None):
         successor_node = self.copy()
         if counter_opposite_loc:
-            counter_loc = midpoint(primary_agent_new_loc, counter_opposite_loc)
+            counter_loc = midpoint(primary_agent_new_loc, counter_opposite_loc, terrain_mtx)
             # interact to get the iter onto the counter
             successor_node.update_primary_agent_loc(counter_loc, counter_loc)
             # change control
@@ -556,7 +565,7 @@ def uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_locations
                     other_agent_walk_dist = shortest_walk_dist(walk_graph, other_agent_loc, suc_loc, terrain_mtx)
                     if other_agent_walk_dist != INFINITY:
                         # give control over to the other agent, and become the other agent by "taking its place on the map"\
-                        newNode = curNode.successor(suc_loc, loc)
+                        newNode = curNode.successor(suc_loc, loc, terrain_mtx)
                         fringe.push(newNode, newNode.path_length())
     return res
 

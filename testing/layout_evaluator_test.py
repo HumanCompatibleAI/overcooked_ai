@@ -27,8 +27,19 @@ class TestHandoverEvaluation(unittest.TestCase):
         ]
         print(self.divided_mtx)
 
-    def test_0(self):
+        self.diagnoal_divided_mtx = [
+            ['X', 'X', 'X', 'X', 'S', 'X'],
+            ['X', 'X', 'X', ' ', '1', 'O'],
+            ['P', '2', ' ', 'X', 'X', 'X'],
+            ['X', 'D', 'X', 'X', 'X', 'X'],
+        ]
+        print(self.diagnoal_divided_mtx)
+
+    def test_simple(self):
         terrain_analysis(self.divided_mtx, False)
+
+    def test_diagonal(self):
+        terrain_analysis(self.diagnoal_divided_mtx, False)
 
 
 class TestMotionExtractor(unittest.TestCase):
