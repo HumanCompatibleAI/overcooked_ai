@@ -1955,7 +1955,7 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
-    def featurize_state(self, overcooked_state, mlam, horizon=400):
+    def featurize_state(self, overcooked_state, mlam, num_pots=2, **kwargs):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
@@ -1963,19 +1963,79 @@ class OvercookedGridworld(object):
 
         all_features = {}
 
-        def make_closest_feature(idx, name, locations):
+        def make_closest_feature(idx, player, name, locations):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
-            all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
-                                                                                                   mlam)
+            obj = None
+            held_obj = player.held_object
+            held_obj_name = held_obj.name if held_obj else "none"
+            if held_obj_name == name:
+                obj = held_obj
+                all_features["p{}_closest_{}".format(i, name)] = (0, 0)
+            else:
+                loc, deltas = self.get_deltas_to_closest_location(player, locations, mlam)
+                obj = overcooked_state.get_object(loc)
+                all_features["p{}_closest_{}".format(idx, name)] = deltas
 
-        IDX_TO_OBJ = ["onion", "soup", "dish"]
+            if name == 'soup':
+                num_onions = num_tomatoes = 0
+                if obj:
+                    ingredients_cnt = Counter(obj.ingredients)
+                    num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
+                all_features["p{}_closest_soup_n_onions".format(i).format(idx)] = num_onions
+                all_features["p{}_closest_soup_n_onions".format(i).format(idx)] = num_tomatoes
+
+        def make_pot_feature(idx, player, pot_idx, pot_loc, pot_states):
+            # Pot doesn't exist
+            if not pot_loc:
+                all_features["p{}_closest_pot_{}_is_empty"] = 0
+                all_features["p{}_closest_pot_{}_is_full"] = 0
+                all_features["p{}_closest_pot_{}_is_cooking"] = 0
+                all_features["p{}_closest_pot_{}_is_ready"] = 0
+                all_features["p{}_closest_pot_{}_num_onions"] = 0
+                all_features["p{}_closest_pot_{}_num_tomatoes"] = 0
+                all_features["p{}_closest_pot_{}_cook_time"] = 0
+                all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = 0
+                return
+            
+            # Get position information
+            deltas = self.get_deltas_to_location(player, pot_loc)
+
+            # Get pot state info
+            is_empty = int(pot_loc in self.get_empty_pots(pot_states))
+            is_full = int(pot_loc in self.get_full_pots(pot_states))
+            is_cooking = int(pot_loc in self.get_cooking_pots(pot_states))
+            is_ready = int(pot_loc in self.get_ready_pots(pot_states))
+
+            # Get soup state info
+            num_onions = num_tomatoes = 0
+            cook_time_remaining = 0
+            if not is_empty:
+                soup = overcooked_state.get_object(pot_loc)
+                ingredients_cnt = Counter(soup.ingredients)
+                num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
+                cook_time_remaining = soup.cook_time_remaining
+            
+            # Encode pot and soup info
+            all_features["p{}_closest_pot_{}_is_empty"] = is_empty
+            all_features["p{}_closest_pot_{}_is_full"] = is_full
+            all_features["p{}_closest_pot_{}_is_cooking"] = is_cooking
+            all_features["p{}_closest_pot_{}_is_ready"] = is_ready
+            all_features["p{}_closest_pot_{}_num_onions"] = num_onions
+            all_features["p{}_closest_pot_{}_num_tomatoes"] = num_tomatoes
+            all_features["p{}_closest_pot_{}_cook_time"] = cook_time_remaining
+            all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = deltas
+
+            
+
+
+        IDX_TO_OBJ = ["onion", "soup", "dish", "tomato"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
 
         counter_objects = self.get_counter_objects_dict(overcooked_state)
-        pot_state = self.get_pot_states(overcooked_state)
+        pot_states = self.get_pot_states(overcooked_state)
 
-        # Player Info
         for i, player in enumerate(overcooked_state.players):
+            # Player info
             orientation_idx = Direction.DIRECTION_TO_INDEX[player.orientation]
             all_features["p{}_orientation".format(i)] = np.eye(4)[orientation_idx]
             obj = player.held_object
@@ -1988,30 +2048,23 @@ class OvercookedGridworld(object):
                 obj_idx = OBJ_TO_IDX[held_obj_name]
                 all_features["p{}_objs".format(i)] = np.eye(len(IDX_TO_OBJ))[obj_idx]
 
-            # Closest feature of each type
-            if held_obj_name == "onion":
-                all_features["p{}_closest_onion".format(i)] = (0, 0)
-            else:
-                make_closest_feature(i, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
+            # Closest feature for each object type
+            make_closest_feature(i, player, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
+            make_closest_feature(i, player, "tomato", self.get_tomato_dispenser_locations() + counter_objects["tomato"])
+            make_closest_feature(i, player, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
+            make_closest_feature(i, player, "soup", counter_objects["soup"])
+            make_closest_feature(i, player, "serving", self.get_serving_locations())
 
-            make_closest_feature(i, "empty_pot", pot_state["empty"])
-            make_closest_feature(i, "one_onion_pot", pot_state["1_items"])
-            make_closest_feature(i, "two_onion_pot", pot_state["2_items"])
-            make_closest_feature(i, "cooking_pot", pot_state["cooking"])
-            make_closest_feature(i, "ready_pot", pot_state["ready"])
+            # Closest pots info
+            pot_locations = self.get_pot_locations().copy()
+            for pot_idx in range(num_pots):
+                _, closest_pot_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, pot_locations, with_argmin=True)
+                make_pot_feature(i, player, pot_idx, closest_pot_loc, pot_states)
 
-            if held_obj_name == "dish":
-                all_features["p{}_closest_dish".format(i)] = (0, 0)
-            else:
-                make_closest_feature(i, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
+                if closest_pot_loc:
+                    pot_locations.remove(closest_pot_loc)
 
-            if held_obj_name == "soup":
-                all_features["p{}_closest_soup".format(i)] = (0, 0)
-            else:
-                make_closest_feature(i, "soup", counter_objects["soup"])
-
-            make_closest_feature(i, "serving", self.get_serving_locations())
-
+            # Adjacent features info
             for direction, pos_and_feat in enumerate(self.get_adjacent_features(player)):
                 adj_pos, feat = pos_and_feat
 
@@ -2024,32 +2077,42 @@ class OvercookedGridworld(object):
 
                 all_features["p{}_wall_{}".format(i, direction)] = [0] if feat == ' ' else [1]
 
+        # Convert feature dict created above into np array for each player
+        # NOTE: This is the portion that assumes n=2 players
         features_np = {k: np.array(v) for k, v in all_features.items()}
-
         p0, p1 = overcooked_state.players
         p0_dict = {k: v for k, v in features_np.items() if k[:2] == "p0"}
         p1_dict = {k: v for k, v in features_np.items() if k[:2] == "p1"}
         p0_features = np.concatenate(list(p0_dict.values()))
         p1_features = np.concatenate(list(p1_dict.values()))
 
+        # Relative player positions
         p1_rel_to_p0 = np.array(pos_distance(p1.position, p0.position))
-        abs_pos_p0 = np.array(p0.position)
-        ordered_features_p0 = np.squeeze(np.concatenate([p0_features, p1_features, p1_rel_to_p0, abs_pos_p0]))
-
         p0_rel_to_p1 = np.array(pos_distance(p0.position, p1.position))
+
+        # Absolute player positions
+        abs_pos_p0 = np.array(p0.position)
         abs_pos_p1 = np.array(p1.position)
+
+        # Player-centric observations for each player
+        ordered_features_p0 = np.squeeze(np.concatenate([p0_features, p1_features, p1_rel_to_p0, abs_pos_p0]))
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
 
 
     def get_deltas_to_closest_location(self, player, locations, mlam):
         _, closest_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
-        if closest_loc is None:
+        deltas = self.get_deltas_to_location(player, closest_loc)
+        return closest_loc, deltas
+        
+
+    def get_deltas_to_location(self, player, location):
+        if location is None:
             # "any object that does not exist or I am carrying is going to show up as a (0,0)
             # but I can disambiguate the two possibilities by looking at the features 
             # for what kind of object I'm carrying"
             return (0, 0)
-        dy_loc, dx_loc = pos_distance(closest_loc, player.position)
+        dy_loc, dx_loc = pos_distance(location, player.position)
         return dy_loc, dx_loc
 
 
