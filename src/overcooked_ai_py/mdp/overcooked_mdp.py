@@ -1952,8 +1952,12 @@ class OvercookedGridworld(object):
         return final_obs_for_players
 
     @property
-    def featurize_state_shape(self):
-        return np.array([62])
+    def featurize_state_shape(self, num_pots=2):
+        # TODO: make this a function instead of a property so that num_pots can be varied by user
+        num_pot_features = 8
+        base_features = 54
+        total_features = self.num_players * num_pots * num_pot_features + base_features
+        return (total_features,)
 
     def featurize_state(self, overcooked_state, mlam, num_pots=2, **kwargs):
         """
@@ -1973,7 +1977,8 @@ class OvercookedGridworld(object):
                 all_features["p{}_closest_{}".format(i, name)] = (0, 0)
             else:
                 loc, deltas = self.get_deltas_to_closest_location(player, locations, mlam)
-                obj = overcooked_state.get_object(loc)
+                if loc and overcooked_state.has_object(loc):
+                    obj = overcooked_state.get_object(loc)
                 all_features["p{}_closest_{}".format(idx, name)] = deltas
 
             if name == 'soup':
@@ -1981,19 +1986,19 @@ class OvercookedGridworld(object):
                 if obj:
                     ingredients_cnt = Counter(obj.ingredients)
                     num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
-                all_features["p{}_closest_soup_n_onions".format(i).format(idx)] = num_onions
-                all_features["p{}_closest_soup_n_onions".format(i).format(idx)] = num_tomatoes
+                all_features["p{}_closest_soup_n_onions".format(i)] = num_onions
+                all_features["p{}_closest_soup_n_tomatoes".format(i)] = num_tomatoes
 
         def make_pot_feature(idx, player, pot_idx, pot_loc, pot_states):
             # Pot doesn't exist
             if not pot_loc:
-                all_features["p{}_closest_pot_{}_is_empty"] = 0
-                all_features["p{}_closest_pot_{}_is_full"] = 0
-                all_features["p{}_closest_pot_{}_is_cooking"] = 0
-                all_features["p{}_closest_pot_{}_is_ready"] = 0
-                all_features["p{}_closest_pot_{}_num_onions"] = 0
-                all_features["p{}_closest_pot_{}_num_tomatoes"] = 0
-                all_features["p{}_closest_pot_{}_cook_time"] = 0
+                all_features["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = 0
+                all_features["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = 0
                 all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = 0
                 return
             
@@ -2013,16 +2018,16 @@ class OvercookedGridworld(object):
                 soup = overcooked_state.get_object(pot_loc)
                 ingredients_cnt = Counter(soup.ingredients)
                 num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
-                cook_time_remaining = soup.cook_time_remaining
+                cook_time_remaining = 0 if soup.is_idle else soup.cook_time_remaining
             
             # Encode pot and soup info
-            all_features["p{}_closest_pot_{}_is_empty"] = is_empty
-            all_features["p{}_closest_pot_{}_is_full"] = is_full
-            all_features["p{}_closest_pot_{}_is_cooking"] = is_cooking
-            all_features["p{}_closest_pot_{}_is_ready"] = is_ready
-            all_features["p{}_closest_pot_{}_num_onions"] = num_onions
-            all_features["p{}_closest_pot_{}_num_tomatoes"] = num_tomatoes
-            all_features["p{}_closest_pot_{}_cook_time"] = cook_time_remaining
+            all_features["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = is_empty
+            all_features["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = is_full
+            all_features["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = is_cooking
+            all_features["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = is_ready
+            all_features["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = num_onions
+            all_features["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = num_tomatoes
+            all_features["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = cook_time_remaining
             all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = deltas
 
             
@@ -2080,6 +2085,7 @@ class OvercookedGridworld(object):
         # Convert feature dict created above into np array for each player
         # NOTE: This is the portion that assumes n=2 players
         features_np = {k: np.array(v) for k, v in all_features.items()}
+        features_np = {k : np.expand_dims(v, 0) if not v.shape else v for k, v in features_np.items()}
         p0, p1 = overcooked_state.players
         p0_dict = {k: v for k, v in features_np.items() if k[:2] == "p0"}
         p1_dict = {k: v for k, v in features_np.items() if k[:2] == "p1"}

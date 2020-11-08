@@ -753,13 +753,15 @@ class TestFeaturizations(unittest.TestCase):
 
     def test_state_featurization(self):
         trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
-        featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam) for state in ep_states] for ep_states in trajs["ep_states"]]
-        pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected')
-        # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
-        # featurizations by uncommenting the following line:
-        # save_pickle(featurized_observations, pickle_path)
-        expected_featurization = load_pickle(pickle_path)
-        self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+
+        for num_pots in range(3):
+            featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam, num_pots=num_pots) for state in ep_states] for ep_states in trajs["ep_states"]]
+            pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected_{}'.format(num_pots))
+            # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
+            # featurizations by uncommenting the following line:
+            # save_pickle(featurized_observations, pickle_path)
+            expected_featurization = load_pickle(pickle_path)
+            self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 
 class TestOvercookedEnvironment(unittest.TestCase):
