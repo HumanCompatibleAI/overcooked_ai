@@ -2,6 +2,8 @@ import random
 import copy
 import numpy as np
 from overcooked_ai_py.mdp.actions import Action
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+from overcooked_ai_py.planning.planners import MotionPlanner
 INTERACT_TRANSITION_COST = 2
 
 INFINITY = np.inf
@@ -13,6 +15,7 @@ UNDEFIND_LOCATION = "UND_L"
 UNDEFIND_ACTION = "UND_A"
 
 ENTROPY_RO = 5
+
 
 import heapq
 
@@ -124,6 +127,109 @@ def path_to_actions(path_0, path_1, terrain_mtx):
             temp_len = len(actions_1)
             actions_1 = [UNDEFIND_ACTION] * len(actions_0) + actions_1
             actions_0 = actions_0 + [UNDEFIND_ACTION] * temp_len
+
+    assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
+    return actions_0, actions_1
+
+def path_to_actions_with_padding(path_0, path_1, terrain_mtx, prev_loc_0, prev_loc_1):
+    """
+    Arguments:
+        path_0 (list): a list of tuble for locations of agent 0
+        path_1 (list): a list of tuble for locations of agent 1
+        terrain_mtx (list of list): the terrain matrix. You might need this to identify counters / pots, etc.
+    return:
+        the list of actions that will be used to fulfill the path
+    """
+    assert len(path_0) == len(path_1), "input path should have the same length. Please check the SearchNode for this"
+    actions_0 = []
+    actions_1 = []
+
+    counter_pickup_position_0 = None
+    counter_pickup_0 = False
+
+    counter_pickup_position_1 = None
+    counter_pickup_1 = False
+
+    # fill in both action lists with actions of movement and interacting
+    for index in range(len(path_0)):
+
+        # Set current and next locations to determine action
+        curr_loc_0 = path_0[index]
+        curr_loc_1 = path_1[index]
+        next_loc_0 = UNDEFIND_LOCATION
+        next_loc_1 = UNDEFIND_LOCATION
+
+        if index != (len(path_0) - 1):
+            next_loc_0 = path_0[index + 1]
+            next_loc_1 = path_1[index + 1]
+
+        add_action_from_location(curr_loc_0, next_loc_0, actions_0)
+        add_action_from_location(curr_loc_1, next_loc_1, actions_1)
+
+        # logic to keep track of the counter pickup location
+        if counter_pickup_0:
+            orientation = (curr_loc_0[0]-next_loc_0[0], curr_loc_0[1]-next_loc_0[1])
+            counter_pickup_position_0 = curr_loc_0
+        if counter_pickup_1:
+            orientation = (curr_loc_1[0]-next_loc_1[0], curr_loc_1[1]-next_loc_1[1])
+            counter_pickup_position_1 = curr_loc_1
+        if len(actions_0) > 0:
+            counter_pickup_0 = actions_0[len(actions_0)-1] == UNDEFIND_ACTION
+        if len(actions_1) > 0:
+            counter_pickup_1 = actions_1[len(actions_1)-1] == UNDEFIND_ACTION
+
+
+    # remove unnecessary action at second to last spot if no in place turning required
+    actions_0 = remove_extra_action(actions_0)
+    actions_1 = remove_extra_action(actions_1)
+
+    # padding the two agent's action lists
+
+    # case where agent 0 did not do anything
+    if len(actions_0) == 0:
+        actions_0 = [(0, 0)] * len(actions_1)
+    # case where agent 1 did not do anything
+    elif len(actions_1) == 0:
+        actions_1 = [(0, 0)] * len(actions_0)
+    # case where counter was used by both agents
+    else:
+        walk_graph = walk_graph_from_terrain(terrain_mtx)
+        # case where agent 0 is picking up from the counter
+        if actions_0[0] == 'interact':
+            temp_len = len(actions_0)
+
+            # calculate the action path to get the agent from where it ended previously to where it needs to pickup
+            action_pad = shortest_walk_path(walk_graph, prev_loc_0, counter_pickup_position_0, terrain_mtx)
+            pad_len = len(action_pad)
+
+            # remove last repetitive action if turning is not necessary
+            if pad_len > 1 and action_pad[pad_len-1] == action_pad[pad_len-2]:
+                action_pad = action_pad[:pad_len-1]
+
+            if len(action_pad) > len(actions_1):
+                actions_0 = action_pad + actions_0
+                actions_1 = actions_1 + [(0, 0)] * (temp_len + len(action_pad) - len(actions_1))
+            else:
+                actions_0 = [(0, 0)] * (len(actions_1) - len(action_pad)) + action_pad + actions_0
+                actions_1 = actions_1 + [(0, 0)] * temp_len
+        # case where agent 1 is picking up from the counter
+        elif actions_1[0] == 'interact':
+            temp_len = len(actions_1)
+
+            # calculate the action path to get the agent from where it ended previously to where it needs to pickup
+            action_pad = shortest_walk_path(walk_graph, prev_loc_1, counter_pickup_position_1, terrain_mtx)
+            pad_len = len(action_pad)
+
+            # remove last repetitive action if turning is not necessary
+            if pad_len > 1 and action_pad[pad_len - 1] == action_pad[pad_len - 2]:
+                action_pad = action_pad[:pad_len - 1]
+
+            if len(action_pad) > len(actions_0):
+                actions_1 = action_pad + actions_1
+                actions_0 = actions_0 + [(0, 0)] * (temp_len + len(action_pad) - len(actions_0))
+            else:
+                actions_1 = [(0, 0)] * (len(actions_0) - len(action_pad)) + action_pad + actions_1
+                actions_0 = actions_0 + [(0, 0)] * temp_len
 
     assert len(actions_0) == len(actions_1), " resulting actions should have the same length. Please pad if otherwise"
     return actions_0, actions_1
@@ -471,6 +577,48 @@ def shortest_walk_dist(walk_graph, start_loc, goal_loc, terrain_mtx, debug=False
         print("cannot find a walk path. Please use uniform_cost_search to utilize handover_graph")
         print("!!!!!!!!!!!!!END WARNING!!!!!!!!!!!!!!!!!!")
     return INFINITY
+
+def shortest_walk_path(walk_graph, start_loc, goal_loc, terrain_mtx, debug=False):
+    walk_graph_copy = copy.deepcopy(walk_graph)
+
+    l, w = len(terrain_mtx), len(terrain_mtx[0])
+
+    # add incoming edge for goal_loc
+    goal_loc_i, goal_loc_j = goal_loc
+    if goal_loc_i > 0 and terrain_mtx[goal_loc_i - 1][goal_loc_j] == ' ':
+        walk_graph_copy[(goal_loc_i - 1, goal_loc_j)].append(goal_loc)
+    if goal_loc_i < l - 1 and terrain_mtx[goal_loc_i + 1][goal_loc_j] == ' ':
+        walk_graph_copy[(goal_loc_i + 1, goal_loc_j)].append(goal_loc)
+    if goal_loc_j > 0 and terrain_mtx[goal_loc_i][goal_loc_j - 1] == ' ':
+        walk_graph_copy[(goal_loc_i, goal_loc_j - 1)].append(goal_loc)
+    if goal_loc_j < w - 1 and terrain_mtx[goal_loc_i][goal_loc_j + 1] == ' ':
+        walk_graph_copy[(goal_loc_i, goal_loc_j + 1)].append(goal_loc)
+
+    closed = set([])
+    fringe = PriorityQueue()
+    # Initialize empty start node.
+    # All search nodes have the form (LOCATION, TOTAL_WALK_COST, CURRENT_ACTION_PATH)
+    startInfo = (start_loc, 0, [])
+    fringe.push(startInfo, 0)
+    # Continue till fringe empty
+    while (not fringe.isEmpty()):
+        (loc, total_walk_cost_so_far, action_path) = fringe.pop()
+        # Goal state check
+        if loc == goal_loc:
+            return action_path
+        # If necessary, add successors
+        if (loc not in closed):
+            closed.add(loc)
+            for sucLoc in walk_graph_copy[loc]:
+                fringe.push((sucLoc, total_walk_cost_so_far + 1,
+                             action_path + [(sucLoc[1]-loc[1], sucLoc[0]-loc[0])]),
+                            total_walk_cost_so_far + 1)
+    if debug:
+        print("!!!!!!!!!!!!!!WARNING!!!!!!!!!!!!!!!!!!!!!")
+        print("cannot find a walk path. Please use uniform_cost_search to utilize handover_graph")
+        print("!!!!!!!!!!!!!END WARNING!!!!!!!!!!!!!!!!!!")
+    return INFINITY
+
 
 
 def uniform_cost_search(walk_graph, handover_graph, terrain_mtx, agent_locations, start_agent_idx, goal_loc):
@@ -954,6 +1102,10 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=False):
     player_2_action_paths = []
     pairs_of_action_paths_by_total_length = {}
 
+    modified_terrain_mtx = copy.deepcopy(terrain_mtx)
+    modified_terrain_mtx[start_player_1_position[0]][start_player_1_position[1]] = ' '
+    modified_terrain_mtx[start_player_2_position[0]][start_player_2_position[1]] = ' '
+
     for key in possible_agents_served_positions:
         for rep in possible_agents_served_positions[key]:
 
@@ -964,11 +1116,39 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=False):
             act_path_0 = []
             act_path_1 = []
 
+            prev_0 = start_player_1_position
+            prev_1 = start_player_2_position
+
             # for each mla location path we convert it to actions and add that to our list of action_lists for this node
             for i in range(len(loc_path_0)):
-                act_paths = path_to_actions(loc_path_0[i], loc_path_1[i], terrain_mtx)
+                # act_paths = path_to_actions(loc_path_0[i], loc_path_1[i], terrain_mtx)
+                act_paths = path_to_actions_with_padding(loc_path_0[i], loc_path_1[i], modified_terrain_mtx, prev_0, prev_1)
                 act_path_0.append(act_paths[0])
                 act_path_1.append(act_paths[1])
+
+                last_counter_0 = False
+                last_counter_1 = False
+                for j, pos in enumerate(loc_path_0[i][::-1]):
+                    if last_counter_0:
+                        prev_0 = pos
+                        break
+                    elif pos != UNDEFIND_LOCATION:
+                        if modified_terrain_mtx[pos[0]][pos[1]] != ' ':
+                            last_counter_0 = True
+                        else:
+                            prev_0 = pos
+                            break
+
+                for pos in loc_path_1[i][::-1]:
+                    if last_counter_1:
+                        prev_1 = pos
+                        break
+                    elif pos != UNDEFIND_LOCATION:
+                        if modified_terrain_mtx[pos[0]][pos[1]] != ' ':
+                            last_counter_1 = True
+                        else:
+                            prev_1 = pos
+                            break
 
             # we add the full action_list for this end node to our list of all possible action paths for each player
             connected_action_path_0 = connect_action_path(act_path_0)
