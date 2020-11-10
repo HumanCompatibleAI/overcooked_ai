@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_actions, \
     UNDEFIND_ACTION, remove_extra_action, add_action_from_location, calculate_entropy_of_path, \
-    ENTROPY_RO
+    ENTROPY_RO, path_to_actions_with_padding, graph_from_terrain, shortest_walk_path
 
 
 class TestHandoverEvaluation(unittest.TestCase):
@@ -140,6 +140,76 @@ class TestMotionExtractor(unittest.TestCase):
         self.assertEqual(path_to_actions(path_0, path_1, self.divided_mtx), (
             [UNDEFIND_ACTION, UNDEFIND_ACTION],
             [(0, 1), 'interact']
+        ))
+
+class TestMotionExtractorWithPathPadding(unittest.TestCase):
+    def setUp(self):
+        self.divided_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', 'X', ' ', ' ', 'O'],
+            ['X', ' ', 'X', ' ', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+
+        self.keyhole_maze = [
+            ['X', 'P', 'X', 'X', 'X', 'X', 'S', 'X', 'X', 'X'],
+            ['X', ' ', 'X', ' ', ' ', ' ', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'X'],
+            ['X', ' ', 'X', ' ', 'X', 'X', ' ', 'X', ' ', 'O'],
+            ['X', ' ', ' ', ' ', 'X', 'X', ' ', ' ', ' ', 'X'],
+            ['X', 'X', 'D', 'X', 'X', 'X', 'X', 'X', 'X', 'X']
+        ]
+
+        self.walk_graph, self.handover_graph = graph_from_terrain(self.keyhole_maze)
+
+    def testShortestWalkPath(self):
+        action_path = shortest_walk_path(self.walk_graph, (4, 8), (7, 9), self.keyhole_maze)
+        self.assertEqual(action_path, [(0, 1), (0, 1), (0, 1), (1, 0)])
+
+        action_path = shortest_walk_path(self.walk_graph, (7, 8), (0, 1), self.keyhole_maze)
+        self.assertEqual(action_path, [(0, 1), (-1, 0), (-1, 0), (0, -1), (0, -1), (0, -1),
+                                       (0, -1), (0, -1), (0, -1), (0, -1), (-1, 0), (-1, 0),
+                                       (-1, 0), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
+                                       (0, 1), (0, 1), (-1, 0), (-1, 0), (0, -1), (0, -1),
+                                       (0, -1), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1)])
+
+    def testBasicMotion(self):
+        # this tests the path padding for undefined actions when one agent should stay
+        path_0 = ['UND_L', 'UND_L']
+        path_1 = [(1, 1), (1, 0)]
+        self.assertEqual(path_to_actions_with_padding(path_0, path_1, self.divided_mtx, (2, 3), (1, 1)), (
+            [(0, 0), (0, 0)],
+            [(-1, 0), 'interact']
+        ))
+
+    def testCounterHandoverTurning(self):
+        # this tests the path padding for undefined actions when there is a counter handover
+        # with turning to reach the counter
+        # with the padded path being shorter than the undefined
+        path_0 = [(1, 4), (1, 3), (1, 2), 'UND_L', 'UND_L']
+        path_1 = ['UND_L', 'UND_L', (1, 2), (1, 1), (0, 1)]
+        prev_loc_0 = (1, 4)
+        prev_loc_1 = (1, 1)
+        self.assertEqual(path_to_actions_with_padding(path_0, path_1, self.divided_mtx, prev_loc_0, prev_loc_1), (
+            [(-1, 0), 'interact', (0, 0), (0, 0), (0, 0)],
+            [(0, 0), (1, 0), 'interact', (0, -1), 'interact']
+        ))
+
+    def testCounterHandoverNoTurning(self):
+        # this tests the path padding for undefined actions when there is a counter handover
+        # without turning to reach the counter
+        # with the padded path being longer than the undefined
+        path_0 = ['UND_L', 'UND_L', (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (0, 6)]
+        path_1 = [(1, 1), (1, 2), 'UND_L', 'UND_L', 'UND_L', 'UND_L', 'UND_L', 'UND_L']
+        prev_loc_0 = (1, 6)
+        prev_loc_1 = (1, 1)
+        self.assertEqual(path_to_actions_with_padding(path_0, path_1, self.keyhole_maze, prev_loc_0, prev_loc_1), (
+            [(-1, 0), (-1, 0), (-1, 0), 'interact', (1, 0), (1, 0), (1, 0), (0, -1), 'interact'],
+            [(1, 0), 'interact', (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)]
         ))
 
 class TestEntropyComparison(unittest.TestCase):
