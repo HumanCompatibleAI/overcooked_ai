@@ -270,7 +270,7 @@ def calculate_entropy_of_path(path, ro):
             curr_length += 1
         else:
             # if the sequence of actions that is ending is undefined, then we don't add the entropy
-            if curr_action == UNDEFIND_ACTION:
+            if curr_action == UNDEFIND_ACTION or curr_action == (0, 0):
                 curr_length = 1
                 curr_action = action
                 continue
@@ -280,7 +280,7 @@ def calculate_entropy_of_path(path, ro):
             curr_action = action
 
     # add entropy for last sequence of actions if the last sequence is undefined
-    if curr_action != UNDEFIND_ACTION:
+    if curr_action != UNDEFIND_ACTION and curr_action != (0, 0):
         entropy = -np.log(curr_length) + const_entropy
         total_entropy += entropy
 
