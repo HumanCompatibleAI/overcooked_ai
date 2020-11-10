@@ -680,7 +680,7 @@ def graph_from_terrain(terrain_mtx):
 
 
 def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, terrain_mtx, task_name,
-                        both_idx=False, is_potting=False, is_dishing=False, best_only=False):
+                        both_idx=False, is_initial_potting=False, is_returning_to_pot=False, best_only=False):
     """
     This function perform one mla action from the previous mla node, recorded in prev_mla_dict
     Arguments:
@@ -691,11 +691,12 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
        terrain_mtx (list of list): matrix for the terrain
        task_name (str): name of the mla action
        both_idx (bool): whether this action can be performed by agents at both agent, and not just the primary agent
-       is_potting (bool): whether we need to update the pot location when create the new mla node
-       is_dishing (bool): whether we are using the pot_loc as the goal for the motion plan
+       is_initial_potting (bool): whether we need to update the pot location when create the new mla node
+       is_returning_to_pot (bool): whether we are using the pot_loc as the goal for the motion plan
        best_only (bool): only keeping the best path at each of the forward_mla_hash
     """
     new_dict = {}
+    assert is_returning_to_pot or feature_locations != [None]
     for f_location in feature_locations:
         for backward_mla_hash in prev_mla_dict.keys():
             for backward_mla_node in prev_mla_dict[backward_mla_hash]:
@@ -707,7 +708,7 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
                 else:
                     start_idx_lst = [backward_mla_node.primary_idx]
                 # if we are dishing a cooked soup, the distination has to be the current pot location
-                if is_dishing:
+                if is_returning_to_pot:
                     f_location = backward_mla_node.pot_loc
 
                 for start_idx in start_idx_lst:
@@ -716,7 +717,7 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
                     for ending_hash_i in options.keys():
                         for forward_node in options[ending_hash_i]:
                             # we only update the pot location in the mla node if we are potting onion
-                            if is_potting:
+                            if is_initial_potting:
                                 forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node, f_location)
                             else:
                                 forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node)
@@ -736,7 +737,7 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
     return new_dict
 
 
-def terrain_analysis(terrain_mtx, silent=True, best_only=False):
+def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     """
     Arguments:
         terrain_mtx (list of list): 2 dimensional terrain matrix which represent the grid
@@ -820,56 +821,161 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=False):
     if not silent:
         print("possible agents positions before starting", possible_starting_agents_positions)
 
-    # first we need the onions
+    # first we need the first onion
     onion_dispenser_locations = get_feature_locations(terrain_mtx, 'O')
-    possible_onion_agent_positions = perform_mla(
+    possible_onion_1_agent_positions = perform_mla(
         onion_dispenser_locations,
         possible_starting_agents_positions,
         walk_graph,
         {},
         terrain_mtx,
-        "onion_pickup",
+        "onion_pickup_1",
         both_idx=True,
         best_only=best_only
     )
 
-    if len(possible_onion_agent_positions) > 0:
+    if len(possible_onion_1_agent_positions) > 0:
         stage_score.append(1)
     else:
         stage_score.append(0)
 
     if not silent:
-        print("possible positions after collecting onion")
-        for k in possible_onion_agent_positions:
+        print("possible positions after collecting onion 1")
+        for k in possible_onion_1_agent_positions:
             print(k)
-            for rep in possible_onion_agent_positions[k]:
+            for rep in possible_onion_1_agent_positions[k]:
                 print(str(rep))
             print("----")
         print("*************************************")
 
     # then we need to put the onion to the pot
     pot_locations = get_feature_locations(terrain_mtx, 'P')
-    possible_agents_and_cooking_pot_positions = perform_mla(
+    possible_agents_and_cooking_pot_1_positions = perform_mla(
         pot_locations,
-        possible_onion_agent_positions,
+        possible_onion_1_agent_positions,
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "onion_drop",
-        is_potting=True,
+        "onion_drop_1",
+        is_initial_potting=True,
         best_only=best_only
     )
 
-    if len(possible_agents_and_cooking_pot_positions) > 0:
+    if len(possible_agents_and_cooking_pot_1_positions) > 0:
         stage_score.append(1)
     else:
         stage_score.append(0)
 
     if not silent:
-        print("possible positions of agents and cooking pot")
-        for k in possible_agents_and_cooking_pot_positions:
+        print("possible positions of agents and cooking pot 1")
+        for k in possible_agents_and_cooking_pot_1_positions:
             print(k)
-            for rep in possible_agents_and_cooking_pot_positions[k]:
+            for rep in possible_agents_and_cooking_pot_1_positions[k]:
+                print(str(rep))
+            print("----")
+        print("*************************************")
+
+    # second we need the second onion
+    possible_onion_2_agent_positions = perform_mla(
+        onion_dispenser_locations,
+        possible_agents_and_cooking_pot_1_positions,
+        walk_graph,
+        {},
+        terrain_mtx,
+        "onion_pickup_2",
+        both_idx=True,
+        best_only=best_only
+    )
+
+    if len(possible_onion_2_agent_positions) > 0:
+        stage_score.append(1)
+    else:
+        stage_score.append(0)
+
+    if not silent:
+        print("possible positions after collecting onion 2")
+        for k in possible_onion_2_agent_positions:
+            print(k)
+            for rep in possible_onion_2_agent_positions[k]:
+                print(str(rep))
+            print("----")
+        print("*************************************")
+
+    # then we need to put the onion to the pot
+    possible_agents_and_cooking_pot_2_positions = perform_mla(
+        [None],
+        possible_onion_2_agent_positions,
+        walk_graph,
+        handover_graph,
+        terrain_mtx,
+        "onion_drop_2",
+        is_returning_to_pot=True,
+        best_only=best_only
+    )
+
+    if len(possible_agents_and_cooking_pot_2_positions) > 0:
+        stage_score.append(1)
+    else:
+        stage_score.append(0)
+
+    if not silent:
+        print("possible positions of agents and cooking pot 2")
+        for k in possible_agents_and_cooking_pot_2_positions:
+            print(k)
+            for rep in possible_agents_and_cooking_pot_2_positions[k]:
+                print(str(rep))
+            print("----")
+        print("*************************************")
+
+
+    # third we need the third onion
+    possible_onion_3_agent_positions = perform_mla(
+        onion_dispenser_locations,
+        possible_agents_and_cooking_pot_2_positions,
+        walk_graph,
+        {},
+        terrain_mtx,
+        "onion_pickup_3",
+        both_idx=True,
+        best_only=best_only
+    )
+
+    if len(possible_onion_3_agent_positions) > 0:
+        stage_score.append(1)
+    else:
+        stage_score.append(0)
+
+    if not silent:
+        print("possible positions after collecting onion 3")
+        for k in possible_onion_3_agent_positions:
+            print(k)
+            for rep in possible_onion_3_agent_positions[k]:
+                print(str(rep))
+            print("----")
+        print("*************************************")
+
+    # then we need to put the onion to the pot
+    possible_agents_and_cooking_pot_3_positions = perform_mla(
+        [None],
+        possible_onion_3_agent_positions,
+        walk_graph,
+        handover_graph,
+        terrain_mtx,
+        "onion_drop_3",
+        is_returning_to_pot=True,
+        best_only=best_only
+    )
+
+    if len(possible_agents_and_cooking_pot_3_positions) > 0:
+        stage_score.append(1)
+    else:
+        stage_score.append(0)
+
+    if not silent:
+        print("possible positions of agents and cooking pot 3")
+        for k in possible_agents_and_cooking_pot_3_positions:
+            print(k)
+            for rep in possible_agents_and_cooking_pot_3_positions[k]:
                 print(str(rep))
             print("----")
         print("*************************************")
@@ -878,7 +984,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=False):
     dish_dispenser_locations = get_feature_locations(terrain_mtx, 'D')
     possible_dish_agent_and_cooking_pot_positions = perform_mla(
         dish_dispenser_locations,
-        possible_agents_and_cooking_pot_positions,
+        possible_agents_and_cooking_pot_3_positions,
         walk_graph,
         {},
         terrain_mtx,
@@ -908,7 +1014,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=False):
         handover_graph,
         terrain_mtx,
         "dishing_soup",
-        is_dishing=True,
+        is_returning_to_pot=True,
         best_only=best_only
     )
 
