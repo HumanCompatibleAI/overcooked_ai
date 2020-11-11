@@ -885,6 +885,25 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
     return new_dict
 
 
+def add_cooking_waiting(act_paths, difference):
+    """
+
+    Args:
+        act_path (tuple of two list of tuples): the act_paths that needs to be amended
+        difference (int) the number of (0, 0) needs to be inserted
+
+    Returns:
+        the amended act_paths
+
+    """
+    insertion = [(0, 0)] * difference
+    amended_act_paths = []
+    amended_act_paths.append(act_paths[0][:-1] + insertion + [act_paths[0][-1]])
+    amended_act_paths.append(act_paths[1][:-1] + insertion + [act_paths[1][-1]])
+    amended_act_paths = tuple(amended_act_paths)
+    return amended_act_paths
+
+
 def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     """
     Arguments:
@@ -977,7 +996,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         {},
         terrain_mtx,
-        "onion_pickup_1",
+        "0_onion_pickup_1",
         both_idx=True,
         best_only=best_only
     )
@@ -1004,7 +1023,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "onion_drop_1",
+        "1_onion_drop_1",
         is_initial_potting=True,
         best_only=best_only
     )
@@ -1030,7 +1049,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         {},
         terrain_mtx,
-        "onion_pickup_2",
+        "2_onion_pickup_2",
         both_idx=True,
         best_only=best_only
     )
@@ -1056,7 +1075,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "onion_drop_2",
+        "3_onion_drop_2",
         is_returning_to_pot=True,
         best_only=best_only
     )
@@ -1083,7 +1102,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         {},
         terrain_mtx,
-        "onion_pickup_3",
+        "4_onion_pickup_3",
         both_idx=True,
         best_only=best_only
     )
@@ -1103,13 +1122,39 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         print("*************************************")
 
     # then we need to put the onion to the pot
-    possible_agents_and_cooking_pot_3_positions = perform_mla(
+    possible_agents_and_full_pot_3_positions = perform_mla(
         [None],
         possible_onion_3_agent_positions,
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "onion_drop_3",
+        "5_onion_drop_3",
+        is_returning_to_pot=True,
+        best_only=best_only
+    )
+
+    if len(possible_agents_and_full_pot_3_positions) > 0:
+        stage_score.append(1)
+    else:
+        stage_score.append(0)
+
+    if not silent:
+        print("possible positions of agents and cooking pot 3")
+        for k in possible_agents_and_full_pot_3_positions:
+            print(k)
+            for rep in possible_agents_and_full_pot_3_positions[k]:
+                print(str(rep))
+            print("----")
+        print("*************************************")
+
+    # then we need to start cooking
+    possible_agents_and_cooking_pot_3_positions = perform_mla(
+        [None],
+        possible_agents_and_full_pot_3_positions,
+        walk_graph,
+        {},
+        terrain_mtx,
+        "6_start_cooking",
         is_returning_to_pot=True,
         best_only=best_only
     )
@@ -1136,7 +1181,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         {},
         terrain_mtx,
-        "dish_pickup",
+        "7_dish_pickup",
         both_idx=True,
         best_only=best_only
     )
@@ -1161,7 +1206,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "dishing_soup",
+        "8_dishing_soup",
         is_returning_to_pot=True,
         best_only=best_only
     )
@@ -1187,7 +1232,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         walk_graph,
         handover_graph,
         terrain_mtx,
-        "serving",
+        "9_serving",
         best_only=best_only
     )
     if len(possible_agents_served_positions) > 0:
@@ -1216,8 +1261,9 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         for rep in possible_agents_served_positions[key]:
 
             # for each possible end mla node we find all the location paths from all the mlas
-            loc_path_0 = list(rep.agent_0_path_dict.values())
-            loc_path_1 = list(rep.agent_1_path_dict.values())
+            loc_path_dict_0 = rep.agent_0_path_dict
+            loc_path_dict_1 = rep.agent_1_path_dict
+            assert set(loc_path_dict_0.keys()) == set(loc_path_dict_1.keys()), "different subtasks were recorded"
 
             act_path_0 = []
             act_path_1 = []
@@ -1225,16 +1271,27 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
             prev_0 = start_player_1_position
             prev_1 = start_player_2_position
 
+            # soup cooking wait time, so that the entire sequence will result in the correct timing to dish the soup
+            soup_cooking_tick = 0
+            # currently only support soup with cook time 20
+            soup_cooking_time = 20
+
             # for each mla location path we convert it to actions and add that to our list of action_lists for this node
-            for i in range(len(loc_path_0)):
-                # act_paths = path_to_actions(loc_path_0[i], loc_path_1[i], terrain_mtx)
-                act_paths = path_to_actions_with_padding(loc_path_0[i], loc_path_1[i], modified_terrain_mtx, prev_0, prev_1)
+            for mla in sorted(list(loc_path_dict_0.keys())):
+                act_paths = path_to_actions_with_padding(loc_path_dict_0[mla], loc_path_dict_1[mla], modified_terrain_mtx, prev_0, prev_1)
+                if mla == "7_dish_pickup":
+                    soup_cooking_tick += len(act_paths[0]) + 1 # the plus one because soup ticking starts at 1
+                elif mla == "8_dishing_soup":
+                    soup_cooking_tick += len(act_paths[0]) - 1
+                    if soup_cooking_tick < soup_cooking_time:
+                        act_paths = add_cooking_waiting(act_paths, soup_cooking_time - soup_cooking_tick)
                 act_path_0.append(act_paths[0])
                 act_path_1.append(act_paths[1])
 
                 last_counter_0 = False
                 last_counter_1 = False
-                for j, pos in enumerate(loc_path_0[i][::-1]):
+                # TODO (jocelyn): maybe explain a bit why this is necessary?
+                for j, pos in enumerate(loc_path_dict_0[mla][::-1]):
                     if last_counter_0:
                         prev_0 = pos
                         break
@@ -1244,8 +1301,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
                         else:
                             prev_0 = pos
                             break
-
-                for pos in loc_path_1[i][::-1]:
+                for pos in loc_path_dict_1[mla][::-1]:
                     if last_counter_1:
                         prev_1 = pos
                         break

@@ -4,6 +4,8 @@ from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_acti
     UNDEFIND_ACTION, remove_extra_action, add_action_from_location, calculate_entropy_of_path, \
     ENTROPY_RO, path_to_actions_with_padding, graph_from_terrain, shortest_walk_path
 
+from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
 
 class TestHandoverEvaluation(unittest.TestCase):
 
@@ -421,6 +423,67 @@ class TestEntropyComparison(unittest.TestCase):
         print(entropies)
 
 
+class TestMotionExtractorRealMDP(unittest.TestCase):
+
+    def mtx_test_helper(self, terrain_mtx, verbose=False):
+
+        mdp = OvercookedGridworld.from_grid(terrain_mtx)
+        env = OvercookedEnv.from_mdp(mdp)
+
+        res = terrain_analysis(terrain_mtx)
+        pairs_of_action_paths_by_total_length = res['pairs of action paths by total length']
+
+        for path_length in pairs_of_action_paths_by_total_length:
+            for pair_of_action_paths_by_total_length in pairs_of_action_paths_by_total_length[path_length]:
+                action_path_0 = pair_of_action_paths_by_total_length[0]
+                action_path_1 = pair_of_action_paths_by_total_length[1]
+                joint_action_path = []
+                for action_0, action_1 in zip(action_path_0, action_path_1):
+                    joint_action_path.append((action_0, action_1))
+                if verbose:
+                    print("joint_action_path", joint_action_path)
+                env.reset()
+                sparse_rew = 0
+                for joint_action in joint_action_path:
+                    env.display_states(env.state)
+                    _, sparse_rew, _, _ = env.step(joint_action)
+                    if verbose:
+                        print("joint action:", joint_action, "sparse reward: ", sparse_rew)
+                if verbose:
+                    print("final state")
+                    env.display_states(env.state)
+                self.assertTrue(sparse_rew == 20, "the action paths did not successfully result in soups in the end")
+
+    def test_divided(self):
+        divided_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', 'X', ' ', ' ', 'O'],
+            ['X', '1', 'X', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+        self.mtx_test_helper(divided_mtx, verbose=True)
+
+    def test_connected(self):
+        # TODO: This actually signals one of the problem we should address: the non-acting agent should move out of the way
+        connected_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', ' ', ' ', ' ', 'O'],
+            ['X', '1', ' ', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+        self.mtx_test_helper(connected_mtx, verbose=True)
+
+
+    def test_small_keyhole(self):
+        # TODO: We should get this case to pass as well, then we are good to go
+        small_keyhole_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', ' ', ' ', ' ', 'O'],
+            ['X', ' ', 'X', ' ', ' ', 'X'],
+            ['X', '1', 'X', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+        self.mtx_test_helper(small_keyhole_mtx, verbose=True)
 
 
 
