@@ -455,6 +455,7 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
                 self.assertTrue(sparse_rew == 20, "the action paths did not successfully result in soups in the end")
 
     def test_divided(self):
+        # This should aready pass
         divided_mtx = [
             ['X', 'P', 'X', 'X', 'X', 'X'],
             ['O', ' ', 'X', ' ', ' ', 'O'],
@@ -462,6 +463,18 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
             ['X', 'D', 'X', 'S', 'X', 'X'],
         ]
         self.mtx_test_helper(divided_mtx, verbose=True)
+
+
+    def test_counter_pre_movement(self):
+        # TODO: making sure agent "1" moves to (1, 1) to receive the soup
+        divided_counter_pre_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['X', ' ', 'X', ' ', ' ', 'O'],
+            ['X', ' ', 'X', 'X', ' ', 'X'],
+            ['X', '1', 'X', 'X', '2', 'X'],
+            ['X', 'D', 'X', 'X', 'S', 'X'],
+        ]
+        self.mtx_test_helper(divided_counter_pre_mtx, verbose=True)
 
     def test_connected(self):
         # TODO: This actually signals one of the problem we should address: the non-acting agent should move out of the way
