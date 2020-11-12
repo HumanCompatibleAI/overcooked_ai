@@ -1140,6 +1140,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         soup_2_litter = 0.02
         soup_3_litter = 0.02
         pot_litter = 0.2
+        player_litter = 0.5
 
         litter_params = {
             "onion_litter": onion_litter,
@@ -1147,7 +1148,8 @@ class TestOvercookedEnvironment(unittest.TestCase):
             "soup_1_litter": soup_1_litter,
             "soup_2_litter": soup_2_litter,
             "soup_3_litter": soup_3_litter,
-            "pot_litter": pot_litter
+            "pot_litter": pot_litter,
+            "player_litter": player_litter
         }
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params, outer_shape=(9, 6))
         env_param = DEFAULT_ENV_PARAMS.copy()
