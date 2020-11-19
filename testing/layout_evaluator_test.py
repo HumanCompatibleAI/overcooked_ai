@@ -466,7 +466,6 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
 
 
     def test_counter_pre_movement(self):
-        # TODO: making sure agent "1" moves to (1, 1) to receive the soup
         divided_counter_pre_mtx = [
             ['X', 'P', 'X', 'X', 'X', 'X'],
             ['X', ' ', 'X', ' ', ' ', 'O'],
@@ -477,7 +476,6 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
         self.mtx_test_helper(divided_counter_pre_mtx, verbose=True)
 
     def test_connected(self):
-        # TODO: This actually signals one of the problem we should address: the non-acting agent should move out of the way
         connected_mtx = [
             ['X', 'P', 'X', 'X', 'X', 'X'],
             ['O', ' ', ' ', ' ', ' ', 'O'],
@@ -488,7 +486,6 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
 
 
     def test_small_keyhole(self):
-        # TODO: We should get this case to pass as well, then we are good to go
         small_keyhole_mtx = [
             ['X', 'P', 'X', 'X', 'X', 'X'],
             ['O', ' ', ' ', ' ', ' ', 'O'],

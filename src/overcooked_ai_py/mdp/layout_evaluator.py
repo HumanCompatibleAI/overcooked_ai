@@ -418,34 +418,37 @@ class OvercookedSearchNode:
 
 
 class OvercookedMLASearchNode:
-    def __init__(self, primary_idx, agent_0_loc, agent_1_loc, pot_loc, agent_0_path_dict, agent_1_path_dict,
-                 num_counter_ops):
+    def __init__(self, primary_idx, agent_0_loc, agent_1_loc, pot_loc, agent_0_act_dict, agent_1_act_dict,
+                 num_counter_ops, terrain_mtx):
         """
         Search Node used for a composition of medium level tasks (picking up an onion, dishing a soup, etc)
         Arguments:
             primary_idx (int): the index of the agent that is moving in the search process
             agent_0_loc (tuple of length 2): the location of agent 0
             agent_1_loc (tuple of length 2): the location of agent 1
-            agent_0_path_dict (dictionary of list of variable length):
+            agent_0_act_dict (dictionary of list of variable length):
                 keys: medium levthe cummulative list of locations traversed by agent 0
-            agent_1_path_dict (dictionary of list of variable length): the cummulative list of locations traversed by agent 1
+            agent_1_act_dict (dictionary of list of variable length): the cummulative list of locations traversed by agent 1
 
         """
         self.primary_idx = primary_idx
         self.agent_0_loc = agent_0_loc
         self.agent_1_loc = agent_1_loc
         self.pot_loc = pot_loc
-        self.agent_0_path_dict = agent_0_path_dict.copy()
-        self.agent_1_path_dict = agent_1_path_dict.copy()
+        self.agent_0_act_dict = agent_0_act_dict.copy()
+        self.agent_1_act_dict = agent_1_act_dict.copy()
         self.num_counter_ops = num_counter_ops
+        self.terrain_mtx = terrain_mtx
 
     def append_path_for_task(self, task_name, agent_0_path_task, agent_1_path_task):
-        self.agent_0_path_dict[task_name] = agent_0_path_task
-        self.agent_1_path_dict[task_name] = agent_1_path_task
+        act_paths = path_to_actions_with_padding(agent_0_path_task, agent_1_path_task, self.terrain_mtx,
+                                                 self.agent_0_loc, self.agent_1_loc)
+        self.agent_0_act_dict[task_name] = act_paths[0]
+        self.agent_1_act_dict[task_name] = act_paths[1]
 
     def total_path_length(self):
         # the total path length of this
-        return sum([len(self.agent_0_path_dict[task]) for task in self.agent_0_path_dict.keys()])
+        return sum([len(self.agent_0_act_dict[task]) for task in self.agent_0_act_dict.keys()])
 
 
     def update_pot_loc(self, pot_loc):
@@ -464,9 +467,9 @@ class OvercookedMLASearchNode:
         """
         updated_mla_search_node = self.copy()
         updated_mla_search_node.primary_idx = search_node.primary_idx
+        updated_mla_search_node.append_path_for_task(task_name, search_node.agent_0_path, search_node.agent_1_path)
         updated_mla_search_node.agent_0_loc = search_node.agent_0_loc
         updated_mla_search_node.agent_1_loc = search_node.agent_1_loc
-        updated_mla_search_node.append_path_for_task(task_name, search_node.agent_0_path, search_node.agent_1_path)
         updated_mla_search_node.num_counter_ops += search_node.num_counter_ops
         if pot_loc:
             updated_mla_search_node.update_pot_loc(pot_loc)
@@ -485,9 +488,10 @@ class OvercookedMLASearchNode:
             self.agent_0_loc,
             self.agent_1_loc,
             self.pot_loc,
-            self.agent_0_path_dict,
-            self.agent_1_path_dict,
-            self.num_counter_ops
+            self.agent_0_act_dict,
+            self.agent_1_act_dict,
+            self.num_counter_ops,
+            self.terrain_mtx
         )
 
     def __str__(self):
@@ -495,8 +499,8 @@ class OvercookedMLASearchNode:
         output += "primary agent: " + str(self.primary_idx) + "\n"
         output += "locations: " + str(self.agent_0_loc) + " " + str(self.agent_1_loc) + "\n"
         output += "pot: " + str(self.pot_loc) + "\n"
-        output += "path dict 0: " + str(self.agent_0_path_dict) + "\n"
-        output += "path dict 1: " + str(self.agent_1_path_dict) + "\n"
+        output += "action dict 0: " + str(self.agent_0_act_dict) + "\n"
+        output += "action dict 1: " + str(self.agent_1_act_dict) + "\n"
         output += "num counter operations: " + str(self.num_counter_ops) + "\n"
         return output
 
@@ -826,6 +830,36 @@ def graph_from_terrain(terrain_mtx):
 
     return walk_graph, handover_graph
 
+def get_feature_locations(terrain_mtx, feature):
+    # Return all (i, j) locations of feature
+    l, w = len(terrain_mtx), len(terrain_mtx[0])
+    res = []
+    for i in range(l):
+        for j in range(w):
+            if terrain_mtx[i][j] == feature:
+                res.append((i, j))
+    return res
+
+def perform_action(prev_loc, action, terrain_mtx):
+    curr_loc = prev_loc
+    if action != 'interact':
+        new_loc = (curr_loc[0] + action[1], curr_loc[1] + action[0])
+        if terrain_mtx[new_loc[0]][new_loc[1]] == ' ':
+            curr_loc = new_loc
+    return curr_loc
+
+def get_open_neighbor(loc, other_agent_loc, terrain_mtx):
+    dirs = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    locs = [(loc[0] + dir[1], loc[1] + dir[0]) for dir in dirs]
+
+    for i in range(len(locs)):
+        new_loc = locs[i]
+        if new_loc != other_agent_loc and terrain_mtx[new_loc[0]][new_loc[1]] == ' ':
+            return new_loc, dirs[i]
+
+    return None, None
+
+
 
 def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, terrain_mtx, task_name,
                         both_idx=False, is_initial_potting=False, is_returning_to_pot=False, best_only=False):
@@ -845,6 +879,16 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
     """
     new_dict = {}
     assert is_returning_to_pot or feature_locations != [None]
+
+    # construct empty terrain mtx in which start locations are emptied out for use in constructing a location path from an action path
+    empty_terrain_mtx = copy.deepcopy(terrain_mtx)
+    agent_0_start = get_feature_locations(empty_terrain_mtx, "1")
+    agent_1_start = get_feature_locations(empty_terrain_mtx, "2")
+    if len(agent_0_start) > 0:
+        empty_terrain_mtx[agent_0_start[0][0]][agent_0_start[0][1]] = ' '
+    if len(agent_1_start) > 0:
+        empty_terrain_mtx[agent_1_start[0][0]][agent_1_start[0][1]] = ' '
+
     for f_location in feature_locations:
         for backward_mla_hash in prev_mla_dict.keys():
             for backward_mla_node in prev_mla_dict[backward_mla_hash]:
@@ -869,6 +913,66 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
                                 forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node, f_location)
                             else:
                                 forward_mla_node = backward_mla_node.update_from_search_node(task_name, forward_node)
+
+                            # check the action/location paths for collision and update the mla node if necessary
+
+                            # previous locations and current unmodified action_paths
+                            prev_locs = [backward_mla_node.agent_0_loc, backward_mla_node.agent_1_loc]
+                            mla_key = list(forward_mla_node.agent_0_act_dict.keys())[-1]
+                            act_paths = [forward_mla_node.agent_0_act_dict[mla_key], forward_mla_node.agent_1_act_dict[mla_key]]
+
+                            # construct empty action paths to be filled out as we traverse to check for collisions
+                            new_act_paths = [[], []]
+                            # keep track of our current location
+                            curr_locs = prev_locs
+                            # keep track of number of whether there is an unavoidable collision
+                            collision = 0
+
+                            # traverse through each joint action
+                            for i in range(len(act_paths[0])):
+
+                                # the would be new locations if these actions were taken
+                                locs = [perform_action(curr_locs[0], act_paths[0][i], empty_terrain_mtx),
+                                        perform_action(curr_locs[1], act_paths[1][i], empty_terrain_mtx)]
+
+                                # extracting primary and non primary indexes
+                                primary_idx = forward_mla_node.primary_idx
+                                non_primary_idx = 1 - primary_idx
+
+                                # check if there is a collision, if there is: move the non primary agent to a
+                                # empty neighbor and modify its action and new location
+                                non_primary_loc = locs[non_primary_idx]
+                                non_primary_act = act_paths[non_primary_idx][i]
+
+                                if locs[0] == locs[1]:
+                                    non_primary_idx = 1 - primary_idx
+                                    new_loc, new_act = get_open_neighbor(locs[non_primary_idx], prev_locs[primary_idx], empty_terrain_mtx)
+
+                                    # if there is no empty neighbor to move to then notify the outer loop and break
+                                    if new_loc == None:
+                                        collision = 1
+                                        break
+
+                                    non_primary_loc = new_loc
+                                    non_primary_act = new_act
+
+                                # update and append to our new list of action paths and the curr location
+                                curr_locs[primary_idx] = locs[primary_idx]
+                                new_act_paths[primary_idx].append(act_paths[primary_idx][i])
+
+                                curr_locs[non_primary_idx] = non_primary_loc
+                                new_act_paths[non_primary_idx].append(non_primary_act)
+
+                            # if there is an unavoidable collision, do not hash and index this search node
+                            if collision:
+                                continue
+
+                            # update the action paths and previous location in the mla search node
+                            forward_mla_node.agent_0_act_dict[mla_key] = new_act_paths[0]
+                            forward_mla_node.agent_1_act_dict[mla_key] = new_act_paths[1]
+                            forward_mla_node.agent_0_loc = curr_locs[0]
+                            forward_mla_node.agent_1_loc = curr_locs[1]
+                            
                             forward_mla_hash = forward_mla_node.hash_key()
 
                             if forward_mla_hash not in new_dict.keys():
@@ -912,17 +1016,6 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         silent (bool): whether to print the details
         best_only (bool): whether to only consider the best mla_node at each mla_hash
     """
-
-    def get_feature_locations(terrain_mtx, feature):
-        # Return all (i, j) locations of feature
-        l, w = len(terrain_mtx), len(terrain_mtx[0])
-        res = []
-        for i in range(l):
-            for j in range(w):
-                if terrain_mtx[i][j] == feature:
-                    res.append((i, j))
-        return res
-
     start_player_positions = [None, None]
 
     start_player_1_positions = get_feature_locations(terrain_mtx, "1")
@@ -973,13 +1066,17 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         for line in terrain_mtx_rep:
             print(line)
 
+    modified_terrain_mtx = copy.deepcopy(terrain_mtx)
+    modified_terrain_mtx[start_player_1_position[0]][start_player_1_position[1]] = ' '
+    modified_terrain_mtx[start_player_2_position[0]][start_player_2_position[1]] = ' '
+
     # keep track of the (position of the agent) and lowest walking cost for each counter operation cost so far
     """
     Format:
     key: (p0_loc, p1_loc, pot_loc, num_counter_operation)
 
     """
-    starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0)
+    starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0, modified_terrain_mtx)
     possible_starting_agents_positions = {
         # format: p0 location, p1 location,
         starting_mla_search_node.hash_key(): [starting_mla_search_node]
@@ -1253,23 +1350,16 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     player_2_action_paths = []
     pairs_of_action_paths_by_total_length = {}
 
-    modified_terrain_mtx = copy.deepcopy(terrain_mtx)
-    modified_terrain_mtx[start_player_1_position[0]][start_player_1_position[1]] = ' '
-    modified_terrain_mtx[start_player_2_position[0]][start_player_2_position[1]] = ' '
-
     for key in possible_agents_served_positions:
         for rep in possible_agents_served_positions[key]:
 
             # for each possible end mla node we find all the location paths from all the mlas
-            loc_path_dict_0 = rep.agent_0_path_dict
-            loc_path_dict_1 = rep.agent_1_path_dict
-            assert set(loc_path_dict_0.keys()) == set(loc_path_dict_1.keys()), "different subtasks were recorded"
+            act_path_dict_0 = rep.agent_0_act_dict
+            act_path_dict_1 = rep.agent_1_act_dict
+            assert set(act_path_dict_0.keys()) == set(act_path_dict_1.keys()), "different subtasks were recorded"
 
             act_path_0 = []
             act_path_1 = []
-
-            prev_0 = start_player_1_position
-            prev_1 = start_player_2_position
 
             # soup cooking wait time, so that the entire sequence will result in the correct timing to dish the soup
             soup_cooking_tick = 0
@@ -1277,8 +1367,8 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
             soup_cooking_time = 20
 
             # for each mla location path we convert it to actions and add that to our list of action_lists for this node
-            for mla in sorted(list(loc_path_dict_0.keys())):
-                act_paths = path_to_actions_with_padding(loc_path_dict_0[mla], loc_path_dict_1[mla], modified_terrain_mtx, prev_0, prev_1)
+            for mla in sorted(list(act_path_dict_0.keys())):
+                act_paths = [act_path_dict_0[mla], act_path_dict_1[mla]]
                 if mla == "7_dish_pickup":
                     soup_cooking_tick += len(act_paths[0]) + 1 # the plus one because soup ticking starts at 1
                 elif mla == "8_dishing_soup":
@@ -1287,30 +1377,6 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
                         act_paths = add_cooking_waiting(act_paths, soup_cooking_time - soup_cooking_tick)
                 act_path_0.append(act_paths[0])
                 act_path_1.append(act_paths[1])
-
-                last_counter_0 = False
-                last_counter_1 = False
-                # TODO (jocelyn): maybe explain a bit why this is necessary?
-                for j, pos in enumerate(loc_path_dict_0[mla][::-1]):
-                    if last_counter_0:
-                        prev_0 = pos
-                        break
-                    elif pos != UNDEFIND_LOCATION:
-                        if modified_terrain_mtx[pos[0]][pos[1]] != ' ':
-                            last_counter_0 = True
-                        else:
-                            prev_0 = pos
-                            break
-                for pos in loc_path_dict_1[mla][::-1]:
-                    if last_counter_1:
-                        prev_1 = pos
-                        break
-                    elif pos != UNDEFIND_LOCATION:
-                        if modified_terrain_mtx[pos[0]][pos[1]] != ' ':
-                            last_counter_1 = True
-                        else:
-                            prev_1 = pos
-                            break
 
             # we add the full action_list for this end node to our list of all possible action paths for each player
             connected_action_path_0 = connect_action_path(act_path_0)
