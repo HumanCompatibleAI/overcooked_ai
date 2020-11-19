@@ -24,6 +24,7 @@ setup(name='overcooked_ai',
         'numpy',
         'tqdm',
         'gym',
-        'ipython'
+        'ipython',
+        'pygame'
       ]
     )
