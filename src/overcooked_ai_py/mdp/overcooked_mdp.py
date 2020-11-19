@@ -157,6 +157,17 @@ class Recipe:
             neighbors.append(new_recipe)
         return neighbors
 
+
+    @staticmethod
+    def recipes_ingredients_diff(recipe1, recipe2):
+        # substract recipe2 ingredients from recipe1 ingredients
+        num_onions_1 = len([_ for _ in recipe1.ingredients if _ == Recipe.ONION])
+        num_onions_2 = len([_ for _ in recipe2.ingredients if _ == Recipe.ONION])
+        num_tomatoes_1 = len([_ for _ in recipe1.ingredients if _ == Recipe.TOMATO])
+        num_tomatoes_2 = len([_ for _ in recipe2.ingredients if _ == Recipe.TOMATO])
+
+        return [Recipe.ONION] * abs(num_onions_1-num_onions_2) + [Recipe.TOMATO]*abs(num_tomatoes_1-num_tomatoes_2)
+
     @classproperty
     def ALL_RECIPES(cls):
         if not cls._computed:
@@ -292,19 +303,15 @@ class Order:
         order_id (str): unique id for the order
         is_bonus(bool): indication if order should be shown in bonus_orders lists
         """
-        recipe_dict = recipe.to_dict() if isinstance(recipe, Recipe) else recipe
-        self._recipe_dict = recipe_dict # not assigning recipe to self.recipe as it causes errors with recipe when unpickling objects containing Order
+        self.recipe = recipe
         self.time_to_expire = time_to_expire
+        assert expire_penalty >= 0, "expire penalty needs to be 0 or more (to not give reward for missing the order)"
         self.expire_penalty = expire_penalty
 
         self.order_id = Order.create_order_id()  if order_id is None else order_id
         self._base_reward = base_reward
         self.linear_time_bonus_reward = linear_time_bonus_reward or 0
         self.is_bonus = is_bonus
-
-    @property
-    def recipe(self):
-        return Recipe.from_dict(self._recipe_dict)
 
     @property
     def is_temporary(self):
@@ -389,12 +396,11 @@ class Order:
 
     def calculate_future_reward(self, timesteps_into_future=0):
         if not self.is_temporary:
-            result = self.base_reward
+            return self.base_reward
         elif timesteps_into_future > self.time_to_expire:
-            result = 0
+            return 0
         else:
-            result = self.base_reward + int(self.linear_time_bonus_reward * (self.time_to_expire-timesteps_into_future))
-        return result
+            return self.base_reward + int(self.linear_time_bonus_reward * abs(self.time_to_expire-timesteps_into_future))
 
     def will_be_expired_in(self, time):
         return self.is_temporary and self.time_to_expire <= time
@@ -1267,7 +1273,11 @@ class OvercookedGridworld(object):
     An MDP grid world based off of the Overcooked game.
     TODO: clean the organization of this class further.
     """
-
+    DEFAULT_POTENTIAL_PARAMS = {
+        "gamma": 0.99,
+        "tomato_value": 13,
+        "onion_value": 21
+        }
     #########################
     # INSTANTIATION METHODS #
     #########################
@@ -1700,7 +1710,7 @@ class OvercookedGridworld(object):
                 gamma, pot_onion_steps, pot_tomato_steps = potential_params['gamma'], potential_params['pot_onion_steps'], potential_params['pot_tomato_steps']
                 steps_into_future = pot_onion_steps * n_onions + pot_tomato_steps * n_tomatoes + recipe.time
             else:
-                gamma =  potential_params['gamma']
+                gamma = potential_params['gamma']
             return gamma**steps_into_future * self.get_recipe_value(state, recipe, discounted=False, 
                 steps_into_future=steps_into_future, include_expire_penalty=include_expire_penalty)
 
@@ -2173,20 +2183,21 @@ class OvercookedGridworld(object):
         """
         NOTE: this only works if self.num_players == 2
         Useful if:
-        - Onion is needed (all pots are non-full)
-        - Nobody is holding onions
+        - Ingredient is needed (all pots are non-full)
+        - Nobody is holding ingredient
         """
         if self.num_players != 2: return False
         all_non_full = len(self.get_full_pots(pot_states)) == 0
         other_player = state.players[1 - player_index]
-        other_player_holding_onion = other_player.has_object() and other_player.get_object().name == "onion"
-        return all_non_full and not other_player_holding_onion
+        other_player_holding_ingredient = other_player.has_object() and other_player.get_object().name in Recipe.ALL_INGREDIENTS
+        return all_non_full and not other_player_holding_ingredient
 
     def is_ingredient_pickup_useful(self, state, pot_states, player_index):
         """
         NOTE: this only works if self.num_players == 2
         Always useful unless:
         - All pots are full & other agent is not holding a dish
+        Can make it more accurate by checking if ingredient is actually used in possible recipes
         """
         if self.num_players != 2: return False
         all_pots_full = self.num_pots == len(self.get_full_pots(pot_states))
@@ -2213,7 +2224,6 @@ class OvercookedGridworld(object):
         NOTE: It is not work perfectly for dynamic (temporary) orders - it does not take into account:
             - optimal order of fulfilling orders (always takes most high value in the current moment)
             - future orders that can be added to order list
-
         """
         old_recipe = Recipe(old_soup.ingredients) if old_soup.ingredients else None
         new_recipe = Recipe(new_soup.ingredients)
@@ -2538,7 +2548,7 @@ class OvercookedGridworld(object):
     # POTENTIAL REWARD SHAPING FN #
     ###############################
 
-    def potential_function(self, state, mp, gamma=0.99):
+    def potential_function(self, state, mp, gamma=None):
         """
         Essentially, this is the ɸ(s) function.
 
@@ -2588,9 +2598,9 @@ class OvercookedGridworld(object):
 
         # Constants needed for potential function
         potential_params = {
-            'gamma' : gamma,
-            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
-            'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
+            'gamma' : gamma if gamma else self.DEFAULT_POTENTIAL_PARAMS["gamma"],
+            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else self.DEFAULT_POTENTIAL_PARAMS["tomato_value"],
+            'onion_value' : Recipe._onion_value if Recipe._tomato_value else self.DEFAULT_POTENTIAL_PARAMS["onion_value"],
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
