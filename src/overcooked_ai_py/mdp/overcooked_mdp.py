@@ -299,6 +299,8 @@ class Order:
         order_id (str): unique id for the order
         is_bonus(bool): indication if order should be shown in bonus_orders lists
         """
+        if not isinstance(recipe, Recipe):
+            recipe = Recipe.from_dict(recipe)
         self.recipe = recipe
         self.time_to_expire = time_to_expire
         assert expire_penalty >= 0, "expire penalty needs to be 0 or more (to not give reward for missing the order)"
@@ -2598,13 +2600,15 @@ class OvercookedGridworld(object):
         if not hasattr(Recipe, '_tomato_value') or not hasattr(Recipe, '_onion_value'):
             raise ValueError("Potential function requires Recipe onion and tomato values to work properly")
 
+        gamma = gamma if gamma is not None else self.DEFAULT_POTENTIAL_PARAMS["gamma"]
         # Constants needed for potential function
         potential_params = {
-            'gamma' : gamma if gamma else self.DEFAULT_POTENTIAL_PARAMS["gamma"],
+            'gamma' : gamma,
             'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else self.DEFAULT_POTENTIAL_PARAMS["tomato_value"],
             'onion_value' : Recipe._onion_value if Recipe._tomato_value else self.DEFAULT_POTENTIAL_PARAMS["onion_value"],
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
+
         pot_states = self.get_pot_states(state)
 
         # Base potential value is the geometric sum of making optimal soups infinitely
