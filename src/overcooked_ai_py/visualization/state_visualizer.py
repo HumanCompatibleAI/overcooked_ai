@@ -1,11 +1,11 @@
 import pygame
-import os, copy
-from overcooked_ai_py.utils import generate_temporary_file_path, classproperty
+import os, copy, math
+from overcooked_ai_py.utils import generate_temporary_file_path, classproperty, cumulative_rewards_from_rew_list
 from overcooked_ai_py.static import GRAPHICS_DIR, FONTS_DIR
 from overcooked_ai_py.mdp.layout_generator import EMPTY, COUNTER, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
-from overcooked_ai_py.visualization.visualization_utils import show_image_in_ipython
-from overcooked_ai_py.visualization.pygame_utils import MultiFramePygameImage, run_static_resizeable_window, vstack_surfaces, scale_surface_by_factor, scale_surface_to_size
-from overcooked_ai_py.mdp.actions import Direction
+from overcooked_ai_py.visualization.visualization_utils import show_image_in_ipython, show_ipython_images_slider
+from overcooked_ai_py.visualization.pygame_utils import MultiFramePygameImage, run_static_resizeable_window, vstack_surfaces, scale_surface_by_factor, blit_on_new_surface_of_size
+from overcooked_ai_py.mdp.actions import Direction, Action
 
 roboto_path = os.path.join(FONTS_DIR, "Roboto-Regular.ttf")
 
@@ -15,6 +15,9 @@ class StateVisualizer:
     OBJECTS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'objects.png'), os.path.join(GRAPHICS_DIR, 'objects.json'))
     SOUPS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'soups.png'), os.path.join(GRAPHICS_DIR, 'soups.json'))
     CHEFS_IMG = MultiFramePygameImage(os.path.join(GRAPHICS_DIR, 'chefs.png'), os.path.join(GRAPHICS_DIR, 'chefs.json'))
+    ARROW_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'arrow.png'))
+    INTERACT_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'interact.png'))
+    STAY_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, 'stay.png'))
     UNSCALED_TILE_SIZE = 15
     DEFAULT_VALUES = {
         "height": None, # if None use grid_width - NOTE: can chop down hud if hud is wider than grid
@@ -27,21 +30,25 @@ class StateVisualizer:
         "hud_font_path": roboto_path, 
         "hud_system_font_name": None, # if set to None use hud_font_path
         "hud_font_color": (255,255,255), # white
-        "hud_data_default_key_order" : ["all_orders", "bonus_orders", "time_left", "score", "potential"],
+        "hud_recipe_timer_bonus_order_color": (0,255,0), # green
+        "hud_recipe_timer_color": (255,255,0), # yellow
+        "hud_data_default_key_order" : ["orders_list", "all_orders", "bonus_orders", "start_all_orders", "start_bonus_orders", "time_left", "score", "potential"],
         "hud_interline_size": 10,
         "hud_margin_bottom": 10,
         "hud_margin_top": 10,
         "hud_margin_left": 10,
         "hud_distance_between_orders": 5,
         "hud_order_size": 15,
+        "hud_order_timer_font_size": 8,
         "is_rendering_cooking_timer": True,
         "show_timer_when_cooked": True,
-        "cooking_timer_font_size": 20, # # if set to None use cooking_timer_font_path
-        "cooking_timer_font_path": roboto_path, 
-        "cooking_timer_system_font_name": None,
+        "cooking_timer_font_size": 20,
+        "cooking_timer_font_path": roboto_path,
+        "cooking_timer_system_font_name": None, # if set to None use cooking_timer_font_path
         "cooking_timer_font_color": (255, 0, 0), # red
         "grid": None,
-        "background_color": (155, 101, 0) # color of empty counter
+        "background_color": (155, 101, 0), # color of empty counter
+        "is_rendering_action_probs": True # whatever represent visually on the grid what actions some given agent would make
     }
     TILE_TO_FRAME_NAME = {
         EMPTY: "floor",
@@ -52,7 +59,7 @@ class StateVisualizer:
         DISH_DISPENSER: "dishes",
         SERVING_LOC: "serve"
     }
-    
+
     def __init__(self, **kwargs):
         params = copy.deepcopy(self.DEFAULT_VALUES)
         params.update(kwargs)
@@ -67,15 +74,18 @@ class StateVisualizer:
         #   see https://pygame.readthedocs.io/en/latest/4_text/text.html#initialize-a-font
         if self.is_rendering_hud:
             self.hud_font = self._init_font(self.hud_font_size, self.hud_font_path, self.hud_system_font_name)
+            self.hud_order_timer_font = self._init_font(self.hud_order_timer_font_size, self.hud_font_path, self.hud_system_font_name)
         else:
             self.hud_font = None
-            
+            self.hud_order_timer_font = None
+
         if self.is_rendering_cooking_timer:
             self.cooking_timer_font = self._init_font(self.cooking_timer_font_size, self.cooking_timer_font_path,
                                                      self.cooking_timer_system_font_name)
         else:
             self.cooking_timer_font = None
         
+
     @classmethod
     def configure_defaults(cls, **kwargs):
         cls._check_config_validity(kwargs)
@@ -85,20 +95,75 @@ class StateVisualizer:
         StateVisualizer._check_config_validity(kwargs)
         for param_name, param_value in copy.deepcopy(kwargs).items():
             setattr(self, param_name, param_value)
-        
-    def display_rendered_state(self, state, hud_data=None, grid=None, img_path=None, ipython_display=False, window_display=False):
+
+    @staticmethod
+    def default_hud_data(state, **kwargs):
+        result = {"timestep": state.timestep}
+        if state.orders_list.contains_temporary_orders:
+            result["orders_list"] = state.orders_list.to_dict()
+        else:
+            result["all_orders"] = [r.to_dict() for r in state.all_orders]
+            result["bonus_orders"] = [r.to_dict() for r in state.bonus_orders]
+        result.update(copy.deepcopy(kwargs))
+        return result
+
+    @staticmethod
+    def default_hud_data_from_trajectories(trajectories, trajectory_idx=0):
+        scores = cumulative_rewards_from_rew_list(trajectories["ep_rewards"][trajectory_idx])
+        return [StateVisualizer.default_hud_data(state, score=scores[i])
+            for i, state in enumerate(trajectories["ep_states"][trajectory_idx])]
+
+    def display_rendered_trajectory(self, trajectories, trajectory_idx=0,  hud_data=None, action_probs=None, img_directory_path=None, img_extension=".png", img_prefix="", ipython_display=True):
+        """
+        saves images of every timestep from trajectory in img_directory_path (or temporary directory if not path is not specified)
+        trajectories (dict): trajectories dict, same format as used by AgentEvaluator
+        trajectory_idx(int): index of trajectory in case of multiple trajectories inside trajectories param
+        img_path (str): img_directory_path - path to directory where consequtive images will be saved
+        ipython_display(bool): if True render slider with rendered states
+        hud_data(list(dict)): hud data for every timestep
+        action_probs(list(list((list(float))))): action probs for every player and timestep acessed in the way action_probs[timestep][player][action]
+        """
+        states = trajectories["ep_states"][trajectory_idx]
+        grid = trajectories["mdp_params"][trajectory_idx]["terrain"]
+        if hud_data is None:
+            if self.is_rendering_hud:
+                hud_data = StateVisualizer.default_hud_data_from_trajectories(trajectories, trajectory_idx)
+            else:
+                hud_data = [None] * len(states)
+
+        if action_probs is None:
+            action_probs = [None] * len(states)
+
+        if not img_directory_path:
+            img_directory_path = generate_temporary_file_path(prefix="overcooked_visualized_trajectory", extension="")
+        os.makedirs(img_directory_path, exist_ok=True)
+        img_pathes = []
+        for i, state in enumerate(states):
+            img_name = img_prefix + str(i) + img_extension
+            img_path = os.path.join(img_directory_path, img_name)
+            img_pathes.append(self.display_rendered_state(state=state, hud_data=hud_data[i], action_probs=action_probs[i], grid=grid, img_path=img_path, ipython_display=False, window_display=False))
+
+        if ipython_display:
+            return show_ipython_images_slider(img_pathes, "timestep")
+
+        return img_directory_path
+
+    def display_rendered_state(self, state, hud_data=None, action_probs=None, grid=None, img_path=None, ipython_display=False, window_display=False):
         """
         renders state as image
+        state (OvercookedState): state to render
+        hud_data (dict): dict with hud data, keys are used for string that describes after using _key_to_hud_text on them
+        grid (iterable): 2d map of the layout, when not supplied take grid from object attribute NOTE: when grid in both method param and object atribute is no supplied it will raise an error
         img_path (str): if it is not None save image to specific path
         ipython_display (bool): if True render state in ipython cell, if img_path is None create file with randomized name in /tmp directory
         window_display (bool): if True render state into pygame window
-        initial_scale_factor(float or int, int is recommended): how much increase size of the result image/window
+        action_probs(list(list(float))): action probs for every player acessed in the way action_probs[player][action]
         """
-        assert window_display or img_path or ipython_display # without any of this param nothing happen when calling this function
-        surface = self.render_state(state, grid, hud_data)
+        assert window_display or img_path or ipython_display, "specify at least one of the ways to output result state image: window_display, img_path, or ipython_display"
+        surface = self.render_state(state, grid, hud_data, action_probs=action_probs)
 
         if img_path is None and ipython_display:
-            img_path = generate_temporary_file_path(prefix="/overcooked_visualized_state_", extension=".png")
+            img_path = generate_temporary_file_path(prefix="overcooked_visualized_state_", extension=".png")
 
         if img_path is not None:
             pygame.image.save(surface, img_path)
@@ -110,10 +175,10 @@ class StateVisualizer:
             run_static_resizeable_window(surface, self.window_fps)
 
         return img_path
-    
-    def render_state(self, state, grid, hud_data=None):
+
+    def render_state(self, state, grid, hud_data=None, action_probs=None):
         """
-        returns surface with rendered game state scaled by initial_scale_factor,
+        returns surface with rendered game state scaled to selected size,
         decoupled from display_rendered_state function to make testing easier
         """
         pygame.init()
@@ -123,13 +188,18 @@ class StateVisualizer:
         self._render_grid(grid_surface, grid)
         self._render_players(grid_surface, state.players)
         self._render_objects(grid_surface, state.objects, grid)       
+
         if self.scale_by_factor != 1:
             grid_surface = scale_surface_by_factor(grid_surface, self.scale_by_factor)
 
         # render text after rescaling as text looks bad when is rendered small resolution and then rescalled to bigger one
         if self.is_rendering_cooking_timer:
             self._render_cooking_timers(grid_surface, state.objects, grid)
-        
+
+        # arrows does not seem good when rendered in very small resolution
+        if self.is_rendering_action_probs and action_probs is not None:
+            self._render_actions_probs(grid_surface, state.players, action_probs)
+
         if self.is_rendering_hud and hud_data:
             hud_width = self.width or grid_surface.get_width()
             hud_surface = pygame.surface.Surface((hud_width, self._calculate_hud_height(hud_data)))
@@ -139,11 +209,11 @@ class StateVisualizer:
         else:
             hud_width = None
             rendered_surface = grid_surface
-        
+
         result_surface_size = (self.width or rendered_surface.get_width(), self.height or rendered_surface.get_height())
-        
+
         if result_surface_size != rendered_surface.get_size():
-            result_surface = scale_surface_to_size(rendered_surface, result_surface_size, background_color=self.background_color)
+            result_surface = blit_on_new_surface_of_size(rendered_surface, result_surface_size, background_color=self.background_color)
         else:
             result_surface = rendered_surface
 
@@ -152,7 +222,7 @@ class StateVisualizer:
     @property
     def scale_by_factor(self):
         return self.tile_size/StateVisualizer.UNSCALED_TILE_SIZE
-    
+
     @property
     def hud_line_height(self):
         return self.hud_interline_size + self.hud_font_size
@@ -160,7 +230,7 @@ class StateVisualizer:
     @staticmethod
     def _check_config_validity(config):
         assert set(config.keys()).issubset(set(StateVisualizer.DEFAULT_VALUES.keys()))
-        
+
     def _init_font(self, font_size, font_path=None, system_font_name=None):   
         if system_font_name:
             key = "%i-sys:%s" %(font_size, system_font_name)
@@ -188,7 +258,7 @@ class StateVisualizer:
         """
         (x,y) = position
         return (self.UNSCALED_TILE_SIZE * x, self.UNSCALED_TILE_SIZE * y)
-    
+
     def _position_in_scaled_pixels(self, position):
         """
         get x and y coordinates in tiles, returns x and y coordinates in pixels
@@ -224,7 +294,7 @@ class StateVisualizer:
 
             self.CHEFS_IMG.blit_on_surface(surface, self._position_in_unscaled_pixels(player.position), chef_frame_name(direction_name, held_object_name))
             self.CHEFS_IMG.blit_on_surface(surface, self._position_in_unscaled_pixels(player.position), hat_frame_name(direction_name, player_color_name))
-    
+
     @staticmethod
     def _soup_frame_name(ingredients_names, status):
             num_onions = ingredients_names.count("onion")
@@ -274,28 +344,35 @@ class StateVisualizer:
         return sorted(hud_data.items(), key=default_order_then_alphabetic)
 
     def _key_to_hud_text(self, key):
-        return key.replace("_", " ").title() + ": "
-    
+        if key == "orders_list":
+            return "Orders: "
+        else:
+            return key.replace("_", " ").title() + ": "
+
     def _render_hud_data(self, surface, hud_data):
         def hud_text_position(line_num):
             return (self.hud_margin_left, self.hud_margin_top + self.hud_line_height * line_num)
         
+        def hud_order_timers_position(recipes_position):
+            return (recipes_position[0], recipes_position[1] + self.hud_line_height)
+
         def hud_recipes_position(text_surface, text_surface_position):
             (text_surface_x, text_surface_y) = text_surface_position
             return (text_surface_x + text_surface.get_width(), text_surface_y)
-        
-        def get_hud_recipes_surface(orders_dicts):
+
+
+        def get_hud_recipes_surface(soups_ingredients):
             order_width = order_height = self.hud_order_size
             scaled_order_size = (order_width, order_width)
             orders_surface_height = order_height
-            orders_surface_width = len(orders_dicts) * order_width + (len(orders_dicts) - 1) * self.hud_distance_between_orders
+            orders_surface_width = len(soups_ingredients) * order_width + (len(soups_ingredients) - 1) * self.hud_distance_between_orders
             unscaled_order_size = (self.UNSCALED_TILE_SIZE, self.UNSCALED_TILE_SIZE)
-            
+
             recipes_surface = pygame.surface.Surface((orders_surface_width, orders_surface_height))
             recipes_surface.fill(self.background_color)
             next_surface_x = 0
-            for order_dict in orders_dicts:
-                frame_name = StateVisualizer._soup_frame_name(order_dict["ingredients"], "done")
+            for ingredients in soups_ingredients:
+                frame_name = StateVisualizer._soup_frame_name(ingredients, "done")
                 unscaled_order_surface = pygame.surface.Surface(unscaled_order_size)
                 unscaled_order_surface.fill(self.background_color)
                 self.SOUPS_IMG.blit_on_surface(unscaled_order_surface, (0,0), frame_name)
@@ -306,22 +383,104 @@ class StateVisualizer:
                 recipes_surface.blit(scaled_order_surface, (next_surface_x, 0))
                 next_surface_x += order_width + self.hud_distance_between_orders
             return recipes_surface
-        
-        
-        for hud_line_num, (key, value) in enumerate(self._sorted_hud_items(hud_data)):
+
+        def get_hud_recipe_timers_surface(orders):
+            order_width = order_height = self.hud_order_size
+            timers_surface_width = len(orders) * order_width + (len(orders) - 1) * self.hud_distance_between_orders
+            timers_surface_height = order_height
+            timers_surface = pygame.surface.Surface((timers_surface_width, timers_surface_height))
+            timers_surface.fill(self.background_color)
+            next_surface_x = 0
+            for order in orders:
+                time_to_expire = order["time_to_expire"]
+                time_str = "∞" if time_to_expire is None else str(time_to_expire)
+                font_color = self.hud_recipe_timer_bonus_order_color if order["is_bonus"] else self.hud_recipe_timer_color
+                single_timer_surface = self.hud_order_timer_font.render(time_str, True, font_color)
+                timers_surface.blit(single_timer_surface, (next_surface_x + order_width/2 - single_timer_surface.get_width()/2, 0))
+                next_surface_x += order_width + self.hud_distance_between_orders
+            return timers_surface
+
+        hud_line_num = 0
+        for (key, value) in self._sorted_hud_items(hud_data):
             hud_text = self._key_to_hud_text(key)
-            if key not in ["all_orders", "bonus_orders", "start_all_orders", "start_bonus_orders"]:
+            if key not in ["orders_list", "all_orders", "bonus_orders", "start_all_orders", "start_bonus_orders"]:
                 hud_text += str(value)
-            
+
             text_surface = self.hud_font.render(hud_text, True, self.hud_font_color)
             text_surface_position = hud_text_position(hud_line_num)
             surface.blit(text_surface, text_surface_position)
 
             if key in ["all_orders", "bonus_orders", "start_all_orders", "start_bonus_orders"] and value:
                 recipes_surface_position = hud_recipes_position(text_surface, text_surface_position)
-                recipes_surface = get_hud_recipes_surface(value)
-                assert recipes_surface.get_width() + text_surface.get_width() <= surface.get_width()
+                soups_ingredients = [r["ingredients"] for r in value]
+                recipes_surface = get_hud_recipes_surface(soups_ingredients)
+                assert recipes_surface.get_width() + text_surface.get_width() <= surface.get_width(), "surface width is too small to fit recipes in single line"
                 surface.blit(recipes_surface, recipes_surface_position)
-                
+            
+            if key == "orders_list" and value:
+                soups_ingredients = [o["recipe"]["ingredients"] for o in value["orders"]]
+                recipes_surface = get_hud_recipes_surface(soups_ingredients)
+                assert recipes_surface.get_width() + text_surface.get_width() <= surface.get_width(), "surface width is too small to fit recipes in single line"
+                recipes_surface_position = hud_recipes_position(text_surface, text_surface_position)
+                surface.blit(recipes_surface, recipes_surface_position)
+
+                timers_surface = get_hud_recipe_timers_surface(value["orders"])
+                assert timers_surface.get_width() + text_surface.get_width() <= surface.get_width(), "surface width is too small to fit recipes in single line"
+                timers_surface_position = hud_order_timers_position(recipes_surface_position)
+                surface.blit(timers_surface, timers_surface_position)
+                hud_line_num += 1 # add additional line as timer is in separate line
+            hud_line_num += 1
+        
     def _calculate_hud_height(self, hud_data):
         return self.hud_margin_top + len(hud_data) * self.hud_line_height + self.hud_margin_bottom
+
+    def _render_on_tile_position(self, scaled_grid_surface, source_surface, tile_position, horizontal_align="left", vertical_align="top"):
+        assert vertical_align in ["top", "center", "bottom"]
+        left_x, top_y = self._position_in_scaled_pixels(tile_position)
+        if horizontal_align == "left":
+            x = left_x
+        elif horizontal_align == "center":
+            x = left_x + (self.tile_size - source_surface.get_width())/2
+        elif horizontal_align == "right":
+            x = left_x + self.tile_size - source_surface.get_width()
+        else:
+            raise ValueError("horizontal_align can have one of the values: "+str(["left", "center", "right"]))
+
+        if vertical_align == "top":
+            y = top_y
+        elif vertical_align == "center":
+            y = top_y + (self.tile_size - source_surface.get_height())/2
+        elif vertical_align == "bottom":
+            y = top_y + self.tile_size - source_surface.get_height()
+        else:
+            raise ValueError("vertical_align can have one of the values: "+str(["top", "center", "bottom"]))
+
+        scaled_grid_surface.blit(source_surface, (x, y))
+
+    def _render_actions_probs(self, surface, players, action_probs):
+        direction_to_rotation = {Direction.NORTH:0, Direction.WEST:90 , Direction.SOUTH:180, Direction.EAST:270}
+        direction_to_aligns = {
+            Direction.NORTH: {"horizontal_align": "center", "vertical_align":"bottom"},
+            Direction.WEST: {"horizontal_align": "right", "vertical_align":"center"},
+            Direction.SOUTH: {"horizontal_align": "center", "vertical_align":"top"},
+            Direction.EAST: {"horizontal_align": "left", "vertical_align":"center"}}
+
+        rescaled_arrow = pygame.transform.scale(self.ARROW_IMG, (self.tile_size, self.tile_size))
+        # divide width by math.sqrt(2) to always fit both interact icon and stay icon into single tile
+        rescaled_interact = pygame.transform.scale(self.INTERACT_IMG, (int(self.tile_size/math.sqrt(2)), self.tile_size))
+        rescaled_stay = pygame.transform.scale(self.STAY_IMG, (int(self.tile_size/math.sqrt(2)), self.tile_size))
+        for player, probs in zip(players, action_probs):
+            if probs is not None:
+                for action in Action.ALL_ACTIONS:
+                    # use math sqrt to make probability proportional to area of the image
+                    size = math.sqrt(probs[Action.ACTION_TO_INDEX[action]])
+                    if action == "interact":
+                        img = pygame.transform.rotozoom(rescaled_interact, 0, size)
+                        self._render_on_tile_position(surface, img, player.position, horizontal_align="left", vertical_align="center")
+                    elif action == Action.STAY:
+                        img = pygame.transform.rotozoom(rescaled_stay, 0, size)
+                        self._render_on_tile_position(surface, img, player.position, horizontal_align="right", vertical_align="center")
+                    else:
+                        position = Action.move_in_direction(player.position, action)
+                        img =  pygame.transform.rotozoom(rescaled_arrow, direction_to_rotation[action], size)
+                        self._render_on_tile_position(surface, img, position, **direction_to_aligns[action])

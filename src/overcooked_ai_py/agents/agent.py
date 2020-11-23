@@ -249,6 +249,328 @@ class GreedyHumanModel(Agent):
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
     in which an individual agent cannot complete the task on their own.
     Also agent can act suboptimaly (even when excluding coordination failures) in some environemnts with multiple (especially temporary) orders.
+    for best play counter_goals, counter_drop and counter_pickup in mlam params are assumed to be equal mdp.get_counter_locations()
+    """
+
+    def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
+                 auto_unstuck=True, debug=False):
+        
+        self.mlam = mlam
+        self.mdp = self.mlam.mdp
+        self.debug = debug
+        # Bool for perfect rationality vs Boltzmann rationality for high level and low level action selection
+        self.hl_boltzmann_rational = hl_boltzmann_rational  # For choices among high level goals of same type
+        self.ll_boltzmann_rational = ll_boltzmann_rational  # For choices about low level motion
+
+        # Coefficient for Boltzmann rationality for high level action selection
+        self.hl_temperature = hl_temp
+        self.ll_temperature = ll_temp
+
+        # Whether to automatically take an action to get the agent unstuck if it's in the same
+        # state as the previous turn. If false, the agent is history-less, while if true it has history.
+        self.auto_unstuck = auto_unstuck
+        self.reset()
+
+    def reset(self):
+        super().reset()
+        self.prev_state = None
+
+    def actions(self, states, agent_indices):
+        actions_and_infos_n = []
+        for state, agent_idx in zip(states, agent_indices):
+            self.set_agent_index(agent_idx)
+            self.reset()
+            actions_and_infos_n.append(self.action(state))
+        return actions_and_infos_n
+
+    def action(self, state):
+        if self.debug: print("timestep", state.timestep, "agent index", self.agent_index)
+        possible_motion_goals = self.ml_action(state)
+
+        # Once we have identified the motion goals for the medium
+        # level action we want to perform, select the one with lowest cost
+        start_pos_and_or = state.players_pos_and_or[self.agent_index]
+
+        chosen_goal, chosen_action, action_probs = self.choose_motion_goal(start_pos_and_or, possible_motion_goals)
+        if self.debug: print("chosen_goal:", chosen_goal, "chosen_action:", chosen_action, "action_probs:", action_probs)
+        if self.ll_boltzmann_rational and chosen_goal[0] == start_pos_and_or[0]:
+            chosen_action, action_probs = self.boltzmann_rational_ll_action(start_pos_and_or, chosen_goal)
+
+        if self.auto_unstuck:
+            # HACK: if two agents get stuck, select an action at random that would
+            # change the player positions if the other player were not to move
+            if self.prev_state is not None and state.players_pos_and_or == self.prev_state.players_pos_and_or:
+                if self.agent_index == 0:
+                    joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
+                elif self.agent_index == 1:
+                    joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
+                else:
+                    raise ValueError("Player index not recognized")
+
+                unblocking_joint_actions = []
+                for j_a in joint_actions:
+                    new_state, _ = self.mlam.mdp.get_state_transition(state, j_a)
+                    if new_state.player_positions != self.prev_state.player_positions:
+                        unblocking_joint_actions.append(j_a)
+                # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
+                if len(unblocking_joint_actions) == 0:
+                    unblocking_joint_actions.append([Action.STAY, Action.STAY])
+                chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
+                    self.agent_index]
+                action_probs = self.a_probs_from_action(chosen_action)
+
+            # NOTE: Assumes that calls to the action method are sequential
+            self.prev_state = state
+        return chosen_action, {"action_probs": action_probs}
+
+    def choose_motion_goal(self, start_pos_and_or, motion_goals):
+        """
+        For each motion goal, consider the optimal motion plan that reaches the desired location.
+        Based on the plan's cost, the method chooses a motion goal (either boltzmann rationally
+        or rationally), and returns the plan and the corresponding first action on that plan.
+        """
+        if self.hl_boltzmann_rational:
+            possible_plans = [self.mlam.motion_planner.get_plan(start_pos_and_or, goal) for goal in motion_goals]
+            plan_costs = [plan[2] for plan in possible_plans]
+            goal_idx, action_probs = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
+            chosen_goal = motion_goals[goal_idx]
+            chosen_goal_action = possible_plans[goal_idx][0][0]
+        else:
+            chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
+            action_probs = self.a_probs_from_action(chosen_goal_action)
+        return chosen_goal, chosen_goal_action, action_probs
+
+    def get_boltzmann_rational_action_idx(self, costs, temperature):
+        """Chooses index based on softmax probabilities obtained from cost array"""
+        costs = np.array(costs)
+        softmax_probs = np.exp(-costs * temperature) / np.sum(np.exp(-costs * temperature))
+        action_idx = np.random.choice(len(costs), p=softmax_probs)
+        return action_idx, softmax_probs
+
+    def get_lowest_cost_action_and_goal(self, start_pos_and_or, motion_goals):
+        """
+        Chooses motion goal that has the lowest cost action plan.
+        Returns the motion goal itself and the first action on the plan.
+        """
+        min_cost = np.Inf
+        best_action, best_goal = None, None
+        for goal in motion_goals:
+            action_plan, _, plan_cost = self.mlam.motion_planner.get_plan(start_pos_and_or, goal)
+            if plan_cost < min_cost:
+                best_action = action_plan[0]
+                min_cost = plan_cost
+                best_goal = goal
+        return best_goal, best_action
+
+    def boltzmann_rational_ll_action(self, start_pos_and_or, goal, inverted_costs=False):
+        """
+        Computes the plan cost to reach the goal after taking each possible low level action.
+        Selects a low level action boltzmann rationally based on the one-step-ahead plan costs.
+
+        If `inverted_costs` is True, it will make a boltzmann "irrational" choice, exponentially
+        favouring high cost plans rather than low cost ones.
+        """
+        future_costs = []
+        for action in Action.ALL_ACTIONS:
+            pos, orient = start_pos_and_or
+            new_pos_and_or = self.mlam.mdp._move_if_direction(pos, orient, action)
+            _, _, plan_cost = self.mlam.motion_planner.get_plan(new_pos_and_or, goal)
+            sign = (-1) ** int(inverted_costs)
+            future_costs.append(sign * plan_cost)
+
+        action_idx, action_probs = self.get_boltzmann_rational_action_idx(future_costs, self.ll_temperature)
+        return Action.ALL_ACTIONS[action_idx], action_probs
+    
+    def _all_soups_objs(self, state, pot_states_dict):
+        possible_soup_keys = ['{}_items'.format(i+1) for i in range(Recipe.MAX_NUM_INGREDIENTS)]
+        return [state.get_object(pos) for pos in itertools.chain(*[pot_states_dict[key] for key in possible_soup_keys])]
+
+    def _empty_pot_best_missing_ingredients(self, state):
+        return self.mlam.mdp.get_optimal_possible_recipe(state, recipe=None)
+
+    def _best_missing_ingredients_for_soups(self, state, pot_states_dict, include_empty_pots=True):
+        # return list of tuples (soup_position, missing_ingredients for best recipe)
+        soup_objs = self._all_soups_objs(state, pot_states_dict)
+        recipes = [Recipe(soup_obj.ingredients) for soup_obj in soup_objs]
+        optimal_recipes_dict = {recipe: self.mlam.mdp.get_optimal_possible_recipe(state, recipe, discounted=False, return_value=False) for recipe in set(recipes)}
+        missing_ingredients = [Recipe.recipes_ingredients_diff(optimal_recipes_dict[recipe], recipe) 
+            for recipe in recipes]
+        result = [(soup_obj.position, ingredients) for soup_obj, ingredients in zip(soup_objs, missing_ingredients)]
+        if include_empty_pots and pot_states_dict["empty"]:
+            empty_pot_ingredients = self._empty_pot_best_missing_ingredients(state)
+            result += [(pos, empty_pot_ingredients) for pos in pot_states_dict["empty"]]
+        return result            
+        
+    def _motion_goals_with_ingredient(self, state, ingredient_obj, pot_states_dict, counter_objects):
+        if ingredient_obj.name in Recipe.ALL_INGREDIENTS:
+            best_missing_ingredients_for_soups = self._best_missing_ingredients_for_soups(state, pot_states_dict)
+            
+            all_ingredients_to_pot = set(itertools.chain(*[ingredients 
+                for (pos, ingredients) in best_missing_ingredients_for_soups]))
+            
+            if ingredient_obj.name in all_ingredients_to_pot:
+                goal_positions = [pos for (pos, ingredients) in best_missing_ingredients_for_soups
+                    if ingredient_obj.name in ingredients]
+                
+                if ingredient_obj.name == Recipe.ONION:
+                    motion_goals = self.mlam._get_ml_actions_for_positions(goal_positions)
+                    if self.debug: print("motion goal: custom put_onion_in_pot_actions", motion_goals)
+                elif ingredient_obj.name ==  Recipe.TOMATO:
+                    motion_goals = self.mlam._get_ml_actions_for_positions(goal_positions)
+                    if self.debug: print("motion goal: custom put_tomato_in_pot_actions", motion_goals)
+                else:
+                    raise ValueError
+            else:
+                # nothing to do with ingredient; check there is something better to do without it
+                if self.debug: print("checking alternative motion goals if item is dropped")
+                alternative_motion_goals = self._motion_goals_pickup_ordered_soups(state, counter_objects) or \
+                    self._motion_goals_pickup_soon_needed_dishes(state, pot_states_dict, counter_objects)
+                if alternative_motion_goals:
+                    motion_goals = self.mlam.place_obj_on_counter_actions(state)
+                    if self.debug: print("motion goal: place_obj_on_counter_actions", motion_goals)
+                else:
+                    motion_goals = []
+        return motion_goals
+
+
+    def _motion_goals_with_dish(self, state, pot_states_dict):
+        motion_goals = self.mlam.pickup_soup_with_dish_actions(pot_states_dict, only_nearly_ready=True)
+        if self.debug: print("motion goal: pickup_soup_with_dish_actions", motion_goals)
+        if not motion_goals: # nothing to do with dish
+            motion_goals = self.mlam.place_obj_on_counter_actions(state)
+            if self.debug: print("motion goal: place_obj_on_counter_actions", motion_goals)
+        return motion_goals
+    
+    def _motion_goals_with_soup(self, state, soup_obj):
+        recipe = soup_obj.recipe
+        # detect soups worthless now, but maybe valuable in future (in orders_list.orders_to_add, but not in orders_list.orders)
+        if recipe in state.orders_list.all_recipes and state.orders_list.get_matching_order(recipe=recipe) is None:
+            motion_goals = self.mlam.place_obj_on_counter_actions(state)
+            if self.debug: print("motion goal: place_obj_on_counter_actions", motion_goals)
+        else:
+            motion_goals = []
+        
+        if not motion_goals: # placing soup on counter is either bad or impossible
+            # deliver soup either for reward or to trash it
+            motion_goals = self.mlam.deliver_soup_actions()
+            if self.debug: print("motion goal: deliver_soup_actions", motion_goals)
+        return motion_goals
+
+    def _motion_goals_pickup_ordered_soups(self, state, counter_objects):
+        counter_soups_objs = [state.get_object(pos) for pos in counter_objects['soup']]
+        ordered_counter_soups_objs = [soup_obj for soup_obj in counter_soups_objs if state.orders_list.get_matching_order(recipe=soup_obj.recipe)]
+        if ordered_counter_soups_objs:
+            motion_goals = self.mlam._get_ml_actions_for_positions([soup.position for soup in ordered_counter_soups_objs])
+            if self.debug: print("motion goal: custom pickup_counter_soup_actions", motion_goals)
+        else:
+            motion_goals = []
+        return motion_goals
+    
+    def _motion_goals_pickup_soon_needed_dishes(self, state, pot_states_dict, counter_objects):
+        player = state.players[self.agent_index]
+        other_player = state.players[1 - self.agent_index]
+        other_player_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
+        soups_nearly_ready = len(pot_states_dict['ready']) + len(pot_states_dict['cooking'])
+        if soups_nearly_ready - int(other_player_has_dish):
+            motion_goals = self.mlam.pickup_dish_actions(counter_objects)
+            if self.debug: print("motion goal: pickup_dish_actions", motion_goals)
+        else:
+            motion_goals = []
+        return motion_goals 
+
+    def _motion_goals_pickup_ingredients(self, state, pot_states_dict, counter_objects):
+        best_missing_ingredients_for_soups = self._best_missing_ingredients_for_soups(state, pot_states_dict)
+        soups_pos_ready_to_cook = [pos for (pos, ingredients) in best_missing_ingredients_for_soups if not ingredients and not state.get_object(pos).is_ready]
+        if soups_pos_ready_to_cook:
+            motion_goals = self.mlam._get_ml_actions_for_positions(soups_pos_ready_to_cook)
+            if self.debug: print("motion goal: custom start_cooking_actions", motion_goals) 
+        else:
+            all_ingredients_to_pot = set(itertools.chain(*[ingredients 
+                for (pos, ingredients) in best_missing_ingredients_for_soups]))
+            
+            motion_goals = []
+            if Recipe.ONION in all_ingredients_to_pot:
+                new_goals = self.mlam.pickup_onion_actions(counter_objects)
+                if self.debug: print("motion goal: pickup_onion_actions", new_goals) 
+                motion_goals += new_goals
+
+            if Recipe.TOMATO in all_ingredients_to_pot:
+                new_goals = self.mlam.pickup_tomato_actions(counter_objects)
+                if self.debug: print("motion goal: pickup_tomato_actions", new_goals) 
+                motion_goals += new_goals
+        return motion_goals
+    
+    def _motion_goals_backup_pickup(self, state, counter_objects):
+        # picking up anything is probably better than nothing, it is last resort before choosing as goal any closest feature
+        # pickup ingredient for moment when pot will get empty
+        all_ingredients_to_pot = set(self._empty_pot_best_missing_ingredients(state)) or Recipe.ALL_INGREDIENTS
+        motion_goals = []
+        if Recipe.ONION in all_ingredients_to_pot:
+            new_goals = self.mlam.pickup_onion_actions(counter_objects)
+            if self.debug: print("motion goal: pickup_onion_actions", new_goals) 
+            motion_goals += new_goals
+        if Recipe.TOMATO in all_ingredients_to_pot:
+            new_goals = self.mlam.pickup_tomato_actions(counter_objects)
+            if self.debug: print("motion goal: pickup_tomato_actions", new_goals) 
+            motion_goals += new_goals
+        return motion_goals
+    
+    def ml_action(self, state):
+        """
+        Selects a medium level action for the current state.
+        Motion goals can be thought of instructions of the form:
+            [do X] at location [Y]
+
+        In this method, X (e.g. deliver the soup, pick up an onion, etc) is chosen based on
+        a simple set of greedy heuristics based on the current state, e.g. it tries to use
+        every ingredient already put into pot and tries to free up pots by cooking best soup
+        in the closest pot even if its suboptimal.
+
+        Effectively, will return a list of all possible locations Y in which the selected
+        medium level action X can be performed.
+        """
+        player = state.players[self.agent_index]
+        pot_states_dict = self.mlam.mdp.get_pot_states(state)
+        counter_objects = self.mlam.mdp.get_counter_objects_dict(state, list(self.mlam.mdp.terrain_pos_dict['X']))
+
+        if player.has_object():
+            player_obj = player.get_object()
+            if player_obj.name in Recipe.ALL_INGREDIENTS:
+                motion_goals = self._motion_goals_with_ingredient(state, player_obj, pot_states_dict, counter_objects)
+            elif player_obj.name == 'dish':
+                motion_goals = self._motion_goals_with_dish(state, pot_states_dict)
+            elif player_obj.name == 'soup':
+                motion_goals = self._motion_goals_with_soup(state, player_obj)
+            else:
+                raise ValueError()
+        else:
+            motion_goals = self._motion_goals_pickup_ordered_soups(state, counter_objects)
+            if not motion_goals:
+                motion_goals = self._motion_goals_pickup_soon_needed_dishes(state, pot_states_dict, counter_objects)
+            if not motion_goals:
+                motion_goals = self._motion_goals_pickup_ingredients(state, pot_states_dict, counter_objects)
+            if not motion_goals:
+                motion_goals = self._motion_goals_backup_pickup(state, counter_objects)
+        
+        motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+
+        if len(motion_goals) == 0:
+            if self.debug: print("no valid motion goals, pick closest feature actions")
+            motion_goals = self.mlam.go_to_closest_feature_actions(player)
+            motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+            assert len(motion_goals) != 0
+
+        return motion_goals
+
+
+class SimpleGreedyHumanModel(Agent):
+    """
+    Agent that at each step selects a medium level action corresponding
+    to the most intuitively high-priority thing to do
+
+    NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
+    in which an individual agent cannot complete the task on their own.
+    Will work only in environments where the only order is 3 onion soup.
     """
 
     def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
@@ -385,9 +707,7 @@ class GreedyHumanModel(Agent):
             [do X] at location [Y]
 
         In this method, X (e.g. deliver the soup, pick up an onion, etc) is chosen based on
-        a simple set of greedy heuristics based on the current state, e.g. it tries to use
-        every ingredient already put into pot and tries to free up pots by cooking best soup
-        in the closest pot even if its suboptimal.
+        a simple set of greedy heuristics based on the current state.
 
         Effectively, will return a list of all possible locations Y in which the selected
         medium level action X can be performed.
@@ -395,75 +715,58 @@ class GreedyHumanModel(Agent):
         player = state.players[self.agent_index]
         other_player = state.players[1 - self.agent_index]
         am = self.mlam
-        orders_list = state.orders_list
 
         counter_objects = self.mlam.mdp.get_counter_objects_dict(state, list(self.mlam.mdp.terrain_pos_dict['X']))
         pot_states_dict = self.mlam.mdp.get_pot_states(state)
 
-        possible_soup_keys = ['{}_items'.format(i) for i in range(Recipe.MAX_NUM_INGREDIENTS)]
-        all_pot_soups_pos = list(itertools.chain(*[pot_states_dict[key] for key in possible_soup_keys]))
-        all_pot_soups_objs = [state.get_object(pos) for pos in all_pot_soups_pos]
 
         if not player.has_object():
             ready_soups = pot_states_dict['ready']
             cooking_soups = pot_states_dict['cooking']
-            counter_soups_objs = [state.get_object(pos) for pos in counter_objects['soup']]
-            ordered_counter_soups_objs = [soup_obj for soup_obj in counter_soups_objs if orders_list.get_matching_order(recipe=soup_obj.recipe)]
 
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
             other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
-            if ordered_counter_soups_objs:
-                motion_goals = am.pickup_counter_soup_actions(self._soup_objs_to_counter_objects_dict(ordered_counter_soups_objs))
-            elif soup_nearly_ready and not other_has_dish:
+
+            if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                best_next_ingredients_for_soups = self._best_missing_ingredients_for_soups(all_pot_soups_objs, state)
-                soups_obj_ready_to_cook = [(soup_obj, missing_ingredients) for (soup_obj, missing_ingredients) in best_next_ingredients_for_soups if not missing_ingredients]
-                all_ingredients_to_pot = set(itertools.chain(*[ingredients for (soup_obj, ingredients) in best_next_ingredients_for_soups]))
-
-                if soups_obj_ready_to_cook:
-                    motion_goals = am.start_cooking_actions(self._soup_objs_to_pot_state(soups_obj_ready_to_cook))
+                assert len(state.all_orders) == 1 and list(state.all_orders[0].ingredients) == ["onion", "onion", "onion"], \
+                    "The current mid level action manager only support 3-onion-soup order, but got orders" \
+                    + str(state.all_orders)
+                next_order = list(state.all_orders)[0]
+                soups_ready_to_cook_key = '{}_items'.format(len(next_order.ingredients))
+                soups_ready_to_cook = pot_states_dict[soups_ready_to_cook_key]
+                if soups_ready_to_cook:
+                    only_pot_states_ready_to_cook = defaultdict(list)
+                    only_pot_states_ready_to_cook[soups_ready_to_cook_key] = soups_ready_to_cook
+                    # we want to cook only soups that has same len as order
+                    motion_goals = am.start_cooking_actions(only_pot_states_ready_to_cook)
                 else:
-                    motion_goals = []
-                    if "onion" in all_ingredients_to_pot:
-                        motion_goals += am.pickup_onion_actions(counter_objects)
-                    if "tomato" in all_ingredients_to_pot:
-                        motion_goals += am.pickup_tomato_actions(counter_objects)
-                    # there is nothing valuable to pickup now for some reason (and no soup to pickup now/in near future) pick any ingredient
-                    #   most likely to occour in envs with only temporary orders when all of them are currently fulfilled
-                    if not motion_goals:
-                        motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
+                    motion_goals = am.pickup_onion_actions(counter_objects)
+                # it does not make sense to have tomato logic when the only possible order is 3 onion soup (see assertion above)
+                # elif 'onion' in next_order:
+                #     motion_goals = am.pickup_onion_actions(counter_objects)
+                # elif 'tomato' in next_order:
+                #     motion_goals = am.pickup_tomato_actions(counter_objects)
+                # else:
+                #     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
+
+
         else:
             player_obj = player.get_object()
 
-            if player_obj.name in Recipe.ALL_INGREDIENTS:
-                best_next_ingredients_for_soups = self._best_missing_ingredients_for_soups(all_pot_soups_objs, state)
-                all_ingredients_to_pot = set(itertools.chain(*[missing_ingredients for (soup_obj, missing_ingredients) in best_next_ingredients_for_soups]))
+            if player_obj.name == 'onion':
+                motion_goals = am.put_onion_in_pot_actions(pot_states_dict)
 
-                if player_obj.name in all_ingredients_to_pot:
-                    only_soups_awaiting_held_ingredient = [soup_obj for (soup_obj, missing_ingredients) in best_next_ingredients_for_soups
-                        if player_obj.name in missing_ingredients]
-                    only_pot_states_awaiting_held_ingredient = self._soup_objs_to_pot_state(only_soups_awaiting_held_ingredient)
-
-                    if player_obj.name == 'onion':
-                        motion_goals = am.put_onion_in_pot_actions(only_pot_states_awaiting_held_ingredient)
-                    elif player_obj.name == 'tomato':
-                        motion_goals = am.put_tomato_in_pot_actions(only_pot_states_awaiting_held_ingredient)
-                    else:
-                        raise ValueError
-                else:
-                    motion_goals = am.place_obj_on_counter_actions(state)
+            elif player_obj.name == 'tomato':
+                motion_goals = am.put_tomato_in_pot_actions(pot_states_dict)
 
             elif player_obj.name == 'dish':
                 motion_goals = am.pickup_soup_with_dish_actions(pot_states_dict, only_nearly_ready=True)
 
             elif player_obj.name == 'soup':
-                recipe = player_obj.recipe
-                # detect soups worthless now, but maybe valuable in future (in orders_list.orders_to_add, but not in orders_list.orders)
-                if recipe in orders_list.all_recipes and orders_list.get_matching_order(recipe=recipe) is None:
-                    motion_goals = am.place_obj_on_counter_actions(state)
-                else: # deliver soup either for reward or to trash it
-                    motion_goals = am.deliver_soup_actions()
+                motion_goals = am.deliver_soup_actions()
+
             else:
                 raise ValueError()
 
@@ -476,25 +779,47 @@ class GreedyHumanModel(Agent):
 
         return motion_goals
 
-    def _best_missing_ingredients_for_soups(self, soup_objs, state):
-        recipes = [Recipe(soup_obj.ingredients) for soup_obj in soup_objs]
-        optimal_recipes_dict = {recipe: self.mdp.get_optimal_possible_recipe(state, recipe, discounted=False, return_value=True) for recipe in set(recipes)}
-        optimal_recipes_with_values = [optimal_recipes_dict[recipe] for recipe in recipes]
-        return [(soup_obj, Recipe.recipes_ingredients_diff(optimal_recipe, current_recipe))
-            for soup_obj, current_recipe, (optimal_recipe, optimal_recipe_value) in zip(soup_objs, recipes, optimal_recipes_with_values)]
+class SampleAgent(Agent):
+    """ Agent that samples action using action_probs of multiple agents
+    """
+    def __init__(self, agents):
+        self.agents = agents
 
-    def _soup_objs_to_pot_state(self, soups_objs):
-        pot_states = defaultdict(list)
-        for soup_obj in soups_objs:
-            pot_states['{}_items'.format(len(soup_obj.ingredients))].append(soup_obj.position)
-        return pot_states
+    @property
+    def agent_index(self):
+        return self._agent_index
+    
+    @agent_index.setter
+    def agent_index(self, v):
+        for agent in self.agents:
+            agent.agent_index = v
+        self._agent_index = v
+       
+    @property
+    def mdp(self):
+        return self._mdp
+    
+    @mdp.setter
+    def mdp(self, v):
+        for agent in self.agents:
+            agent.mdp = v
+        self._mdp = v
+    
+    def action(self, state):
+        action_probs = np.zeros(Action.NUM_ACTIONS)
+        for agent in self.agents:
+            action_probs += agent.action(state)[1]["action_probs"]
+        action_probs = action_probs/len(self.agents)
+        return Action.sample(action_probs), {"action_probs": action_probs}
 
-    def _soup_objs_to_counter_objects_dict(self, soups_objs):
-        counter_objects = defaultdict(list)
-        for soup_obj in soups_objs:
-            counter_objects['soup'].append(soup_obj.position)
-        return counter_objects
+    def reset(self):
+        self._agent_index = None
+        self._mdp = None
+        for agent in self.agents:
+            agent.reset()
 
+    """
+    """
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
 # class CoupledPlanningAgent(Agent):
 #     """
