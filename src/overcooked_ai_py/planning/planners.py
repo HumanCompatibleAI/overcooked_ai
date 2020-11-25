@@ -74,7 +74,7 @@ class MotionPlanner(object):
         try:
             mp = MotionPlanner.from_file(filename)
 
-            if mp.counter_goals != counter_goals or mp.mdp != mdp:
+            if mp.counter_goals != counter_goals or not mdp.ids_independent_equal(mp.mdp):
                 print("motion planner with different counter goal or mdp found, computing from scratch")
                 return MotionPlanner.compute_mp(filename, mdp, counter_goals)
 
@@ -800,7 +800,7 @@ class MediumLevelActionManager(object):
         try:
             mlam = MediumLevelActionManager.from_file(filename)
 
-            if mlam.params != mlam_params or mlam.mdp != mdp:
+            if mlam.params != mlam_params or not mdp.ids_independent_equal(mlam.mdp):
                 print("medium level action manager with different params or mdp found, computing from scratch")
                 return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
 
