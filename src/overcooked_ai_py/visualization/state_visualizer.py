@@ -99,7 +99,7 @@ class StateVisualizer:
     @staticmethod
     def default_hud_data(state, **kwargs):
         result = {"timestep": state.timestep}
-        if state.orders_list.contains_temporary_orders:
+        if state.orders_list.contains_temporary_orders or state.orders_list.contains_temporary_orders:
             result["orders_list"] = state.orders_list.to_dict()
         else:
             result["all_orders"] = [r.to_dict() for r in state.all_orders]
