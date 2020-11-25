@@ -38,6 +38,11 @@ def load_from_json(filename):
     with open(fix_filetype(filename, ".json"), "r") as json_file:
         return json.load(json_file)
 
+def load_text_file(filename):
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        return "".join(lines)
+
 def iterate_over_json_files_in_dir(dir_path):
     pathlist = Path(dir_path).glob("*.json")
     return [str(path) for path in pathlist]
@@ -173,6 +178,24 @@ def profile(fnc):
         print(s.getvalue())
         return retval
     return inner
+
+def numpy_to_native(x):
+    if isinstance(x, np.generic):
+        return x.item()
+    else:
+        return x
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    # code taken from https://pynative.com/python-serialize-numpy-ndarray-into-json
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NumpyArrayEncoder, self).default(obj)
 
 def read_layout_dict(layout_name):
     return load_dict_from_file(os.path.join(LAYOUTS_DIR, layout_name + ".layout"))

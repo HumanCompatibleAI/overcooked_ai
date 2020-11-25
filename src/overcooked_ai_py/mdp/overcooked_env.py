@@ -268,6 +268,7 @@ class OvercookedEnv(object):
             "cumulative_sparse_rewards_sum": np.array([0])
         }
         self.game_stats = {**events_dict, **rewards_dict}
+        self.events_list = []
 
     def is_done(self):
         """Whether the episode is over."""
@@ -305,7 +306,8 @@ class OvercookedEnv(object):
     def _add_episode_info(self, env_info):
         env_info["episode"] = {
             "ep_game_stats": self.game_stats,
-            "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_sum"]),
+            "events_list": self.events_list,
+            "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
             "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
             "ep_sparse_env_r": sum(self.game_stats["cumulative_sparse_env_rewards"]),
             "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
@@ -330,7 +332,10 @@ class OvercookedEnv(object):
             for idx, event_by_agent in enumerate(event_occurred_by_idx):
                 if event_by_agent:
                     self.game_stats[event_type][idx].append(self.state.timestep)
-
+        
+        for event in infos["events_list"]:
+            event["timestep"] = self.state.timestep
+            self.events_list.append(event)
 
     ####################
     # TRAJECTORY LOGIC #

@@ -18,7 +18,8 @@ setup(name='overcooked_ai',
       keywords=['Overcooked', 'AI', 'Reinforcement Learning'],
       package_dir={"": "src"},
       package_data={
-        'overcooked_ai_py' : ['data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle']
+        'overcooked_ai_py' : ['data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle', 
+        "visualization/web/*.js", "visualization/web/*.html", "visualization/web/*.css"]
       },
       install_requires=[
         'numpy',
