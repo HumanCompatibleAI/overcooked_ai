@@ -902,8 +902,8 @@ class TestOvercookedEnvironment(unittest.TestCase):
                     cumm_dish += 1
                 else:
                     raise NotImplementedError("%s encountered, when expecting onion or dish" % object.name)
-        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
-        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by dish")
 
     def test_onion_and_dish_and_soup_littering(self):
         base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
@@ -928,9 +928,9 @@ class TestOvercookedEnvironment(unittest.TestCase):
                     assert len(object.ingredients) == 1
                 else:
                     raise NotImplementedError("%s encountered, when expecting onion or dish or soup" % object.name)
-        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
-        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
-        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by dish")
+        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.02, msg="Should have 0.1 of counters occupied by soup_1")
 
     def test_onion_and_dish_and_soup_more_littering(self):
         base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
@@ -964,11 +964,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
                         raise NotImplementedError("soup with %d ingrdients encountered, whereas the maximum is 3" % num_ing)
                 else:
                     raise NotImplementedError("%s encountered, when expecting onion or dish or soup" % object.name)
-        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by onion")
-        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.01, msg="Should have 0.3 of counters occupied by dish")
-        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.01, msg="Should have 0.1 of counters occupied by soup_1")
-        self.assertAlmostEqual(0.15, cumm_soup_2/(num_counter * num_game), delta=0.01, msg="Should have 0.15 of counters occupied by soup_2")
-        self.assertAlmostEqual(0.12, cumm_soup_3/(num_counter * num_game), delta=0.01, msg="Should have 0.12 of counters occupied by soup_1")
+        self.assertAlmostEqual(0.3, cumm_onion/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by onion")
+        self.assertAlmostEqual(0.2, cumm_dish/(num_counter * num_game), delta=0.02, msg="Should have 0.3 of counters occupied by dish")
+        self.assertAlmostEqual(0.1, cumm_soup_1/(num_counter * num_game), delta=0.02, msg="Should have 0.1 of counters occupied by soup_1")
+        self.assertAlmostEqual(0.15, cumm_soup_2/(num_counter * num_game), delta=0.02, msg="Should have 0.15 of counters occupied by soup_2")
+        self.assertAlmostEqual(0.12, cumm_soup_3/(num_counter * num_game), delta=0.02, msg="Should have 0.12 of counters occupied by soup_1")
 
 
     def test_onion_and_dish_and_soup_more_littering_display(self):
