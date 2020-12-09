@@ -14,7 +14,7 @@ UNDEFIND_LOCATION = "UND_L"
 # the undefined action
 UNDEFIND_ACTION = "UND_A"
 
-ENTROPY_RO = 5
+ENTROPY_RHO = 5
 
 
 import heapq
@@ -248,18 +248,18 @@ def connect_action_path(action_paths):
         total_path += path
     return total_path
 
-def calculate_entropy_of_path(path, ro):
+def calculate_entropy_of_path(path, rho):
     """
         Arguments:
             path (list): a list of tuble for locations of agent 0
-            ro: parameter used in calculation of entropy
+            rho: parameter used in calculation of entropy
         return:
             the calculated entropy of the path
-            entropy of a sequence of one action 'a' repeated 'n' times is -ln(n) + ln(ro)
+            entropy of a sequence of one action 'a' repeated 'n' times is -ln(n) + ln(rho)
             total entropy is the sum of all the sequences in the path
     """
     total_entropy = 0
-    const_entropy = np.log(ro)
+    const_entropy = np.log(rho)
     curr_length = 1
     curr_action = path[0]
 
@@ -1015,6 +1015,9 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
             details for conventions can be found at overcooked_ai_py.mdp.layout_generator
         silent (bool): whether to print the details
         best_only (bool): whether to only consider the best mla_node at each mla_hash
+    Returns:
+        a dictionary containing the stage score, various individual paths for both agents
+        to make a 3 onion soup, and these paths sorted by length
     """
     start_player_positions = [None, None]
 

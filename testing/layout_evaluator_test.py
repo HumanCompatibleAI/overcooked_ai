@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_actions, \
     UNDEFIND_ACTION, remove_extra_action, add_action_from_location, calculate_entropy_of_path, \
-    ENTROPY_RO, path_to_actions_with_padding, graph_from_terrain, shortest_walk_path
+    ENTROPY_RHO, path_to_actions_with_padding, graph_from_terrain, shortest_walk_path
 
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
@@ -260,11 +260,11 @@ class TestEntropyComparison(unittest.TestCase):
         path_undefined_at_end = [(0, 1), (0, 1), (1, 0), 'interact', 'UND_A', 'UND_A']
         path_undefined_at_start = ['UND_A', 'UND_A', (0, 1), (0, 1), (1, 0), 'interact']
 
-        entropy = -np.log(2) - np.log(1) - np.log(1) + 3 * np.log(ENTROPY_RO)
+        entropy = -np.log(2) - np.log(1) - np.log(1) + 3 * np.log(ENTROPY_RHO)
 
-        self.assertAlmostEqual(calculate_entropy_of_path(path, ENTROPY_RO), entropy)
-        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_end, ENTROPY_RO), entropy)
-        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_start, ENTROPY_RO), entropy)
+        self.assertAlmostEqual(calculate_entropy_of_path(path, ENTROPY_RHO), entropy)
+        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_end, ENTROPY_RHO), entropy)
+        self.assertAlmostEqual(calculate_entropy_of_path(path_undefined_at_start, ENTROPY_RHO), entropy)
 
     def test_entropy_comparison_basic(self):
         # This tests entropy comparison for some basic variation in layouts
@@ -275,8 +275,8 @@ class TestEntropyComparison(unittest.TestCase):
         path_1 = [(0, 1), (0, 1), (0, 1), (0, 1), (1, 0), (1, 0),
                   (1, 0), (1, 0), (0, -1), (0, -1), (0, -1), (0, -1)]
 
-        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RO)
-        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RO)
+        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RHO)
+        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RHO)
 
         self.assertGreater(entropy_0, entropy_1)
 
@@ -292,8 +292,8 @@ class TestEntropyComparison(unittest.TestCase):
         path_1 = [(0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (1, 0),
                   (1, 0), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1)]
 
-        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RO)
-        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RO)
+        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RHO)
+        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RHO)
 
         self.assertGreater(entropy_0, entropy_1)
 
@@ -309,8 +309,8 @@ class TestEntropyComparison(unittest.TestCase):
         path_1 = [(0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (1, 0),
                   (1, 0), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1)]
 
-        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RO)
-        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RO)
+        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RHO)
+        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RHO)
 
         self.assertGreater(entropy_0, entropy_1)
 
@@ -325,8 +325,8 @@ class TestEntropyComparison(unittest.TestCase):
         path_1 = [(0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (1, 0),
                   (1, 0), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1)]
 
-        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RO)
-        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RO)
+        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RHO)
+        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RHO)
 
         self.assertGreater(entropy_0, entropy_1)
 
@@ -343,8 +343,8 @@ class TestEntropyComparison(unittest.TestCase):
         path_1 = [(0, 1), (0, 1), (0, 1), (0, 1), (0, 1), (1, 0),
                   (1, 0), (0, -1), (0, -1), (0, -1), (0, -1), (0, -1)]
 
-        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RO)
-        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RO)
+        entropy_0 = calculate_entropy_of_path(path_0, ENTROPY_RHO)
+        entropy_1 = calculate_entropy_of_path(path_1, ENTROPY_RHO)
 
         #self.assertGreater(entropy_0, entropy_1)
 
@@ -398,7 +398,7 @@ class TestEntropyComparison(unittest.TestCase):
         # calculate and save entropies of each path
         entropies = {}
         for path in paths_to_compare:
-            entropies[path] = calculate_entropy_of_path(paths_to_compare[path], ENTROPY_RO)
+            entropies[path] = calculate_entropy_of_path(paths_to_compare[path], ENTROPY_RHO)
 
         print(entropies)
 
@@ -417,8 +417,8 @@ class TestEntropyComparison(unittest.TestCase):
 
         # calculates and stores the entropies of each full action path
         for path in paths:
-            entropies[path] = calculate_entropy_of_path(paths[path][0], ENTROPY_RO) + \
-                              calculate_entropy_of_path(paths[path][1], ENTROPY_RO)
+            entropies[path] = calculate_entropy_of_path(paths[path][0], ENTROPY_RHO) + \
+                              calculate_entropy_of_path(paths[path][1], ENTROPY_RHO)
 
         print(entropies)
 
