@@ -1,6 +1,5 @@
 import io, json, pickle, pstats, cProfile, os
 import numpy as np
-import random
 from collections import defaultdict
 from pathlib import Path
 from overcooked_ai_py.static import LAYOUTS_DIR
@@ -172,7 +171,7 @@ def is_iterable(obj):
     return isinstance(obj, Iterable)
 
 def weighted_random_by_dct(dct):
-    rand_val = random.random()
+    rand_val = np.random.random()
     total = 0
     for k, v in dct.items():
         total += v
