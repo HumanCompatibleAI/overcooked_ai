@@ -6,7 +6,7 @@ from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_acti
 
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
-"""
+
 class TestHandoverEvaluation(unittest.TestCase):
 
     def setUp(self):
@@ -494,7 +494,7 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
             ['X', 'D', 'X', 'S', 'X', 'X'],
         ]
         self.mtx_test_helper(small_keyhole_mtx, verbose=True)
-        """
+
 
 class TestMLASearchNodeWaypointTracking(unittest.TestCase):
     def setUp(self):
