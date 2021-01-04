@@ -6,7 +6,7 @@ from overcooked_ai_py.mdp.layout_evaluator import terrain_analysis, path_to_acti
 
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
-
+"""
 class TestHandoverEvaluation(unittest.TestCase):
 
     def setUp(self):
@@ -494,7 +494,61 @@ class TestMotionExtractorRealMDP(unittest.TestCase):
             ['X', 'D', 'X', 'S', 'X', 'X'],
         ]
         self.mtx_test_helper(small_keyhole_mtx, verbose=True)
+        """
 
+class TestMLASearchNodeWaypointTracking(unittest.TestCase):
+    def setUp(self):
+        self.divided_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', 'X', ' ', ' ', 'O'],
+            ['X', '1', 'X', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+
+        self.connected_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', ' ', ' ', ' ', 'O'],
+            ['X', '1', ' ', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+
+        self.small_keyhole_mtx = [
+            ['X', 'P', 'X', 'X', 'X', 'X'],
+            ['O', ' ', ' ', ' ', ' ', 'O'],
+            ['X', ' ', 'X', ' ', ' ', 'X'],
+            ['X', '1', 'X', '2', ' ', 'X'],
+            ['X', 'D', 'X', 'S', 'X', 'X'],
+        ]
+
+    def test_divided_waypoints(self):
+        print("testing divided waypoints------------")
+        analysis = terrain_analysis(self.divided_mtx)
+        waypoints = analysis['waypoints']
+        path1 = analysis['player 1 action paths']
+        path2 = analysis['player 2 action paths']
+        for waypoint in waypoints:
+            print("possible waypoints\n", waypoint)
+        print()
+
+    def test_connected_waypoints(self):
+        print("testing connected waypoints------------")
+        analysis = terrain_analysis(self.connected_mtx)
+        waypoints = analysis['waypoints']
+        path1 = analysis['player 1 action paths']
+        path2 = analysis['player 2 action paths']
+        for waypoint in waypoints:
+            print("possible waypoints\n", waypoint)
+        print()
+
+    def test_keyhole_waypoints(self):
+        print("testing keyhole waypoints------------")
+        analysis = terrain_analysis(self.small_keyhole_mtx)
+        waypoints = analysis['waypoints']
+        path1 = analysis['player 1 action paths']
+        path2 = analysis['player 2 action paths']
+        for waypoint in waypoints:
+            print("possible waypoints\n", waypoint)
+        print()
 
 
 if __name__ == '__main__':

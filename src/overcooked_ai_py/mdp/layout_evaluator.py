@@ -419,7 +419,7 @@ class OvercookedSearchNode:
 
 class OvercookedMLASearchNode:
     def __init__(self, primary_idx, agent_0_loc, agent_1_loc, pot_loc, agent_0_act_dict, agent_1_act_dict,
-                 num_counter_ops, terrain_mtx):
+                 num_counter_ops, terrain_mtx, waypoints):
         """
         Search Node used for a composition of medium level tasks (picking up an onion, dishing a soup, etc)
         Arguments:
@@ -429,7 +429,10 @@ class OvercookedMLASearchNode:
             agent_0_act_dict (dictionary of list of variable length):
                 keys: medium levthe cummulative list of locations traversed by agent 0
             agent_1_act_dict (dictionary of list of variable length): the cummulative list of locations traversed by agent 1
-
+            terrain_mtx: terrain matrix containing item locations
+            waypoints: list of current waypoints for this path
+                waypoint_i = (event name, index of primary agent (0 or 1), location of the agent, location of the dispenser/item)
+                    locations are in the form of (y, x) or terrain_mtx[y][x]
         """
         self.primary_idx = primary_idx
         self.agent_0_loc = agent_0_loc
@@ -439,6 +442,7 @@ class OvercookedMLASearchNode:
         self.agent_1_act_dict = agent_1_act_dict.copy()
         self.num_counter_ops = num_counter_ops
         self.terrain_mtx = terrain_mtx
+        self.waypoints = waypoints
 
     def append_path_for_task(self, task_name, agent_0_path_task, agent_1_path_task):
         act_paths = path_to_actions_with_padding(agent_0_path_task, agent_1_path_task, self.terrain_mtx,
@@ -471,6 +475,9 @@ class OvercookedMLASearchNode:
         updated_mla_search_node.agent_0_loc = search_node.agent_0_loc
         updated_mla_search_node.agent_1_loc = search_node.agent_1_loc
         updated_mla_search_node.num_counter_ops += search_node.num_counter_ops
+        # waypoint = search_node.agent_0_loc if search_node.primary_idx == 0 else search_node.agent_1_loc
+        # updated_mla_search_node.waypoints.append((task_name, search_node.primary_idx, waypoint))
+        # print(task_name)
         if pot_loc:
             updated_mla_search_node.update_pot_loc(pot_loc)
         return updated_mla_search_node
@@ -491,7 +498,8 @@ class OvercookedMLASearchNode:
             self.agent_0_act_dict,
             self.agent_1_act_dict,
             self.num_counter_ops,
-            self.terrain_mtx
+            self.terrain_mtx,
+            self.waypoints
         )
 
     def __str__(self):
@@ -502,6 +510,7 @@ class OvercookedMLASearchNode:
         output += "action dict 0: " + str(self.agent_0_act_dict) + "\n"
         output += "action dict 1: " + str(self.agent_1_act_dict) + "\n"
         output += "num counter operations: " + str(self.num_counter_ops) + "\n"
+        output += "waypoints: " + str(self.waypoints) + "\n"
         return output
 
 class PriorityQueue:
@@ -859,6 +868,24 @@ def get_open_neighbor(loc, other_agent_loc, terrain_mtx):
 
     return None, None
 
+def parse_event_name(event_name):
+    # given an event_name consisting possibly of i_event_name_j, returns mapped_event_name
+    # the name is mapped to match with the event names used in loaded human trajectories
+    parts = event_name.split('_')
+    output = []
+    for p in parts:
+        if not p.isnumeric():
+            output.append(p)
+
+    name = '_'.join(output)
+
+    mapping = {'onion_pickup': 'onion_pickup', 'onion_drop': 'potting_onion',
+               'start_cooking': 'soup_start_cooking', 'dish_pickup': 'dish_pickup',
+               'dishing_soup': 'soup_pickup', 'serving': 'soup_delivery'}
+
+    if name in mapping:
+        return mapping[name]
+    return name
 
 
 def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, terrain_mtx, task_name,
@@ -972,6 +999,13 @@ def perform_mla(feature_locations, prev_mla_dict, walk_graph, handover_graph, te
                             forward_mla_node.agent_1_act_dict[mla_key] = new_act_paths[1]
                             forward_mla_node.agent_0_loc = curr_locs[0]
                             forward_mla_node.agent_1_loc = curr_locs[1]
+                            # construct and add waypoint information
+                            agent_waypoints = [(curr_locs[i][0]+act_paths[i][-2][1],
+                                                curr_locs[i][1]+act_paths[i][-2][0]) for i in range(2)]
+                            waypoint_location = agent_waypoints[forward_mla_node.primary_idx]
+                            waypoint_entry = (parse_event_name(task_name), forward_mla_node.primary_idx,
+                                              curr_locs[forward_mla_node.primary_idx], waypoint_location)
+                            forward_mla_node.waypoints = backward_mla_node.waypoints + [waypoint_entry]
                             
                             forward_mla_hash = forward_mla_node.hash_key()
 
@@ -1017,7 +1051,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         best_only (bool): whether to only consider the best mla_node at each mla_hash
     Returns:
         a dictionary containing the stage score, various individual paths for both agents
-        to make a 3 onion soup, and these paths sorted by length
+        to make a 3 onion soup, these paths sorted by length, and a list of waypoints for each path
     """
     start_player_positions = [None, None]
 
@@ -1079,7 +1113,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     key: (p0_loc, p1_loc, pot_loc, num_counter_operation)
 
     """
-    starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0, modified_terrain_mtx)
+    starting_mla_search_node = OvercookedMLASearchNode(-1, p0_starting, p1_starting, None, {}, {}, 0, modified_terrain_mtx, [])
     possible_starting_agents_positions = {
         # format: p0 location, p1 location,
         starting_mla_search_node.hash_key(): [starting_mla_search_node]
@@ -1353,8 +1387,13 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     player_2_action_paths = []
     pairs_of_action_paths_by_total_length = {}
 
+    # list to store waypoints for each possible path
+    waypoints = []
+
     for key in possible_agents_served_positions:
         for rep in possible_agents_served_positions[key]:
+            # add to waypoints list
+            waypoints.append(rep.waypoints)
 
             # for each possible end mla node we find all the location paths from all the mlas
             act_path_dict_0 = rep.agent_0_act_dict
@@ -1401,6 +1440,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     return_dict['player 1 action paths'] = player_1_action_paths
     return_dict['player 2 action paths'] = player_2_action_paths
     return_dict['pairs of action paths by total length'] = pairs_of_action_paths_by_total_length
+    return_dict['waypoints'] = waypoints
 
     return return_dict
 
