@@ -293,21 +293,33 @@ class LayoutGenerator(object):
     def add_features(self, grid, prop_features=0, feature_types=DEFAULT_FEATURE_TYPES):
         """
         Places one round of basic features and then adds random features 
-        until prop_features of valid locations are filled"""
+        until prop_features of valid locations are filled
+
+        parallel_pot(bool): whether we are guranteed to have an additional pot
+        """
 
         valid_locations = grid.valid_feature_locations()
         np.random.shuffle(valid_locations)
         assert len(valid_locations) > len(feature_types)
 
         num_features_placed = 0
+        # how many additional pot we are looking at
+        num_additional_pot = int(prop_features * len(valid_locations)) // len(feature_types)
+
         for location in valid_locations:
             current_prop = num_features_placed / len(valid_locations)
+            # Make sure each feature get at least one spot
             if num_features_placed < len(feature_types):
                 grid.add_feature(location, feature_types[num_features_placed])
+            # place up to the required additional pot
+            elif num_additional_pot > 0:
+                grid.add_feature(location, feature_types[0])
+                num_additional_pot -= 1
             elif current_prop >= prop_features:
                 break
+            # place non-pot features
             else:
-                random_feature = np.random.choice(feature_types)
+                random_feature = np.random.choice(feature_types[1:])
                 grid.add_feature(location, random_feature)
             num_features_placed += 1
 
