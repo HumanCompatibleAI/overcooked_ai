@@ -804,6 +804,7 @@ EVENT_TYPES = [
     'useful_dish_drop',
 
     # Soup events
+    'soup_start_cooking',
     'soup_pickup',
     'soup_delivery',
     'soup_drop',
@@ -1251,6 +1252,7 @@ class OvercookedGridworld(object):
                 # Cooking soup
                 if self.soup_to_be_cooked_at_location(new_state, i_pos):
                     soup = new_state.get_object(i_pos)
+                    self.log_soup_start_cooking(events_infos, player_idx)
                     soup.begin_cooking()
             
             elif terrain_type == 'P' and player.has_object():
@@ -1712,6 +1714,9 @@ class OvercookedGridworld(object):
     ################################
     # EVENT LOGGING HELPER METHODS #
     ################################
+
+    def log_soup_start_cooking(self, events_infos, player_index):
+        events_infos['soup_start_cooking'][player_index] = True
 
     def log_object_potting(self, events_infos, state, old_soup, new_soup, obj_name, player_index):
         """Player added an ingredient to a pot"""
