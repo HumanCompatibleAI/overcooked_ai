@@ -1390,6 +1390,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     # list to store all possible full action paths for each player
     player_1_action_paths = []
     player_2_action_paths = []
+    pairs_of_action_paths_by_total_length = {}
     length_and_entropy_for_joint_paths = []
 
     # list to store waypoints for each possible path
@@ -1438,6 +1439,11 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
             plan_entropy = np.round(calculate_entropy_of_path(connected_action_path_0, ENTROPY_RHO) + \
                               calculate_entropy_of_path(connected_action_path_1, ENTROPY_RHO), decimals=3)
             length_and_entropy_for_joint_paths.append((total_length, plan_entropy))
+
+            if total_length not in pairs_of_action_paths_by_total_length:
+                pairs_of_action_paths_by_total_length[total_length] = [pair_of_action_paths]
+            else:
+                pairs_of_action_paths_by_total_length[total_length].append(pair_of_action_paths)
 
     return_dict = {}
     return_dict['stage score'] = stage_score
