@@ -14,7 +14,7 @@ UNDEFIND_LOCATION = "UND_L"
 # the undefined action
 UNDEFIND_ACTION = "UND_A"
 
-ENTROPY_RHO = 5
+ENTROPY_RHO = 7
 
 
 import heapq
@@ -1061,6 +1061,8 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         for i, j in start_player_1_positions:
             terrain_mtx[i][j] = ' '
         start_player_positions[0] = start_player_1_position[::-1]
+    else:
+        start_player_1_position = random.choice(get_feature_locations(terrain_mtx, " "))
 
     start_player_2_positions = get_feature_locations(terrain_mtx, "2")
     if len(start_player_2_positions) > 0:
@@ -1068,6 +1070,9 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
         for i, j in start_player_2_positions:
             terrain_mtx[i][j] = ' '
         start_player_positions[1] = start_player_2_position[::-1]
+    else:
+        # make sure player 2 does not start at the same place as player 1
+        start_player_2_position = random.choice(list(set(get_feature_locations(terrain_mtx, " ")) - set([start_player_1_position])))
 
     walk_graph, handover_graph = graph_from_terrain(terrain_mtx)
 
@@ -1385,7 +1390,7 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     # list to store all possible full action paths for each player
     player_1_action_paths = []
     player_2_action_paths = []
-    pairs_of_action_paths_by_total_length = {}
+    length_and_entropy_for_joint_paths = []
 
     # list to store waypoints for each possible path
     waypoints = []
@@ -1430,10 +1435,9 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
             pair_of_action_paths = [connected_action_path_0, connected_action_path_1]
             assert len(connected_action_path_0) == len(connected_action_path_1)
             total_length = len(connected_action_path_0)
-            if total_length not in pairs_of_action_paths_by_total_length:
-                pairs_of_action_paths_by_total_length[total_length] = [pair_of_action_paths]
-            else:
-                pairs_of_action_paths_by_total_length[total_length].append(pair_of_action_paths)
+            plan_entropy = np.round(calculate_entropy_of_path(connected_action_path_0, ENTROPY_RHO) + \
+                              calculate_entropy_of_path(connected_action_path_1, ENTROPY_RHO), decimals=3)
+            length_and_entropy_for_joint_paths.append((total_length, plan_entropy))
 
     return_dict = {}
     return_dict['stage score'] = stage_score
@@ -1441,15 +1445,19 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     return_dict['player 2 action paths'] = player_2_action_paths
     return_dict['pairs of action paths by total length'] = pairs_of_action_paths_by_total_length
     return_dict['waypoints'] = waypoints
+    return_dict['length_and_entropy_for_joint_paths'] = length_and_entropy_for_joint_paths
 
     return return_dict
 
 
-def stats_from_analaysis(terrain_mtx, best_only=True):
+def stats_from_analaysis(terrain_mtx, best_only=True, printing=False):
     dic = terrain_analysis(terrain_mtx, best_only=best_only)
-    pairs_of_action_paths_by_total_length = dic['pairs of action paths by total length']
-    stats_by_length = {}
-    for total_length in sorted(pairs_of_action_paths_by_total_length.keys()):
-        stats_by_length[total_length] = pairs_of_action_paths_by_total_length[total_length]
-    return stats_by_length
+    length_and_entropy_for_joint_paths = dic['length_and_entropy_for_joint_paths']
+    # if we want to print the stats
+    if printing:
+        # first go in ascending length
+        print("by length", sorted(length_and_entropy_for_joint_paths, key=lambda x:x[0]))
+        # then go in ascending entropy
+        print("by entropy", sorted(length_and_entropy_for_joint_paths, key=lambda x:x[1]))
+    return length_and_entropy_for_joint_paths
 
