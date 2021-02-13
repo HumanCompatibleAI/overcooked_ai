@@ -2,13 +2,8 @@ import itertools, copy
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, read_layout_dict
+from overcooked_ai_py.utils import pos_distance, read_layout_dict, classproperty
 from overcooked_ai_py.mdp.actions import Action, Direction
-
-
-class classproperty(property):
-    def __get__(self, cls, owner):
-        return classmethod(self.fget).__get__(None, owner)()
 
 
 class Recipe:
@@ -326,7 +321,7 @@ class ObjectState(object):
 
 class SoupState(ObjectState):
 
-    def __init__(self, position, ingredients=[], cooking_tick=-1, **kwargs):
+    def __init__(self, position, ingredients=[], cooking_tick=-1, cook_time=None, **kwargs):
         """
         Represents a soup object. An object becomes a soup the instant it is placed in a pot. The
         soup's recipe is a list of ingredient names used to create it. A soup's recipe is undetermined
@@ -335,11 +330,13 @@ class SoupState(ObjectState):
         position (tupe): (x, y) coordinates in the grid
         ingrdients (list(ObjectState)): Objects that have been used to cook this soup. Determiens @property recipe
         cooking (int): How long the soup has been cooking for. -1 means cooking hasn't started yet
+        cook_time(int): How long soup needs to be cooked, used only mostly for getting soup from dict with supplied cook_time, if None self.recipe.time is used
         """
         super(SoupState, self).__init__("soup", position)
         self._ingredients = ingredients
         self._cooking_tick = cooking_tick
         self._recipe = None
+        self._cook_time = cook_time
 
     def __eq__(self, other):
         return isinstance(other, SoupState) and self.name == other.name and self.position == other.position and self._cooking_tick == other._cooking_tick and \
@@ -393,7 +390,11 @@ class SoupState(ObjectState):
 
     @property
     def cook_time(self):
-        return self.recipe.time
+        # used mostly when cook time is supplied by state dict
+        if self._cook_time is not None:
+            return self._cook_time
+        else:
+            return self.recipe.time
 
     @property
     def cook_time_remaining(self):
