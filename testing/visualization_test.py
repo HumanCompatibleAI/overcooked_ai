@@ -82,27 +82,24 @@ class TestStateVisualizer(unittest.TestCase):
         self.assertEqual(visualizer.hud_line_height, 26+7)
 
     def test_hud_display(self):
-        print("testing hud display, but without asserts to not fail test because of inconsistent font displays between osx and linux")
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_hud.json")):
             test_render_state_from_dict(d)
 
     def test_differnet_sizes(self):
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_sizes.json")):
-            self.assertTrue(test_render_state_from_dict(d))
+            test_render_state_from_dict(d)
 
     def test_cooking_timer_display(self):
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_cooking_display.json")):
-            self.assertTrue(test_render_state_from_dict(d))
+            test_render_state_from_dict(d)
 
     def test_various_states(self):
-        # testing some states from trajectory hoping it can find unexpected bugs
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_various.json")):
-            self.assertTrue(test_render_state_from_dict(d))
+            test_render_state_from_dict(d)
 
     def test_generated_layout_states(self):
-        # testing some states from trajectory hoping it can find unexpected bugs
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_generated_layout.json")):
-            self.assertTrue(test_render_state_from_dict(d))
+            test_render_state_from_dict(d)
 
     def test_default_hud_data_from_trajectories(self):
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json') # NOTE: for test purposes reward is added here despite there was no soup delivery in trajectory
@@ -115,7 +112,7 @@ class TestStateVisualizer(unittest.TestCase):
 
     def test_action_probs_display(self):
         for d in load_from_json(os.path.join(state_visualizer_dir, "render_state_data_test_action_probs_display.json")):
-            self.assertTrue(test_render_state_from_dict(d))
+            test_render_state_from_dict(d)
 
     def test_trajectory_visualization(self):
         # we don't have good way to check slider automatically so its mostly test for basic stuff like numer of outputed images, if using method raises error etc.
