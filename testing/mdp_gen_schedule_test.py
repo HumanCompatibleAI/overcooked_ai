@@ -160,7 +160,7 @@ class TestParamScheduleFnInterval(unittest.TestCase):
         avg_num_empty_07_03 = sum(num_empty_grid[1975:2025]) / 50
         self.assertTrue(11.5 < avg_num_empty_07_03 < 11.8, "should be between 11.5 and 11.8, but got %f" % avg_num_empty_07_03)
         avg_num_empty_05_05 = sum(num_empty_grid[3950:4000]) / 50
-        self.assertTrue(10.4 < avg_num_empty_05_05 < 11.0, "should be between 10.4 and 11.0, but got %f" % avg_num_empty_05_05)
+        self.assertTrue(10.3 < avg_num_empty_05_05 < 10.8, "should be between 10.3 and 10.8, but got %f" % avg_num_empty_05_05)
         print("avg number of empty grids:", avg_num_empty_09_01, avg_num_empty_07_03, avg_num_empty_05_05)
 
 
