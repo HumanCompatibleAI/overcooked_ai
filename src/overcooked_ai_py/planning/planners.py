@@ -779,9 +779,8 @@ class MediumLevelActionManager(object):
         
         self.params = mlam_params
         self.wait_allowed = mlam_params['wait_allowed']
-        self.counter_drop = mlam_params["counter_drop"]
-        self.counter_pickup = mlam_params["counter_pickup"]
-        
+        self.counter_drop = [tuple(elem) for elem in mlam_params["counter_drop"]]
+        self.counter_pickup = [tuple(elem) for elem in mlam_params["counter_pickup"]]
         self.joint_motion_planner = JointMotionPlanner(mdp, mlam_params)
         self.motion_planner = self.joint_motion_planner.motion_planner
 
@@ -796,6 +795,9 @@ class MediumLevelActionManager(object):
     @staticmethod
     def from_pickle_or_compute(mdp, mlam_params, custom_filename=None, force_compute=False, info=True):
         assert isinstance(mdp, OvercookedGridworld)
+        mlam_params["counter_drop"] = [tuple(elem) for elem in mlam_params["counter_drop"]]
+        mlam_params["counter_pickup"] = [tuple(elem) for elem in mlam_params["counter_pickup"]]
+        mlam_params["counter_goals"] = [tuple(elem) for elem in mlam_params["counter_goals"]]
 
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
 
@@ -804,9 +806,12 @@ class MediumLevelActionManager(object):
 
         try:
             mlam = MediumLevelActionManager.from_file(filename)
-
-            if mlam.params != mlam_params or not mdp.ids_independent_equal(mlam.mdp):
+            if mlam.params != mlam_params or not mdp.ids_and_reward_shaping_independent_equal(mlam.mdp):
                 print("medium level action manager with different params or mdp found, computing from scratch")
+                if mlam.params != mlam_params:
+                    print("different mlam_params", mlam.params, mlam_params)
+                if not mdp.ids_and_reward_shaping_independent_equal(mlam.mdp):
+                    print("different mdps")
                 return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
 
         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
