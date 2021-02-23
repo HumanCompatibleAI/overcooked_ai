@@ -1421,9 +1421,30 @@ class TestGridworld(unittest.TestCase):
 
         self.assertLess(val24, val25, "Moving towards serving area with valid soup increases potential")
         self.assertEqual(sum(rewards['sparse_reward_by_agent']), 50, "Soup was not properly devivered, probably an error with MDP logic")
-
-
-
+    
+    def test_is_terminal(self):
+        mdp = self.base_mdp
+        mdp.orders_to_end_episode = 3
+        state = mdp.get_standard_start_state()
+        recipe = state.orders_list.orders[0].recipe
+        
+        state.orders_list.fulfill_order(recipe)
+        self.assertFalse(mdp.is_terminal(state)) # 1 >= 3
+        state.orders_list.fulfill_order(recipe)
+        self.assertFalse(mdp.is_terminal(state)) # 2 >= 3
+        state.orders_list.fulfill_order(recipe)
+        self.assertTrue(mdp.is_terminal(state)) # 3 >= 3
+        state.orders_list.fulfill_order(recipe)
+        self.assertTrue(mdp.is_terminal(state)) # 4 >= 3
+        # 4 orders fulfilled now
+        mdp.orders_to_end_episode = 100
+        self.assertFalse(mdp.is_terminal(state))
+        mdp.orders_to_end_episode = 0
+        self.assertFalse(mdp.is_terminal(state))
+        mdp.orders_to_end_episode = None
+        self.assertFalse(mdp.is_terminal(state))
+        mdp.orders_to_end_episode = 4
+        self.assertTrue(mdp.is_terminal(state))
 
 
 def random_joint_action():

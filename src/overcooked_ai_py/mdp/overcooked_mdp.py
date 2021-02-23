@@ -1354,7 +1354,8 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, rew_shaping_params=None, layout_name="unnamed_layout", start_orders_list=None, start_all_orders=[], start_bonus_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
+    def __init__(self, terrain, start_player_positions, rew_shaping_params=None, layout_name="unnamed_layout", start_orders_list=None, start_all_orders=[],
+        start_bonus_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, orders_to_end_episode=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -1366,6 +1367,7 @@ class OvercookedGridworld(object):
         start_orders_list: OrdersList dict or object
         start_bonus_orders: Legacy param, use orders instead, list of recipes dicts that are worth a bonus
         start_all_orders: Legacy param, use orders instead, list of all available order dicts the players can make, defaults to all possible recipes if empy list provided
+        orders_to_end_episode: number of fulfilled orders that ends the episode
         """
         assert not (start_bonus_orders and start_orders_list), "Use either legacy param 'start_bonus_orders' or new one 'start_orders_list', but not the both"
         if not start_orders_list:
@@ -1394,6 +1396,7 @@ class OvercookedGridworld(object):
         self.layout_name = layout_name
         self.order_bonus = order_bonus
         self.start_state = start_state
+        self.orders_to_end_episode = orders_to_end_episode
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
@@ -1586,8 +1589,11 @@ class OvercookedGridworld(object):
         return start_state_fn
 
     def is_terminal(self, state):
-        # There is a finite horizon, handled by the environment.
-        return False
+        # There is a finite horizon, handled by the environment unless self.orders_to_end_episode is bigger than 0
+        if self.orders_to_end_episode and self.orders_to_end_episode <= len(state.orders_list.fulfilled_orders):
+            return True
+        else:
+            return False
 
     def get_state_transition(self, state, joint_action, display_phi=False, motion_planner=None):
         """Gets information about possible transitions for the action.
