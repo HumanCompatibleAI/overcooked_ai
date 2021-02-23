@@ -5,7 +5,7 @@ from overcooked_ai_py.utils import save_pickle, load_pickle, cumulative_rewards_
     load_from_json, merge_dictionaries, rm_idx_from_dict, take_indexes_from_dict, is_iterable, NumpyArrayEncoder
 from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS
 from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanModel
-from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState, Recipe
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
 from overcooked_ai_py.visualization.extract_events import extract_events
@@ -235,24 +235,25 @@ class AgentEvaluator(object):
     @staticmethod
     def save_trajectories(trajectories, filename):
         AgentEvaluator.check_trajectories(trajectories)
-        if any(t["env_params"]["start_state_fn"] is not None for t in trajectories):
+        if any(env_params["start_state_fn"] is not None for env_params in trajectories["env_params"]):
             print("Saving trajectories with a custom start state. This can currently "
                   "cause things to break when loading in the trajectories.")
         save_pickle(trajectories, filename)
 
+
     @staticmethod
     def load_trajectories(filename):
+        AgentEvaluator._configure_recipe_if_needed()
         trajs = load_pickle(filename)
         AgentEvaluator.check_trajectories(trajs)
         return trajs
 
     @staticmethod
-    def save_traj_as_json(trajectory, filename):
-        """Saves the `idx`th trajectory as a list of state action pairs"""
-        assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectory.keys())
-        AgentEvaluator.check_trajectories(trajectory)
-        trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
-        save_as_json(trajectory, filename)
+    def save_traj_as_json(trajectories, filename):
+        assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectories.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectories.keys())
+        AgentEvaluator.check_trajectories(trajectories)
+        trajectories = AgentEvaluator.make_trajectories_json_serializable(trajectories)
+        save_as_json(trajectories, filename)
 
     @staticmethod
     def make_trajectories_json_serializable(trajectories):
@@ -276,6 +277,7 @@ class AgentEvaluator(object):
 
     @staticmethod
     def load_traj_from_json(filename):
+        AgentEvaluator._configure_recipe_if_needed()
         traj_dict = load_from_json(filename)
         return AgentEvaluator.load_traj_from_json_obj(traj_dict)
 
@@ -287,6 +289,16 @@ class AgentEvaluator(object):
         traj_dict["ep_actions"] = [[tuple(tuple(a) if type(a) is list else a for a in j_a) for j_a in ep_acts] for ep_acts in traj_dict["ep_actions"]]
         return traj_dict
     
+    @staticmethod
+    def _configure_recipe_if_needed(config={}):
+        """
+        method that configures recipe to avoid ValueError when recipe is created before configuring class
+        recipe is created on reading trajectory because recipe is part of the order that is part of the state that is part of the treajectory
+        """
+        if not Recipe._configured:
+            print("Configuring recipe from AgentEvaluator class with config:", config)
+            Recipe.configure(config)
+
     ############################
     # TRAJ MANINPULATION UTILS #
     ############################
