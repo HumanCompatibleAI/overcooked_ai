@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, RandomAgent, SampleAgent
+from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, \
+    SimpleGreedyHumanModel, RandomAgent, SampleAgent, SlowedDownAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -65,26 +66,80 @@ class TestBasicAgents(unittest.TestCase):
         self.assertEqual(time_taken, 10)
         self.assertEqual(env.mdp.get_standard_start_state().player_positions, end_state.player_positions)
 
-    def test_two_greedy_human_open_map(self):
+    def test_agents_on_open_map(self):
         scenario_2_mdp = OvercookedGridworld.from_layout_name('scenario2')
         mlam = MediumLevelActionManager.from_pickle_or_compute(scenario_2_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
-        a0 = GreedyHumanModel(mlam)
-        a1 = GreedyHumanModel(mlam)
-        agent_pair = AgentPair(a0, a1)
+        agent_pairs = [
+            AgentPair(GreedyHumanModel(mlam), GreedyHumanModel(mlam)),
+            AgentPair(SimpleGreedyHumanModel(mlam), SimpleGreedyHumanModel(mlam)),
+            AgentPair(RandomAgent(all_actions=True), RandomAgent(all_actions=True)),
+            AgentPair(RandomAgent(all_actions=False), RandomAgent(all_actions=False))
+        ]
+
         start_state = OvercookedState(
             [P((8, 1), s),
              P((1, 1), s)],
             {},
             all_orders=scenario_2_mdp.start_all_orders
         )
-        env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
-        trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
+        for agent_pair in agent_pairs:
+            env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
+            trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
     def test_sample_agent(self):
         agent = SampleAgent([RandomAgent(all_actions=False), RandomAgent(all_actions=True)])
         probs = agent.action(None)[1]["action_probs"]
         expected_probs = np.array([0.18333333, 0.18333333, 0.18333333, 0.18333333, 0.18333333, 0.08333333])
         self.assertTrue(np.allclose(probs, expected_probs))
+
+    def test_slowed_down_agent(self):
+        def should_stop(step_num, stop_every_n_steps):
+            # currently SlowDownAgent always stops at 2nd step 
+            return not bool((i-1) % stop_every_n_steps)
+
+        horizon = 100
+        #NOTE: if stop_every_n_steps is 3 this would not work because of rounding error
+        #   (ok for practical purposes, will just skip turn later but would fail test below)
+        for stop_every_n_steps in [2, 4]:
+            slowdown_rate = 1 - 1/stop_every_n_steps
+            
+            agent_pair = AgentPair(
+                SlowedDownAgent(RandomAgent(), slowdown_rate), 
+                SlowedDownAgent(RandomAgent(), slowdown_rate)
+                )
+            skip_action_probs = SlowedDownAgent(RandomAgent()).skip_action[1]["action_probs"].tolist()
+            env = OvercookedEnv.from_mdp(large_mdp, horizon=horizon)
+            trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
+
+            for i, traj_step in enumerate(trajectory):
+                (s_t, a_t, r_t, done, info) = traj_step 
+                if not done:
+                    agent_0_probs = info["agent_infos"][0]["action_probs"]
+                    agent_1_probs = info["agent_infos"][1]["action_probs"]
+                    if should_stop(i, stop_every_n_steps):
+                        self.assertEqual(agent_0_probs.tolist(), skip_action_probs)
+                        self.assertEqual(agent_1_probs.tolist(), skip_action_probs)
+                    else:
+                        self.assertNotEqual(agent_0_probs.tolist(), skip_action_probs)
+                        self.assertNotEqual(agent_1_probs.tolist(), skip_action_probs)
+    
+    def test_pedagogical_ingredients_picking(self):
+        mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages_tomato")
+        mlam = MediumLevelActionManager.from_pickle_or_compute(mdp, NO_COUNTERS_PARAMS, force_compute=force_compute)
+        agent = GreedyHumanModel(mlam, choose_ingredients_pedagogically=True)
+
+        self.assertEqual(agent.next_ingredients([], ['tomato', 'tomato', 'tomato'] ), {"tomato"})
+        self.assertEqual(agent.next_ingredients([], ['onion', 'onion', 'tomato']), {'tomato', 'onion'})
+        self.assertEqual(agent.next_ingredients([], ['onion', 'onion', 'onion']), {"onion"})
+
+        self.assertEqual(agent.next_ingredients(["onion"], ["onion", "onion", "tomato"]), {"tomato"})
+        self.assertEqual(agent.next_ingredients(["onion"], ["onion", "onion", "onion"]), {"onion"})
+
+        self.assertEqual(agent.next_ingredients(["tomato"], ["onion", "onion", "tomato"]), {"onion"})
+        self.assertEqual(agent.next_ingredients(["tomato"], ["tomato", "tomato", "tomato"]), {"tomato"})
+
+
+        
 
 class TestAgentEvaluatorStatic(unittest.TestCase):
 
