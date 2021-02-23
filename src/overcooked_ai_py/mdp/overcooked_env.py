@@ -1,7 +1,7 @@
 import gym, tqdm
 import time
 import numpy as np
-from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
+from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries, only_valid_named_args
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, MotionPlanner, NO_COUNTERS_PARAMS
@@ -117,6 +117,11 @@ class OvercookedEnv(object):
             num_mdp=1
         )
 
+    @staticmethod
+    def from_trajectories_json(trajs, idx=0):
+        mdp = OvercookedGridworld(**trajs["mdp_params"][idx])
+        env_params = only_valid_named_args(trajs["env_params"][idx], OvercookedEnv.from_mdp) 
+        return OvercookedEnv.from_mdp(mdp, **env_params)
 
     #####################
     # BASIC CLASS UTILS #

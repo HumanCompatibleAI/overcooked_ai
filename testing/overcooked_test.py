@@ -1409,6 +1409,9 @@ class TestOvercookedEnvironment(unittest.TestCase):
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([stay, w, w]), FixedPlanAgent([stay, e, e]))
         np.random.seed(0)
 
+    def ids_independent_equal_envs(self, env1, env2):
+        return env1.env_params == env2.env_params and env1.mdp.ids_independent_equal(env2.mdp)
+
     def test_constructor(self):
         try:
             OvercookedEnv.from_mdp(self.base_mdp, horizon=10)
@@ -1417,6 +1420,14 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             OvercookedEnv.from_mdp(self.base_mdp, **{"invalid_env_param": None})
+
+    def test_init_from_trajectories_json(self):
+
+        agent_eval = AgentEvaluator.from_mdp(self.base_mdp, DEFAULT_ENV_PARAMS)
+        self.assertTrue(self.ids_independent_equal_envs(self.env, agent_eval.env))
+        trajectory = agent_eval.evaluate_random_pair()
+        env_from_traj = OvercookedEnv.from_trajectories_json(trajectory)
+        self.assertTrue(self.ids_independent_equal_envs(self.env, env_from_traj))
 
     def test_step_fn(self):
         for _ in range(10):

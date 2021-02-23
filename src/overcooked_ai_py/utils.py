@@ -1,4 +1,4 @@
-import io, json, pickle, pstats, cProfile, os, tempfile, uuid
+import io, json, pickle, pstats, cProfile, os, tempfile, uuid, inspect  
 import numpy as np
 from numpy import nan
 from collections import defaultdict
@@ -217,3 +217,13 @@ def delete_duplicates(seq):
         else:
             return d
     return [x for x in seq if not (serialize_if_dict_or_list(x) in seen or seen_add(serialize_if_dict_or_list(x)))]
+
+def only_valid_named_args(kwargs, function, kwargs_accepted=True):
+    """returns trimmed kwargs out of arguments that are not in function argument names
+    if kwargs accepted=True and function accept **kwargs then pass any named arguments
+    """
+    arg_names, var_args_name, kwargs_name, defaults = inspect.getargspec(function)
+    if kwargs_name and kwargs_accepted:
+        return kwargs
+    else:
+        return {k:v for k,v in kwargs.items() if k in arg_names}
