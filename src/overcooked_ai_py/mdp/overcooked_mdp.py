@@ -1490,6 +1490,11 @@ class OvercookedGridworld(object):
     def __eq__(self, other):
         return self.ids_independent_equal(other) and self.start_orders_list == other.start_orders_list
 
+    def ids_and_reward_shaping_independent_equal(self, other):
+        return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
+                self.start_player_positions == other.start_player_positions and \
+                ids_independent_equal(self.start_orders_list, other.start_orders_list) and \
+                self.layout_name == other.layout_name
     
     def ids_independent_equal(self, other):
         return np.array_equal(self.terrain_mtx, other.terrain_mtx) and \
