@@ -253,8 +253,8 @@ class GreedyHumanModel(Agent):
     """
 
     def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
-                 auto_unstuck=True, debug=False):
-        
+                 auto_unstuck=True, debug=False,  prioritize_less_ingredients_left_pots=False, 
+                 choose_ingredients_pedagogically=False, most_pedagogical_next_ingredients=None):
         self.mlam = mlam
         self.mdp = self.mlam.mdp
         self.debug = debug
@@ -269,7 +269,71 @@ class GreedyHumanModel(Agent):
         # Whether to automatically take an action to get the agent unstuck if it's in the same
         # state as the previous turn. If false, the agent is history-less, while if true it has history.
         self.auto_unstuck = auto_unstuck
+
+        # Try to finish soups that are close to finising over bringing ingredient to the closest pot
+        self.prioritize_less_ingredients_left_pots = prioritize_less_ingredients_left_pots
+
+        # Try to choose ingredients in the way that lets other agent recognize easier what recipe agent is aiming at
+        self.choose_ingredients_pedagogically = choose_ingredients_pedagogically
+        if self.choose_ingredients_pedagogically:
+            if not most_pedagogical_next_ingredients:
+                most_pedagogical_next_ingredients = self._preprocess_most_pedagogical_next_ingredients()
+            # see _preprocess_most_pedagogical_next_ingredients for more info on this attribute
+            self.most_pedagogical_next_ingredients = most_pedagogical_next_ingredients
+        else:
+            self.most_pedagogical_next_ingredients = None
+
         self.reset()
+
+    def next_ingredients(self, current_ingredients, target_ingredients):
+        # chooses next ingredient to pickup and pot
+        if self.choose_ingredients_pedagogically:
+            return self.most_pedagogical_next_ingredients[Recipe.standarized_ingredients(current_ingredients)][Recipe.standarized_ingredients(target_ingredients)]
+        else:
+            return set(Recipe.ingredients_diff(target_ingredients, current_ingredients))
+        
+    def _preprocess_most_pedagogical_next_ingredients(self):
+        # dict accesed in form of dict[current_ingredients][target_ingredients] and returns set of ingredients that are most pedagogical to pick up;
+        #   this method uses number of possible recipes (lower is more pedagogical) available after adding ingredient 
+        #   (currently looking only 1 ingredient forward, it works fine for recipes of size 4 or smaller)
+        most_pedagogical_next_ingredients = defaultdict(lambda: defaultdict(set))
+
+        target_recipes_ingredients = [r.ingredients for r in self.mdp.start_orders_list.all_recipes]
+        if any (len(i)> 4 for i in target_recipes_ingredients):
+            print("WARNING, when recipes have a size 5 or bigger calculated pedagogical ingredients \
+                to pickup will be most likely suboptimal but still better than random")
+        # dict accesed in form of dict[current_ingredients][possible_target_ingredients]
+        reachable_target_ingredients = defaultdict(set)
+        # dicurrentct accesed in form of dict[target_ingredients][possible_current_ingredients]
+        reachable_from_ingredients = defaultdict(set)
+        for ingredients in target_recipes_ingredients:
+            for i in range(0, len(ingredients)):
+                for subset in itertools.combinations(ingredients, i):
+                    reachable_target_ingredients[subset].add(ingredients)
+                    reachable_from_ingredients[ingredients].add(subset)
+        
+        for current_ingredients, possible_target_ingredients in sorted(reachable_target_ingredients.items(), key = lambda x: -len(x[0])):
+            target_recipes_num = len(possible_target_ingredients)
+            for target_ingredients in possible_target_ingredients:
+                missing_ingredients = Recipe.ingredients_diff(target_ingredients, current_ingredients)
+                if len(set(missing_ingredients)) == 1 or target_recipes_num == 1:
+                    best_ingredients = set(missing_ingredients)
+                else: # at least 2 ingredients of different type are waiting for adding and there are more than 1 target recipe possible from them
+                    # prioritize next ingredients that narrows down possible recipes
+                    best_ingredient_min_recipes_num = target_recipes_num
+                    best_ingredients = set()
+                
+                    for possible_next_ingredient in set(missing_ingredients): 
+                        new_ingredients = Recipe.standarized_ingredients((possible_next_ingredient,) + current_ingredients)
+                        new_ingredients_recipes_num = len(reachable_target_ingredients[new_ingredients])
+                        if best_ingredient_min_recipes_num > new_ingredients_recipes_num:
+                            best_ingredient_min_recipes_num = new_ingredients_recipes_num
+                            best_ingredients = set([possible_next_ingredient])
+                        elif best_ingredient_min_recipes_num == new_ingredients_recipes_num:
+                            best_ingredients.add(possible_next_ingredient)
+            
+                most_pedagogical_next_ingredients[current_ingredients][target_ingredients] = best_ingredients
+        return most_pedagogical_next_ingredients
 
     def reset(self):
         super().reset()
@@ -386,19 +450,27 @@ class GreedyHumanModel(Agent):
         return [state.get_object(pos) for pos in itertools.chain(*[pot_states_dict[key] for key in possible_soup_keys])]
 
     def _empty_pot_best_missing_ingredients(self, state):
-        return self.mlam.mdp.get_optimal_possible_recipe(state, recipe=None)
+        # finds ingredients that are part of best possible soup for empty pot case
+        target_ingredients = self.mlam.mdp.get_optimal_possible_recipe(state, recipe=None) or tuple()
+        return self.next_ingredients(tuple(), target_ingredients)
 
     def _best_missing_ingredients_for_soups(self, state, pot_states_dict, include_empty_pots=True):
-        # return list of tuples (soup_position, missing_ingredients for best recipe)
+        # return list of tuples (soup_position, missing_ingredients for best recipe from current ingredients in pots)
         soup_objs = self._all_soups_objs(state, pot_states_dict)
         recipes = [Recipe(soup_obj.ingredients) for soup_obj in soup_objs]
         optimal_recipes_dict = {recipe: self.mlam.mdp.get_optimal_possible_recipe(state, recipe, discounted=False, return_value=False) for recipe in set(recipes)}
-        missing_ingredients = [Recipe.recipes_ingredients_diff(optimal_recipes_dict[recipe], recipe) 
+        
+        best_missing_ingredients = [self.next_ingredients(recipe.ingredients, optimal_recipes_dict[recipe].ingredients) 
             for recipe in recipes]
-        result = [(soup_obj.position, ingredients) for soup_obj, ingredients in zip(soup_objs, missing_ingredients)]
+        result = [(soup_obj.position, ingredients) for soup_obj, ingredients in zip(soup_objs, best_missing_ingredients)]
         if include_empty_pots and pot_states_dict["empty"]:
             empty_pot_ingredients = self._empty_pot_best_missing_ingredients(state)
             result += [(pos, empty_pot_ingredients) for pos in pot_states_dict["empty"]]
+    
+        if self.prioritize_less_ingredients_left_pots and result:
+            min_ingredients_left = min([len(ingedients) for (pos, ingredients) in result])
+            result = [(pos, ingredients) for (pos, ingredients) in result if len(ingedients) == min_ingredients_left]
+        
         return result            
         
     def _motion_goals_with_ingredient(self, state, ingredient_obj, pot_states_dict, counter_objects):
@@ -424,7 +496,8 @@ class GreedyHumanModel(Agent):
                 # nothing to do with ingredient; check there is something better to do without it
                 if self.debug: print("checking alternative motion goals if item is dropped")
                 alternative_motion_goals = self._motion_goals_pickup_ordered_soups(state, counter_objects) or \
-                    self._motion_goals_pickup_soon_needed_dishes(state, pot_states_dict, counter_objects)
+                    self._motion_goals_pickup_soon_needed_dishes(state, pot_states_dict, counter_objects) or \
+                    self._motion_goals_pickup_ingredients_or_start_soups(state, pot_states_dict, counter_objects)
                 if alternative_motion_goals:
                     motion_goals = self.mlam.place_obj_on_counter_actions(state)
                     if self.debug: print("motion goal: place_obj_on_counter_actions", motion_goals)
@@ -478,17 +551,21 @@ class GreedyHumanModel(Agent):
             motion_goals = []
         return motion_goals 
 
-    def _motion_goals_pickup_ingredients(self, state, pot_states_dict, counter_objects):
+    def _motion_goals_pickup_ingredients_or_start_soups(self, state, pot_states_dict, counter_objects):
+        # motion goals from empty handed agent
         best_missing_ingredients_for_soups = self._best_missing_ingredients_for_soups(state, pot_states_dict)
-        soups_pos_ready_to_cook = [pos for (pos, ingredients) in best_missing_ingredients_for_soups if not ingredients and not state.get_object(pos).is_ready]
+
+        soups_pos_ready_to_cook = [pos for (pos, ingredients) in best_missing_ingredients_for_soups 
+            if not ingredients and state.has_object(pos) and not state.get_object(pos).is_ready]            
         if soups_pos_ready_to_cook:
             motion_goals = self.mlam._get_ml_actions_for_positions(soups_pos_ready_to_cook)
             if self.debug: print("motion goal: custom start_cooking_actions", motion_goals) 
         else:
             all_ingredients_to_pot = set(itertools.chain(*[ingredients 
                 for (pos, ingredients) in best_missing_ingredients_for_soups]))
-            
+                
             motion_goals = []
+                
             if Recipe.ONION in all_ingredients_to_pot:
                 new_goals = self.mlam.pickup_onion_actions(counter_objects)
                 if self.debug: print("motion goal: pickup_onion_actions", new_goals) 
@@ -548,7 +625,7 @@ class GreedyHumanModel(Agent):
             if not motion_goals:
                 motion_goals = self._motion_goals_pickup_soon_needed_dishes(state, pot_states_dict, counter_objects)
             if not motion_goals:
-                motion_goals = self._motion_goals_pickup_ingredients(state, pot_states_dict, counter_objects)
+                motion_goals = self._motion_goals_pickup_ingredients_or_start_soups(state, pot_states_dict, counter_objects)
             if not motion_goals:
                 motion_goals = self._motion_goals_backup_pickup(state, counter_objects)
         
