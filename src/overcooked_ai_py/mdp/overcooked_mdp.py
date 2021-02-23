@@ -40,7 +40,7 @@ class Recipe:
             if not elem in cls.ALL_INGREDIENTS:
                 raise ValueError("Invalid ingredient: {0}. Recipe can only contain ingredients {1}".format(elem, cls.ALL_INGREDIENTS))
         if not len(ingredients) <= cls.MAX_NUM_INGREDIENTS:
-            raise ValueError("Recipe of length {0} is invalid. Recipe can contain at most {1} ingredients".format(len(ingredients), cls.MAX_NUM_INGREDIENTS))
+            raise ValueError("Recipe of length {0} is invalid: {1}. Recipe can contain at most {2} ingredients".format(len(ingredients), ingredients, cls.MAX_NUM_INGREDIENTS))
         key = hash(tuple(sorted(ingredients)))
         if key in cls.ALL_RECIPES_CACHE:
             return cls.ALL_RECIPES_CACHE[key]
@@ -104,9 +104,13 @@ class Recipe:
             for ingredient_list in itertools.combinations_with_replacement(cls.ALL_INGREDIENTS, i + 1):
                 cls(ingredient_list)
 
+    @staticmethod
+    def standarized_ingredients(ingredients):
+        return tuple(sorted(ingredients))
+
     @property
     def ingredients(self):
-        return tuple(sorted(self._ingredients))
+        return Recipe.standarized_ingredients(self._ingredients)
 
     @ingredients.setter
     def ingredients(self, _):
@@ -138,31 +142,33 @@ class Recipe:
 
     def to_dict(self):
         return { 'ingredients' : self.ingredients }
+    
+    @classmethod
+    def neighbors_ingredients(cls, ingredients):
+        neighbors = []
+        if len(ingredients) == cls.MAX_NUM_INGREDIENTS:
+            return neighbors
+        for ingredient in cls.ALL_INGREDIENTS:
+            new_ingredients = Recipe.standarized_ingredients([*ingredients, ingredient])
+            neighbors.append(new_ingredients)
+        return neighbors
+
 
     def neighbors(self):
         """
         Return all "neighbor" recipes to this recipe. A neighbor recipe is one that can be obtained
         by adding exactly one ingredient to the current recipe
         """
-        neighbors = []
-        if len(self.ingredients) == self.MAX_NUM_INGREDIENTS:
-            return neighbors
-        for ingredient in self.ALL_INGREDIENTS:
-            new_ingredients = [*self.ingredients, ingredient]
-            new_recipe = Recipe(new_ingredients)
-            neighbors.append(new_recipe)
-        return neighbors
+        return [Recipe(ingredients) for ingredients in Recipe.neighbors_ingredients(self.ingredients)]
 
-
-    @staticmethod
-    def recipes_ingredients_diff(recipe1, recipe2):
-        # substract recipe2 ingredients from recipe1 ingredients
-        num_onions_1 = len([_ for _ in recipe1.ingredients if _ == Recipe.ONION])
-        num_onions_2 = len([_ for _ in recipe2.ingredients if _ == Recipe.ONION])
-        num_tomatoes_1 = len([_ for _ in recipe1.ingredients if _ == Recipe.TOMATO])
-        num_tomatoes_2 = len([_ for _ in recipe2.ingredients if _ == Recipe.TOMATO])
-
-        return [Recipe.ONION] * abs(num_onions_1-num_onions_2) + [Recipe.TOMATO]*abs(num_tomatoes_1-num_tomatoes_2)
+    @classmethod
+    def ingredients_diff(cls, ingredients1, ingredients2):
+        # returns tuple of ingredients that are missing in ingredients2 to have same elements as ingredients1 
+        # (if there are no extra ingredients in ingredients 1 that are not in ingredients2),
+        # can be viewed as ingredients1 - ingredients2 (substraction operation)
+        ingredients_diffs = {ingredient: len([i for i in ingredients1 if i == ingredient]) - len([i for i in ingredients2 if i == ingredient])
+            for ingredient in cls.ALL_INGREDIENTS}
+        return Recipe.standarized_ingredients(itertools.chain.from_iterable([[ingredient]*diff for (ingredient, diff) in ingredients_diffs.items() if diff > 0]))
 
     @classproperty
     def ALL_RECIPES(cls):

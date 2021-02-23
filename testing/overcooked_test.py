@@ -126,6 +126,58 @@ class TestRecipe(unittest.TestCase):
     def _expected_num_recipes(self, num_ingredients, max_len):
         return comb(num_ingredients + max_len, num_ingredients) - 1
 
+    def test_ingredients_list_standarization(self):
+        o = Recipe.ONION
+        t = Recipe.TOMATO
+        self.assertEqual(
+            Recipe.standarized_ingredients([o,o,t]),
+            Recipe.standarized_ingredients([t,o,o])
+            )
+        self.assertEqual(
+            Recipe.standarized_ingredients([t,o,t]),
+            Recipe.standarized_ingredients([t,t,o])
+            )
+        self.assertNotEqual(
+            Recipe.standarized_ingredients([o,o,t]),
+            Recipe.standarized_ingredients([t,t,o])
+            )
+        self.assertNotEqual(
+            Recipe.standarized_ingredients([t,o,t]),
+            Recipe.standarized_ingredients([t,t,t])
+            )
+    
+    def test_ingredients_diff(self):
+        o = Recipe.ONION
+        t = Recipe.TOMATO
+        self.assertEqual(
+            Recipe.ingredients_diff([t,o,t], [o,t]),
+            Recipe.standarized_ingredients([t])
+            )
+        self.assertEqual(
+            Recipe.ingredients_diff([t,o], [o,t]),
+            Recipe.standarized_ingredients([])
+            )
+        self.assertEqual(
+            Recipe.ingredients_diff([t, t, t], [o,o]),
+            Recipe.standarized_ingredients([t, t, t])
+            )
+    
+    def test_neighbours(self):
+        o = Recipe.ONION
+        t = Recipe.TOMATO
+        expected_neighbours_ingredients = set(
+            [Recipe.standarized_ingredients([o,o,t]),
+            Recipe.standarized_ingredients([o,t,t])])
+        expected_neighbours_recipes = set(Recipe(i) for i in expected_neighbours_ingredients)
+        self.assertEqual(
+            set(Recipe.neighbors_ingredients([o,t])), 
+            expected_neighbours_ingredients
+        )
+        self.assertEqual(
+            set(Recipe([o,t]).neighbors()), 
+            expected_neighbours_recipes
+        )
+
 class TestSoupState(unittest.TestCase):
     
     def setUp(self):
