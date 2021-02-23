@@ -143,7 +143,8 @@ class OvercookedEnv(object):
             start_state_fn=self.start_state_fn,
             horizon=self.horizon,
             info_level=self.info_level,
-            num_mdp=self.num_mdp
+            num_mdp=self.num_mdp,
+            mlam_params=self.mlam_params
         )
 
 
