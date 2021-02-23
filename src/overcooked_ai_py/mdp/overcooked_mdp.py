@@ -410,13 +410,20 @@ class Order:
 
 
 class OrdersList:
-    def __init__(self, orders=[], orders_to_add=[], add_new_order_every=None, time_to_next_order=None):
+    def __init__(self, orders=[], orders_to_add=[], add_new_order_every=None, time_to_next_order=None, 
+        max_orders_num=None, num_orders_in_queue=0, fulfilled_orders=[]):
         """
         list of orders with methods to interact with them
         orders (list(Order) or list(dict)): initial list of orders
+        orders_to_add list (list(Order) or list(dict)): list of orders that will be randomly added
+             when time_to_next_order would reach 0
         add_new_order_every (int): number of timesteps between adding consecutive orders
         time_to_next_order (int): remaining timesteps number before next order will be added to this OrderList
-        orders_to_add list (list(Order) or list(dict)): list of orders that will be randomly added when time_to_next_order would reach 0
+        max_orders_num (int): maximum number of orders that can be inside orders ready to be fullfilled at same time, 
+            None is for infinity
+        num_orders_in_queue (int): number of orders waiting to go into orders list becaue of max_orders_num limit
+        fulfilled_orders(list(Order)): list of fullfilled orders; used by mdp to check if episode can be terminated after 
+        fulliling selected number of orders (currently mdp uses only size of this list)
         """
         assert add_new_order_every is None or add_new_order_every > 0
         assert (add_new_order_every is None and time_to_next_order is None) or orders_to_add
@@ -426,7 +433,11 @@ class OrdersList:
         self.add_orders(orders_to_add, list_to_add=self.orders_to_add)
         self.add_new_order_every = add_new_order_every
         self.time_to_next_order = time_to_next_order or add_new_order_every
-
+        self.num_orders_in_queue = num_orders_in_queue
+        self.max_orders_num = max_orders_num
+        self.fulfilled_orders = []
+        self.add_orders(fulfilled_orders, list_to_add=self.fulfilled_orders)
+    
     @property
     def all_recipes(self):
         """
@@ -485,14 +496,16 @@ class OrdersList:
             and OrdersList.orders_iterables_equal(self.orders, other.orders) \
             and self.add_new_order_every == other.add_new_order_every \
             and self.time_to_next_order == other.time_to_next_order \
-            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add)
+            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add) \
+            and self.fulfilled_orders == other.fulfilled_orders
     
     def ids_independent_equal(self, other):
         return isinstance(other, OrdersList) \
             and OrdersList.orders_iterables_equal(self.orders, other.orders, ids_independent_equal) \
             and self.add_new_order_every == other.add_new_order_every \
             and self.time_to_next_order == other.time_to_next_order \
-            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add, ids_independent_equal)
+            and OrdersList.orders_iterables_equal(self.orders_to_add, other.orders_to_add, ids_independent_equal) \
+            and self.fulfilled_orders == other.fulfilled_orders
 
     def __len__(self):
         return len(self.orders)
@@ -511,7 +524,11 @@ class OrdersList:
         return OrdersList(orders=[copy.deepcopy(o) for o in self.orders],
                          add_new_order_every=self.add_new_order_every,
                          time_to_next_order=self.time_to_next_order,
-                         orders_to_add=[copy.deepcopy(o) for o in self.orders_to_add])
+                         orders_to_add=[copy.deepcopy(o) for o in self.orders_to_add],
+                         num_orders_in_queue=self.num_orders_in_queue,
+                         max_orders_num=self.max_orders_num,
+                         fulfilled_orders=self.fulfilled_orders
+                         )
 
     @staticmethod
     def orders_iterables_equal(orders1, orders2, f_equal=lambda x, y: x == y):
@@ -567,15 +584,17 @@ class OrdersList:
             return None
 
     def add_order(self, order, list_to_add=None):
+        """ Adds order to selected list (self.orders as default); contains additional checks for self.orders
+        """
         if list_to_add is None:
             list_to_add = self.orders
         if not isinstance(order, Order):
             order = Order.from_dict(order)
-        if list_to_add == self.orders:
+        if list_to_add is self.orders:
             assert order.is_temporary or self.get_matching_order(recipe=order.recipe, temporary_order=False) is None, "More than one non-temporary order with the same recipe is not allowed"
             assert self.get_matching_order(order_id=order.order_id) is None, "More than one order in with the same order_id is not allowed"
         list_to_add.append(order)
-
+    
     def add_orders(self, orders, list_to_add=None):
         for order in orders:
             self.add_order(order, list_to_add)
@@ -611,6 +630,7 @@ class OrdersList:
         if order_idx is None:
             return None
         order = self.orders[order_idx]
+        self.add_order(order, list_to_add=self.fulfilled_orders)
         if order.is_temporary:
             self.remove_order(order_idx=order_idx)
         return order
@@ -632,10 +652,17 @@ class OrdersList:
         if self.is_adding_orders:
             self.time_to_next_order -= 1
             if self.time_to_next_order < 1:
-                self.add_random_orders(n=1)
                 self.time_to_next_order = self.add_new_order_every
+                self.num_orders_in_queue += 1
+
+            while self.can_add_more_orders(n=1) and self.num_orders_in_queue > 0:
+                self.add_random_orders(n=1)
+                self.num_orders_in_queue -= 1
         return reward
 
+    def can_add_more_orders(self, n=1):
+        return not self.max_orders_num or len(self.orders) + n <= self.max_orders_num
+    
     @classmethod
     def from_dict(cls, obj_dict):
         return cls(**copy.deepcopy(obj_dict))
@@ -644,7 +671,11 @@ class OrdersList:
         return {"orders": [o.to_dict() for o in self.orders],
                 "add_new_order_every": self.add_new_order_every,
                 "time_to_next_order": self.time_to_next_order,
-                "orders_to_add": [o.to_dict() for o in self.orders_to_add]}
+                "orders_to_add": [o.to_dict() for o in self.orders_to_add],
+                "max_orders_num": self.max_orders_num,
+                "num_orders_in_queue": self.num_orders_in_queue,
+                "fulfilled_orders": [o.to_dict() for o in self.fulfilled_orders]
+                }
 
     @classmethod
     def from_recipes_lists(cls, all_orders_recipes, bonus_orders_recipes):

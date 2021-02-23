@@ -704,12 +704,21 @@ class TestOrdersList(unittest.TestCase):
         self.assertIsNone(orders_list.fulfill_order(recipe=self.recipe_outside_orders_list))
 
         self.assertEqual(pernament_order, orders_list.fulfill_order(recipe=pernament_order.recipe))
+        self.assertEqual(orders_list.fulfilled_orders, [pernament_order])
         self.assertEqual(len(orders_list), len(self.example_orders_list))
 
         self.assertEqual(temporary_order, orders_list.fulfill_order(recipe=temporary_order.recipe))
+        self.assertEqual(orders_list.fulfilled_orders, [pernament_order, temporary_order])
+
         self.assertEqual(len(orders_list), len(self.example_orders_list)-1)
         list_with_removed_order = copy.deepcopy(self.example_orders_list)
         list_with_removed_order.remove_order(recipe=temporary_order.recipe)
+
+              
+        # orders list would differ by fulfilled_orders only
+        self.assertFalse(list_with_removed_order.ids_independent_equal(orders_list))
+
+        list_with_removed_order.fulfilled_orders = orders_list.fulfilled_orders = []
         self.assertTrue(list_with_removed_order.ids_independent_equal(orders_list))
         self.assertIsNone(orders_list.fulfill_order(recipe=temporary_order.recipe))
 
@@ -759,6 +768,19 @@ class TestOrdersList(unittest.TestCase):
     def test_dict_to_all_recipes_dicts(self):
         self.assertCountEqual(OrdersList.dict_to_all_recipes_dicts(self.example_orders_list.to_dict()), [r.to_dict() for r in self.example_orders_list.all_recipes])
 
+
+    def test_max_orders_num(self):
+        orders_list = OrdersList(orders=[], orders_to_add=[(Order(Recipe(["onion"]), time_to_expire=9999))],
+            add_new_order_every=1, max_orders_num=5)
+        for i in range(100):
+            orders_list.step()
+        self.assertEqual(len(orders_list.orders), 5)
+        self.assertEqual(orders_list.num_orders_in_queue, 95)
+        orders_list.orders = []
+        orders_list.step()
+        self.assertEqual(len(orders_list.orders), 5)
+        self.assertEqual(orders_list.num_orders_in_queue, 91)
+        
 
 class TestGridworld(unittest.TestCase):
 
