@@ -1,5 +1,4 @@
-import unittest, os, copy, shutil
-import json
+import unittest, os, copy, shutil, gym, json
 import numpy as np
 from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -765,6 +764,7 @@ class TestOrdersList(unittest.TestCase):
         self.assertCountEqual([r.to_dict() for r in orders_list.all_recipes], all_orders_recipes)
         self.assertCountEqual([r.to_dict() for r in orders_list.bonus_recipes], bonus_orders_recipes)
 
+
     def test_dict_to_all_recipes_dicts(self):
         self.assertCountEqual(OrdersList.dict_to_all_recipes_dicts(self.example_orders_list.to_dict()), [r.to_dict() for r in self.example_orders_list.all_recipes])
 
@@ -1494,6 +1494,34 @@ class TestFeaturizations(unittest.TestCase):
         # save_pickle(featurized_observations, pickle_path)
         expected_featurization = load_pickle(pickle_path)
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+
+    def test_multi_hot_orders_encoding(self):
+        state = self.base_mdp.get_standard_start_state()
+        self.assertEqual(self.base_mdp.multi_hot_orders_encoding_single_agent(state), np.array([1.0]))
+        self.assertEqual(self.base_mdp.multi_hot_orders_encoding(state), [np.array([1.0])]*2)
+        self.assertEqual(self.base_mdp.multi_hot_orders_encoding_shape, (1,))
+
+    def test_sparse_categorical_joint_action_encoding(self):
+        joint_action = [Action.INTERACT, Action.STAY]
+        print(self.base_mdp.sparse_categorical_joint_action_encoding_shape)
+        self.assertEqual(self.base_mdp.sparse_categorical_joint_action_encoding(joint_action).tolist(), [[5], [4]])
+        self.assertEqual(self.base_mdp.sparse_categorical_joint_action_encoding_shape.tolist(), [2, 1])
+
+    def test_one_hot_joint_action_encoding(self):
+        joint_action = [Action.INTERACT, Action.STAY]
+        one_hot_action = [[0.0, 0.0, 0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]]
+        self.assertEqual(self.base_mdp.one_hot_joint_action_encoding(joint_action).tolist(), one_hot_action)
+        self.assertEqual(self.base_mdp.one_hot_joint_action_encoding_shape.tolist(), [2, 6])
+
+    def test_gym_spaces(self):
+        space1 = self.base_mdp.multi_hot_orders_encoding_gym_space
+        self.assertIsInstance(space1, gym.spaces.MultiBinary)
+
+        space2 = self.base_mdp.lossless_state_encoding_gym_space
+        self.assertIsInstance(space2, gym.spaces.Box)
+
+        space3 = self.base_mdp.featurize_state_gym_space
+        self.assertIsInstance(space3, gym.spaces.Box)
 
 
 class TestOvercookedEnvironment(unittest.TestCase):

@@ -1,4 +1,4 @@
-import itertools, copy, uuid, json
+import itertools, copy, uuid, json, gym
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
@@ -1404,6 +1404,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
+        self._recipe_to_one_hot_encoding_index = {Recipe.from_dict(r): i for i, r in enumerate(self.start_all_orders)}
 
     @property
     def start_all_orders(self):
@@ -2411,12 +2412,65 @@ class OvercookedGridworld(object):
     ###################
     # STATE ENCODINGS #
     ###################
+    def multi_hot_orders_encoding_single_agent(self, overcooked_state, skip_not_found_recipes=True):
+        result = np.zeros(self.multi_hot_orders_encoding_shape)
+        for order in overcooked_state.orders_list.orders:
+                idx = self.recipe_one_hot_encoding_index(order.recipe, allow_not_found=skip_not_found_recipes)
+                if idx is None:
+                    assert skip_not_found_recipes
+                    # do that to be backward compatible with pickled states i.e. in human behavioral cloning data in harl repo 
+                    # that have all recipes by default
+                    pass
+                else:
+                    result[idx] = 1
+        return result
+    
+    def multi_hot_orders_encoding(self, overcooked_state):
+        return [self.multi_hot_orders_encoding_single_agent(overcooked_state)]*self.num_players
 
+    def recipe_one_hot_encoding_index(self, recipe, allow_not_found=False, not_found_value=None):
+        if allow_not_found:
+            return self._recipe_to_one_hot_encoding_index.get(recipe, not_found_value)
+        else:
+            return self._recipe_to_one_hot_encoding_index[recipe]
+
+    @property
+    def multi_hot_orders_encoding_shape(self):
+        return np.array([len(self._recipe_to_one_hot_encoding_index)])
+
+    @property
+    def multi_hot_orders_encoding_gym_space(self):
+        return gym.spaces.MultiBinary(self.multi_hot_orders_encoding_shape)
+    
     @property
     def lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [26])
 
+    @property
+    def lossless_state_encoding_gym_space(self):
+        return gym.spaces.Box(
+            low=np.ones(self.lossless_state_encoding_shape) * 0,
+            high=np.ones(self.lossless_state_encoding_shape) * float("inf"), 
+            dtype=np.float32)
 
+    @property
+    def sparse_categorical_joint_action_encoding_shape(self):
+        return np.array([self.num_players, 1])
+
+    def sparse_categorical_joint_action_encoding(self, joint_action):
+        return np.array([[Action.ACTION_TO_INDEX[a]] for a in joint_action]).astype(int)
+    
+    @property
+    def one_hot_joint_action_encoding_shape(self):
+        return np.array([self.num_players, len(Action.ACTION_TO_INDEX)])
+
+    def one_hot_joint_action_encoding(self, joint_action):
+        # can be improved if too slow https://stackoverflow.com/questions/29831489/convert-array-of-indices-to-1-hot-encoded-numpy-array
+        result = np.zeros(self.one_hot_joint_action_encoding_shape)
+        for player_idx, action in enumerate(joint_action):
+            result[player_idx][Action.ACTION_TO_INDEX[action]] = 1
+        return result
+        
     def lossless_state_encoding(self, overcooked_state, horizon=400, debug=False):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
@@ -2534,6 +2588,13 @@ class OvercookedGridworld(object):
     def featurize_state_shape(self):
         return np.array([62])
 
+    @property
+    def featurize_state_gym_space(self):
+        return gym.spaces.Box(
+            low=np.ones(self.featurize_state_shape) * -10,
+            high=np.ones(self.featurize_state_shape) * 10, 
+            dtype=np.float32)
+
     def featurize_state(self, overcooked_state, mlam, horizon=400):
         """
         Encode state with some manually designed features.
@@ -2546,7 +2607,8 @@ class OvercookedGridworld(object):
             "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
             all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
                                                                                                    mlam)
-
+        ingredients = self.possibble_ingredients_from_dispensers
+        assert ingredients == ["onion"], "featurization of the state works for layouts containing no ingredient dispensers other than onion"
         IDX_TO_OBJ = ["onion", "soup", "dish"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
 
@@ -2620,6 +2682,15 @@ class OvercookedGridworld(object):
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
 
+    @property
+    def possibble_ingredients_from_dispensers(self):
+        terrain_types = set(np.array(self.terrain_mtx).flatten())
+        ingredients = []
+        if "O" in terrain_types:
+            ingredients.append("onion")
+        if "T" in terrain_types:
+            ingredients.append("tomato")
+        return ingredients
 
     def get_deltas_to_closest_location(self, player, locations, mlam):
         _, closest_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, locations, with_argmin=True)
