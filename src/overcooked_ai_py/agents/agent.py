@@ -820,6 +820,52 @@ class SampleAgent(Agent):
         for agent in self.agents:
             agent.reset()
 
+
+class SlowedDownAgent(Agent):
+    """
+    Agent that is slowed down version of supplied agent.
+    Can be used to produce assymetry of power between agents.
+    """
+    def __init__(self, agent, slowdown_rate=0.5):
+        self.agent = agent
+        self.slowdown_rate = slowdown_rate
+        self.reset()
+    
+    @property
+    def agent_index(self):
+        return self.agent.agent_index
+    
+    @agent_index.setter
+    def agent_index(self, v):
+        self.agent.agent_index = v
+       
+    @property
+    def mdp(self):
+        return self.agent.mdp
+    
+    @mdp.setter
+    def mdp(self, v):
+        self.agent.mdp = v
+
+    @property
+    def skip_action(self):
+        return Action.STAY, {"action_probs": Agent.a_probs_from_action(Action.STAY)}
+
+    def action(self, state):
+        last_actions_increment = self.actions_increment
+        self.actions_increment += self.slowdown_rate
+        # if increment crosses full number then it is time to act
+        if int(last_actions_increment) < int(self.actions_increment):
+            return self.agent.action(state)
+        else:
+            return self.skip_action
+
+    def reset(self):
+        self.agent_index = None
+        self.mdp = None
+        self.agent.reset()
+        # every agent starts an episode with some non-waiting action and then does waiting action
+        self.actions_increment = 1 - self.slowdown_rate
     """
     """
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
