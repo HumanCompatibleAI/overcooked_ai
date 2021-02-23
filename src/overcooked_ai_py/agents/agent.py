@@ -779,11 +779,13 @@ class SimpleGreedyHumanModel(Agent):
 
         return motion_goals
 
+
 class SampleAgent(Agent):
     """ Agent that samples action using action_probs of multiple agents
     """
     def __init__(self, agents):
         self.agents = agents
+        self.reset()
 
     @property
     def agent_index(self):
