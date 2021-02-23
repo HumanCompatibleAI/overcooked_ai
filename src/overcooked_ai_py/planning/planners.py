@@ -65,7 +65,7 @@ class MotionPlanner(object):
     @staticmethod
     def from_pickle_or_compute(mdp, counter_goals, custom_filename=None, force_compute=False, info=False):
         assert isinstance(mdp, OvercookedGridworld)
-
+        counter_goals = [tuple(x) for x in counter_goals]
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_mp.pkl"
 
         if force_compute:
@@ -74,8 +74,12 @@ class MotionPlanner(object):
         try:
             mp = MotionPlanner.from_file(filename)
 
-            if mp.counter_goals != counter_goals or not mdp.ids_independent_equal(mp.mdp):
+            if mp.counter_goals != counter_goals or not mdp.ids_and_reward_shaping_independent_equal(mp.mdp):
                 print("motion planner with different counter goal or mdp found, computing from scratch")
+                if mp.counter_goals != counter_goals:
+                    print("different counter goals", mp.counter_goals, counter_goals)
+                if not mdp.ids_and_reward_shaping_independent_equal(mp.mdp):
+                    print("different mdps")
                 return MotionPlanner.compute_mp(filename, mdp, counter_goals)
 
         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
