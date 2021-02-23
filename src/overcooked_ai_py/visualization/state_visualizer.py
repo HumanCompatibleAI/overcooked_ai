@@ -99,7 +99,7 @@ class StateVisualizer:
     @staticmethod
     def default_hud_data(state, **kwargs):
         result = {"timestep": state.timestep}
-        if state.orders_list.contains_temporary_orders or state.orders_list.contains_temporary_orders:
+        if state.orders_list.contains_temporary_orders or state.orders_list.is_adding_orders:
             result["orders_list"] = state.orders_list.to_dict()
         else:
             result["all_orders"] = [r.to_dict() for r in state.all_orders]
@@ -362,6 +362,8 @@ class StateVisualizer:
 
 
         def get_hud_recipes_surface(soups_ingredients):
+            if not soups_ingredients:
+                return pygame.surface.Surface((0,0))
             order_width = order_height = self.hud_order_size
             scaled_order_size = (order_width, order_width)
             orders_surface_height = order_height
@@ -385,6 +387,8 @@ class StateVisualizer:
             return recipes_surface
 
         def get_hud_recipe_timers_surface(orders):
+            if not orders:
+                return pygame.surface.Surface((0, 0))
             order_width = order_height = self.hud_order_size
             timers_surface_width = len(orders) * order_width + (len(orders) - 1) * self.hud_distance_between_orders
             timers_surface_height = order_height
