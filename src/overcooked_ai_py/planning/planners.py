@@ -349,7 +349,7 @@ class JointMotionPlanner(object):
 
     def __init__(self, mdp, params, debug=False):
         self.mdp = mdp
-
+        
         # Whether starting orientations should be accounted for
         # when solving all motion problems 
         # (increases number of plans by a factor of 4)
@@ -776,11 +776,13 @@ class MediumLevelActionManager(object):
 
     def __init__(self, mdp, mlam_params):
         self.mdp = mdp
-        
         self.params = mlam_params
         self.wait_allowed = mlam_params['wait_allowed']
         self.counter_drop = [tuple(elem) for elem in mlam_params["counter_drop"]]
         self.counter_pickup = [tuple(elem) for elem in mlam_params["counter_pickup"]]
+        # used to make agent mlam not see certain feature/counter;
+        #  can be used for make irrational agent or pedagogical one
+        self.ignored_goals = set([tuple(elem) for elem in mlam_params.get("ignored_goals", [])])
         self.joint_motion_planner = JointMotionPlanner(mdp, mlam_params)
         self.motion_planner = self.joint_motion_planner.motion_planner
 
@@ -798,7 +800,8 @@ class MediumLevelActionManager(object):
         mlam_params["counter_drop"] = [tuple(elem) for elem in mlam_params["counter_drop"]]
         mlam_params["counter_pickup"] = [tuple(elem) for elem in mlam_params["counter_pickup"]]
         mlam_params["counter_goals"] = [tuple(elem) for elem in mlam_params["counter_goals"]]
-
+        mlam_params["ignored_goals"] = [tuple(elem) for elem in mlam_params.get("ignored_goals", [])]
+    
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
 
         if force_compute:
@@ -832,6 +835,9 @@ class MediumLevelActionManager(object):
         mlam.save_to_file(final_filepath)
         return mlam
 
+    def remove_ignored_goals_from_locations(self, locations):
+        return [loc for loc in locations if not loc in self.ignored_goals]
+    
     def joint_ml_actions(self, state):
         """Determine all possible joint medium level actions for a certain state"""
         agent1_actions, agent2_actions = tuple(self.get_medium_level_actions(state, player) for player in state.players)
@@ -974,7 +980,9 @@ class MediumLevelActionManager(object):
     def go_to_closest_feature_actions(self, player):
         feature_locations = self.mdp.get_onion_dispenser_locations() + self.mdp.get_tomato_dispenser_locations() + \
                             self.mdp.get_pot_locations() + self.mdp.get_dish_dispenser_locations()
+        feature_locations = self.remove_ignored_goals_from_locations(feature_locations)
         closest_feature_pos = self.motion_planner.min_cost_to_feature(player.pos_and_or, feature_locations, with_argmin=True)[1]
+        
         return self._get_ml_actions_for_positions([closest_feature_pos])
 
     def go_to_closest_feature_or_counter_to_goal(self, goal_pos_and_or, goal_location):
@@ -983,6 +991,7 @@ class MediumLevelActionManager(object):
                                     self.mdp.get_tomato_dispenser_locations() + self.mdp.get_pot_locations() + \
                                     self.mdp.get_dish_dispenser_locations() + self.counter_drop
         valid_locations.remove(goal_location)
+        valid_locations = self.remove_ignored_goals_from_locations(valid_locations)
         closest_non_goal_feature_pos = self.motion_planner.min_cost_to_feature(
                                             goal_pos_and_or, valid_locations, with_argmin=True)[1]
         return self._get_ml_actions_for_positions([closest_non_goal_feature_pos])
@@ -998,10 +1007,11 @@ class MediumLevelActionManager(object):
             positions_list (list): list of target terrain feature positions
         """
         possible_motion_goals = []
+        positions_list = self.remove_ignored_goals_from_locations(positions_list)
         for pos in positions_list:
-            # All possible ways to reach the target feature
-            for motion_goal in self.joint_motion_planner.motion_planner.motion_goals_for_pos[pos]:
-                possible_motion_goals.append(motion_goal)
+                # All possible ways to reach the target feature
+                for motion_goal in self.joint_motion_planner.motion_planner.motion_goals_for_pos[pos]:
+                    possible_motion_goals.append(motion_goal)
         return possible_motion_goals
 
 # # Deprecated, since agent-level dynamic planning is no longer used
