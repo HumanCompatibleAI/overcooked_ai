@@ -1285,7 +1285,11 @@ BASE_REW_SHAPING_PARAMS = {
     "SOUP_PICKUP_REWARD": 5,
     "DISH_DISP_DISTANCE_REW": 0,
     "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0
+    "SOUP_DISTANCE_REW": 0,
+    "TOMATO_COUNTER_PICKUP_REWARD": 0,
+    "ONION_COUNTER_PICKUP_REWARD": 0,
+    "TOMATO_DISPENSER_PICKUP_REWARD": 1,
+    "ONION_DISPENSER_PICKUP_REWARD": 1
 }
 
 EVENT_TYPES = [
@@ -1679,24 +1683,26 @@ class OvercookedGridworld(object):
                     obj = new_state.remove_object(i_pos)
                     player.set_object(obj)
                     self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
-                    
+                    if obj.name == "onion":
+                        shaped_reward[player_idx] += self.reward_shaping_params["ONION_COUNTER_PICKUP_REWARD"]
+                    elif obj.name == "tomato":
+                        shaped_reward[player_idx] += self.reward_shaping_params["TOMATO_COUNTER_PICKUP_REWARD"]
             elif terrain_type == 'O' and player.held_object is None:
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
                 player.set_object(obj)
                 self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
-            
+                shaped_reward[player_idx] += self.reward_shaping_params["ONION_DISPENSER_PICKUP_REWARD"]
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
                 obj = ObjectState('tomato', pos)
                 player.set_object(obj)
                 self.log_object_pickup(events_infos, events_list, new_state, obj, pot_states, player_idx)
-
+                shaped_reward[player_idx] += self.reward_shaping_params["TOMATO_DISPENSER_PICKUP_REWARD"]
             elif terrain_type == 'D' and player.held_object is None:
                 # Give shaped reward if pickup is useful
                 if self.is_dish_pickup_useful(new_state, pot_states):
                     shaped_reward[player_idx] += self.reward_shaping_params["DISH_PICKUP_REWARD"]
-
                 # Perform dish pickup from dispenser
                 obj = ObjectState('dish', pos)
                 player.set_object(obj)
