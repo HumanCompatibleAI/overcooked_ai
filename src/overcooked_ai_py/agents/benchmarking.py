@@ -32,7 +32,9 @@ class AgentEvaluator(object):
         debug (bool): whether to display debugging information on init
         """
         assert callable(mdp_fn), "mdp generating function must be a callable function"
-        env_params["mlam_params"] = mlam_params
+        if env_params.get("mlam_params") is None:
+            env_params = copy.deepcopy(env_params)
+            env_params["mlam_params"] = mlam_params
         self.mdp_fn = mdp_fn
         self.env = OvercookedEnv(self.mdp_fn, **env_params)
         self.force_compute = force_compute
