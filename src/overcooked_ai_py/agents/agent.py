@@ -858,7 +858,7 @@ class SimpleGreedyHumanModel(Agent):
 
 
 class SampleAgent(Agent):
-    """ Agent that samples action using action_probs of multiple agents
+    """ Agent that samples action using the average action_probs across multiple agents
     """
     def __init__(self, agents):
         self.agents = agents
