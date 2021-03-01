@@ -125,7 +125,7 @@ class TestStateVisualizer(unittest.TestCase):
             test_render_state_from_dict(d)
         
     def test_trajectory_visualization(self):
-        # we don't have good way to check slider automatically so its mostly test for basic stuff like numer of outputed images, if using method raises error etc.
+        # we don't have good way to check slider automatically so its mostly test for basic stuff like number of outputted images, if using method raises error etc.
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_state_visualizer', 'test_trajectory.json')
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
         expected_images_num = len(test_trajectory["ep_states"][0])
