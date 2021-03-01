@@ -128,11 +128,11 @@ class AgentEvaluator(object):
     def evaluate_agent_pair(self, agent_pair, num_games, game_length=None, start_state_fn=None, metadata_fn=None, metadata_info_fn=None, display=False, dir=None,
                             display_phi=False, info=True, native_eval=False):
         # this index has to be 0 because the Agent_Evaluator only has 1 env initiated
-        # if you would like to evaluate on a different env using rllib, please modifiy
+        # if you would like to evaluate on a different env using rllib, please modify
         # rllib/ -> rllib.py -> get_rllib_eval_function -> _evaluate
 
         # native eval: using self.env in evaluation instead of creating a copy
-        # this is particulally helpful with variable MDP, where we want to make sure
+        # this is particularly helpful with variable MDP, where we want to make sure
         # the mdp used in evaluation is the same as the native self.env.mdp
         if native_eval:
             return self.env.get_rollouts(agent_pair, num_games=num_games, display=display, dir=dir, display_phi=display_phi,
@@ -300,7 +300,7 @@ class AgentEvaluator(object):
             Recipe.configure(config)
 
     ############################
-    # TRAJ MANINPULATION UTILS #
+    # TRAJ MANIPULATION UTILS #
     ############################
     # TODO: add more documentation!
 
@@ -366,7 +366,7 @@ class AgentEvaluator(object):
         Displays chart with visualization of events (when items pickups happened etc.)
         ipython - chooses between opening chart
         in default browser or below ipython cell (for ipython=True)
-        chart_settings - json with various chart settings that overwrittes default ones
+        chart_settings - json with various chart settings that overwrites default ones
         """
         settings = DEFAULT_EVENT_CHART_SETTINGS.copy()
         settings.update(chart_settings or {})

@@ -22,7 +22,7 @@ class Agent(object):
 
     def actions(self, states, agent_indices):
         """
-        A multi-state version of the action method. This enables for parallized
+        A multi-state version of the action method. This enables for parallelized
         implementations that can potentially give speedups in action prediction. 
 
         Args:
@@ -136,7 +136,7 @@ class NNPolicy(object):
 
     def multi_obs_policy(self, states):
         """
-        A function that takes in multiple preprocessed OvercookedState instatences and returns action probabilities.
+        A function that takes in multiple preprocessed OvercookedState instances and returns action probabilities.
         """
         raise NotImplementedError()
 
@@ -248,7 +248,7 @@ class GreedyHumanModel(Agent):
     to the most intuitively high-priority thing to do. Do not seek for cooperation, acts like he is only agent in the environment.
     NOTE: MIGHT NOT WORK IN ALL ENVIRONMENTS, for example forced_coordination.layout,
     in which an individual agent cannot complete the task on their own.
-    Also agent can act suboptimaly (even when excluding coordination failures) in some environemnts with multiple (especially temporary) orders.
+    Also agent can act suboptimally (even when excluding coordination failures) in some environments with multiple (especially temporary) orders.
     for best play counter_goals, counter_drop and counter_pickup in mlam params are assumed to be equal mdp.get_counter_locations()
     """
 
@@ -288,12 +288,12 @@ class GreedyHumanModel(Agent):
     def next_ingredients(self, current_ingredients, target_ingredients):
         # chooses next ingredient to pickup and pot
         if self.choose_ingredients_pedagogically:
-            return self.most_pedagogical_next_ingredients[Recipe.standarized_ingredients(current_ingredients)][Recipe.standarized_ingredients(target_ingredients)]
+            return self.most_pedagogical_next_ingredients[Recipe.standardized_ingredients(current_ingredients)][Recipe.standardized_ingredients(target_ingredients)]
         else:
             return set(Recipe.ingredients_diff(target_ingredients, current_ingredients))
         
     def _preprocess_most_pedagogical_next_ingredients(self):
-        # dict accesed in form of dict[current_ingredients][target_ingredients] and returns set of ingredients that are most pedagogical to pick up;
+        # dict accessed in form of dict[current_ingredients][target_ingredients] and returns set of ingredients that are most pedagogical to pick up;
         #   this method uses number of possible recipes (lower is more pedagogical) available after adding ingredient 
         #   (currently looking only 1 ingredient forward, it works fine for recipes of size 4 or smaller)
         most_pedagogical_next_ingredients = defaultdict(lambda: defaultdict(set))
@@ -302,9 +302,9 @@ class GreedyHumanModel(Agent):
         if any (len(i)> 4 for i in target_recipes_ingredients):
             print("WARNING, when recipes have a size 5 or bigger calculated pedagogical ingredients \
                 to pickup will be most likely suboptimal but still better than random")
-        # dict accesed in form of dict[current_ingredients][possible_target_ingredients]
+        # dict accessed in form of dict[current_ingredients][possible_target_ingredients]
         reachable_target_ingredients = defaultdict(set)
-        # dicurrentct accesed in form of dict[target_ingredients][possible_current_ingredients]
+        # dict accessed in form of dict[target_ingredients][possible_current_ingredients]
         reachable_from_ingredients = defaultdict(set)
         for ingredients in target_recipes_ingredients:
             for i in range(0, len(ingredients)):
@@ -324,7 +324,7 @@ class GreedyHumanModel(Agent):
                     best_ingredients = set()
                 
                     for possible_next_ingredient in set(missing_ingredients): 
-                        new_ingredients = Recipe.standarized_ingredients((possible_next_ingredient,) + current_ingredients)
+                        new_ingredients = Recipe.standardized_ingredients((possible_next_ingredient,) + current_ingredients)
                         new_ingredients_recipes_num = len(reachable_target_ingredients[new_ingredients])
                         if best_ingredient_min_recipes_num > new_ingredients_recipes_num:
                             best_ingredient_min_recipes_num = new_ingredients_recipes_num
@@ -376,7 +376,7 @@ class GreedyHumanModel(Agent):
                     new_state, _ = self.mlam.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
-                # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
+                # Getting stuck became a possibility simply because the nature of a layout (having a dip in the middle)
                 if len(unblocking_joint_actions) == 0:
                     unblocking_joint_actions.append([Action.STAY, Action.STAY])
                 chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
@@ -468,8 +468,8 @@ class GreedyHumanModel(Agent):
             result += [(pos, empty_pot_ingredients) for pos in pot_states_dict["empty"]]
     
         if self.prioritize_less_ingredients_left_pots and result:
-            min_ingredients_left = min([len(ingedients) for (pos, ingredients) in result])
-            result = [(pos, ingredients) for (pos, ingredients) in result if len(ingedients) == min_ingredients_left]
+            min_ingredients_left = min([len(ingredients) for (pos, ingredients) in result])
+            result = [(pos, ingredients) for (pos, ingredients) in result if len(ingredients) == min_ingredients_left]
         
         return result            
         
@@ -708,7 +708,7 @@ class SimpleGreedyHumanModel(Agent):
                     new_state, _ = self.mlam.mdp.get_state_transition(state, j_a)
                     if new_state.player_positions != self.prev_state.player_positions:
                         unblocking_joint_actions.append(j_a)
-                # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
+                # Getting stuck became a possibility simply because the nature of a layout (having a dip in the middle)
                 if len(unblocking_joint_actions) == 0:
                     unblocking_joint_actions.append([Action.STAY, Action.STAY])
                 chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
@@ -901,7 +901,7 @@ class SampleAgent(Agent):
 class SlowedDownAgent(Agent):
     """
     Agent that is slowed down version of supplied agent.
-    Can be used to produce assymetry of power between agents.
+    Can be used to produce asymmetry of power between agents.
     """
     def __init__(self, agent, slowdown_rate=0.5):
         self.agent = agent

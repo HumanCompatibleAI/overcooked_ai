@@ -105,12 +105,12 @@ class Recipe:
                 cls(ingredient_list)
 
     @staticmethod
-    def standarized_ingredients(ingredients):
+    def standardized_ingredients(ingredients):
         return tuple(sorted(ingredients))
 
     @property
     def ingredients(self):
-        return Recipe.standarized_ingredients(self._ingredients)
+        return Recipe.standardized_ingredients(self._ingredients)
 
     @ingredients.setter
     def ingredients(self, _):
@@ -149,7 +149,7 @@ class Recipe:
         if len(ingredients) == cls.MAX_NUM_INGREDIENTS:
             return neighbors
         for ingredient in cls.ALL_INGREDIENTS:
-            new_ingredients = Recipe.standarized_ingredients([*ingredients, ingredient])
+            new_ingredients = Recipe.standardized_ingredients([*ingredients, ingredient])
             neighbors.append(new_ingredients)
         return neighbors
 
@@ -168,7 +168,7 @@ class Recipe:
         # can be viewed as ingredients1 - ingredients2 (substraction operation)
         ingredients_diffs = {ingredient: len([i for i in ingredients1 if i == ingredient]) - len([i for i in ingredients2 if i == ingredient])
             for ingredient in cls.ALL_INGREDIENTS}
-        return Recipe.standarized_ingredients(itertools.chain.from_iterable([[ingredient]*diff for (ingredient, diff) in ingredients_diffs.items() if diff > 0]))
+        return Recipe.standardized_ingredients(itertools.chain.from_iterable([[ingredient]*diff for (ingredient, diff) in ingredients_diffs.items() if diff > 0]))
 
     @classproperty
     def ALL_RECIPES(cls):
@@ -767,8 +767,8 @@ class SoupState(ObjectState):
         soup's recipe is a list of ingredient names used to create it. A soup's recipe is undetermined
         until it has begun cooking. 
 
-        position (tupe): (x, y) coordinates in the grid
-        ingrdients (list(ObjectState)): Objects that have been used to cook this soup. Determiens @property recipe
+        position (tuple): (x, y) coordinates in the grid
+        ingredients (list(ObjectState)): Objects that have been used to cook this soup. Determiens @property recipe
         cooking (int): How long the soup has been cooking for. -1 means cooking hasn't started yet
         cook_time(int): How long soup needs to be cooked, used only mostly for getting soup from dict with supplied cook_time, if None self.recipe.time is used
         """
@@ -917,8 +917,8 @@ class SoupState(ObjectState):
 
     def to_dict(self):
         info_dict = super(SoupState, self).to_dict()
-        ingrdients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
-        info_dict['_ingredients'] = ingrdients_dict
+        ingredients_dict = [ingredient.to_dict() for ingredient in self._ingredients]
+        info_dict['_ingredients'] = ingredients_dict
         info_dict['cooking_tick'] = self._cooking_tick
         info_dict['is_cooking'] = self.is_cooking
         info_dict['is_ready'] = self.is_ready

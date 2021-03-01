@@ -43,7 +43,7 @@ DEFAULT_MDP_GEN_PARAMS = {
 }
 
 
-def DEFAILT_PARAMS_SCHEDULE_FN(outside_information):
+def DEFAULT_PARAMS_SCHEDULE_FN(outside_information):
     mdp_default_gen_params = {
         "inner_shape": (5, 4),
         "prop_empty": 0.95,
@@ -57,6 +57,8 @@ def DEFAILT_PARAMS_SCHEDULE_FN(outside_information):
     }
     return mdp_default_gen_params
 
+# there was typo in function name, left for backward compatibility code outside of the repo
+DEFAILT_PARAMS_SCHEDULE_FN = DEFAULT_PARAMS_SCHEDULE_FN
 
 class MDPParamsGenerator(object):
 
@@ -100,11 +102,11 @@ class LayoutGenerator(object):
             mdp_params, outer_shape=None, mdp_params_schedule_fn=None
     ):
         """
-        mdp_params: one set of fixed mdp parameter used by the enviroment
+        mdp_params: one set of fixed mdp parameter used by the environment
         outer_shape: outer shape of the environment
         mdp_params_schedule_fn: the schedule for varying mdp params
         """
-        # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
+        # if outer_shape is not defined, we have to be using one of the default layout from names bank
         if outer_shape is None:
             assert type(mdp_params) is dict and "layout_name" in mdp_params
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)

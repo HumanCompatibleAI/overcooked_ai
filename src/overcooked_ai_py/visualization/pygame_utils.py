@@ -46,7 +46,7 @@ def vstack_surfaces(surfaces, background_color=None):
     return result_surface
 
 def scale_surface_by_factor(surface, scale_by_factor):
-    ''' return scaled input surfacem (with size multiplied by scale_by_factor param)
+    ''' return scaled input surface (with size multiplied by scale_by_factor param)
         scales also content of the surface
     '''
     unscaled_size = surface.get_size()
@@ -63,7 +63,7 @@ def blit_on_new_surface_of_size(surface, size, background_color=None):
     return result_surface
 
 class MultiFramePygameImage:
-    ''' use to read frames of images from overcooked-demo repo easly
+    ''' use to read frames of images from overcooked-demo repo easily
     '''
     def __init__(self, img_path, frames_path):
         self.image = pygame.image.load(img_path)

@@ -131,7 +131,7 @@ class OvercookedEnv(object):
     def env_params(self):
         """
         Env params should be though of as all of the params of an env WITHOUT the mdp.
-        Alone, env_params is not sufficent to recreate a copy of the Env instance, but it is
+        Alone, env_params is not sufficient to recreate a copy of the Env instance, but it is
         together with mdp_params (which is sufficient to build a copy of the Mdp instance).
         """
         return {

@@ -2,6 +2,8 @@ import numpy as np
 import itertools, copy
 from collections import defaultdict
 from overcooked_ai_py.utils import numpy_to_native
+
+
 def extract_events(trajectories, traj_idx=0, cumulative_events_description=[]):
     """
     extracts events from trajectories for plots
@@ -43,7 +45,7 @@ def extract_events(trajectories, traj_idx=0, cumulative_events_description=[]):
             }
         return event
 
-    def get_cumulative_events(events, last_timestep, cumulative_events_desription):
+    def get_cumulative_events(events, last_timestep, cumulative_events_description):
         """
         Receives events for scatter plot and returns events for cumulative plot
         """
@@ -73,7 +75,7 @@ def extract_events(trajectories, traj_idx=0, cumulative_events_description=[]):
     
         cumulative_events = []
 
-        for description in cumulative_events_desription:
+        for description in cumulative_events_description:
             actions = description.get("actions")
             adjectives = description.get("adjectives")
             all_events_sum = 0

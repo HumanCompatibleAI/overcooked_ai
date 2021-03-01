@@ -129,20 +129,20 @@ class TestRecipe(unittest.TestCase):
         o = Recipe.ONION
         t = Recipe.TOMATO
         self.assertEqual(
-            Recipe.standarized_ingredients([o,o,t]),
-            Recipe.standarized_ingredients([t,o,o])
+            Recipe.standardized_ingredients([o,o,t]),
+            Recipe.standardized_ingredients([t,o,o])
             )
         self.assertEqual(
-            Recipe.standarized_ingredients([t,o,t]),
-            Recipe.standarized_ingredients([t,t,o])
+            Recipe.standardized_ingredients([t,o,t]),
+            Recipe.standardized_ingredients([t,t,o])
             )
         self.assertNotEqual(
-            Recipe.standarized_ingredients([o,o,t]),
-            Recipe.standarized_ingredients([t,t,o])
+            Recipe.standardized_ingredients([o,o,t]),
+            Recipe.standardized_ingredients([t,t,o])
             )
         self.assertNotEqual(
-            Recipe.standarized_ingredients([t,o,t]),
-            Recipe.standarized_ingredients([t,t,t])
+            Recipe.standardized_ingredients([t,o,t]),
+            Recipe.standardized_ingredients([t,t,t])
             )
     
     def test_ingredients_diff(self):
@@ -150,23 +150,23 @@ class TestRecipe(unittest.TestCase):
         t = Recipe.TOMATO
         self.assertEqual(
             Recipe.ingredients_diff([t,o,t], [o,t]),
-            Recipe.standarized_ingredients([t])
+            Recipe.standardized_ingredients([t])
             )
         self.assertEqual(
             Recipe.ingredients_diff([t,o], [o,t]),
-            Recipe.standarized_ingredients([])
+            Recipe.standardized_ingredients([])
             )
         self.assertEqual(
             Recipe.ingredients_diff([t, t, t], [o,o]),
-            Recipe.standarized_ingredients([t, t, t])
+            Recipe.standardized_ingredients([t, t, t])
             )
     
     def test_neighbours(self):
         o = Recipe.ONION
         t = Recipe.TOMATO
         expected_neighbours_ingredients = set(
-            [Recipe.standarized_ingredients([o,o,t]),
-            Recipe.standarized_ingredients([o,t,t])])
+            [Recipe.standardized_ingredients([o,o,t]),
+            Recipe.standardized_ingredients([o,t,t])])
         expected_neighbours_recipes = set(Recipe(i) for i in expected_neighbours_ingredients)
         self.assertEqual(
             set(Recipe.neighbors_ingredients([o,t])), 

@@ -12,7 +12,7 @@ DEFAULT_EVENT_CHART_SETTINGS = {
     "object_event_height": 10, "object_event_width":16, # used both in chart and its legend
     "show_event_data": True, # chart that shows when events happened
     "use_adjectives": True, # adjectives of events like useful, catastrophic etc.
-    "actions_to_show": ["pickup","drop", "delivery", "potting", "holding"], # holding is the only continous event - line between pickup and drop/potting/delivery
+    "actions_to_show": ["pickup","drop", "delivery", "potting", "holding"], # holding is the only continuous event - line between pickup and drop/potting/delivery
     "show_cumulative_data": True, # cumulative data is data about sum of events done so far in any point in time - line chart
     "cumulative_data_ticks": 4, # number of ticks on cumulative data axis
     # list of dicts where every dict is one cumulative events curve for every player + one additional for all players

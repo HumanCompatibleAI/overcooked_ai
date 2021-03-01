@@ -118,10 +118,10 @@ class StateVisualizer:
         saves images of every timestep from trajectory in img_directory_path (or temporary directory if not path is not specified)
         trajectories (dict): trajectories dict, same format as used by AgentEvaluator
         trajectory_idx(int): index of trajectory in case of multiple trajectories inside trajectories param
-        img_path (str): img_directory_path - path to directory where consequtive images will be saved
+        img_path (str): img_directory_path - path to directory where consecutive images will be saved
         ipython_display(bool): if True render slider with rendered states
         hud_data(list(dict)): hud data for every timestep
-        action_probs(list(list((list(float))))): action probs for every player and timestep acessed in the way action_probs[timestep][player][action]
+        action_probs(list(list((list(float))))): action probs for every player and timestep accessed in the way action_probs[timestep][player][action]
         """
         states = trajectories["ep_states"][trajectory_idx]
         grid = trajectories["mdp_params"][trajectory_idx]["terrain"]
@@ -153,11 +153,11 @@ class StateVisualizer:
         renders state as image
         state (OvercookedState): state to render
         hud_data (dict): dict with hud data, keys are used for string that describes after using _key_to_hud_text on them
-        grid (iterable): 2d map of the layout, when not supplied take grid from object attribute NOTE: when grid in both method param and object atribute is no supplied it will raise an error
+        grid (iterable): 2d map of the layout, when not supplied take grid from object attribute NOTE: when grid in both method param and object attribute is no supplied it will raise an error
         img_path (str): if it is not None save image to specific path
         ipython_display (bool): if True render state in ipython cell, if img_path is None create file with randomized name in /tmp directory
         window_display (bool): if True render state into pygame window
-        action_probs(list(list(float))): action probs for every player acessed in the way action_probs[player][action]
+        action_probs(list(list(float))): action probs for every player accessed in the way action_probs[player][action]
         """
         assert window_display or img_path or ipython_display, "specify at least one of the ways to output result state image: window_display, img_path, or ipython_display"
         surface = self.render_state(state, grid, hud_data, action_probs=action_probs)
