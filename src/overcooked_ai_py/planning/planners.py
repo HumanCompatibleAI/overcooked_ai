@@ -1009,9 +1009,9 @@ class MediumLevelActionManager(object):
         possible_motion_goals = []
         positions_list = self.remove_ignored_goals_from_locations(positions_list)
         for pos in positions_list:
-                # All possible ways to reach the target feature
-                for motion_goal in self.joint_motion_planner.motion_planner.motion_goals_for_pos[pos]:
-                    possible_motion_goals.append(motion_goal)
+            # All possible ways to reach the target feature
+            for motion_goal in self.joint_motion_planner.motion_planner.motion_goals_for_pos[pos]:
+                possible_motion_goals.append(motion_goal)
         return possible_motion_goals
 
 # # Deprecated, since agent-level dynamic planning is no longer used
