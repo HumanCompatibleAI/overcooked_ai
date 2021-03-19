@@ -1,4 +1,4 @@
-import io, json, pickle, pstats, cProfile, os
+import io, json, pickle, pstats, cProfile, os, tempfile, uuid
 import numpy as np
 from collections import defaultdict
 from pathlib import Path
@@ -45,6 +45,14 @@ def fix_filetype(path, filetype):
         return path
     else:
         return path + filetype
+
+def generate_temporary_file_path(file_name=None, prefix="", suffix="", extension=""):
+    if file_name is None:
+        file_name = str(uuid.uuid1())
+    if extension and not extension.startswith("."):
+        extension = "." + extension
+    file_name = prefix + file_name + suffix + extension
+    return os.path.join(tempfile.gettempdir(), file_name)
 
 # MDP
 
@@ -166,6 +174,10 @@ def profile(fnc):
 
 def read_layout_dict(layout_name):
     return load_dict_from_file(os.path.join(LAYOUTS_DIR, layout_name + ".layout"))
+
+class classproperty(property):
+    def __get__(self, cls, owner):
+        return classmethod(self.fget).__get__(None, owner)()
 
 def is_iterable(obj):
     return isinstance(obj, Iterable)
