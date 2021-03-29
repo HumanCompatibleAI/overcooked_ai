@@ -1056,10 +1056,12 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     start_player_positions = [None, None]
 
     start_player_1_positions = get_feature_locations(terrain_mtx, "1")
+
+    terrain_mtx_copy = copy.deepcopy(terrain_mtx)
     if len(start_player_1_positions) > 0:
         start_player_1_position = random.choice(start_player_1_positions)
         for i, j in start_player_1_positions:
-            terrain_mtx[i][j] = ' '
+            terrain_mtx_copy[i][j] = ' '
         start_player_positions[0] = start_player_1_position[::-1]
     else:
         start_player_1_position = random.choice(get_feature_locations(terrain_mtx, " "))
@@ -1068,12 +1070,13 @@ def terrain_analysis(terrain_mtx, silent=True, best_only=True):
     if len(start_player_2_positions) > 0:
         start_player_2_position = random.choice(start_player_2_positions)
         for i, j in start_player_2_positions:
-            terrain_mtx[i][j] = ' '
+            terrain_mtx_copy[i][j] = ' '
         start_player_positions[1] = start_player_2_position[::-1]
     else:
         # make sure player 2 does not start at the same place as player 1
         start_player_2_position = random.choice(list(set(get_feature_locations(terrain_mtx, " ")) - set([start_player_1_position])))
 
+    terrain_mtx = terrain_mtx_copy
     walk_graph, handover_graph = graph_from_terrain(terrain_mtx)
 
     empty_locations = get_feature_locations(terrain_mtx, ' ')
