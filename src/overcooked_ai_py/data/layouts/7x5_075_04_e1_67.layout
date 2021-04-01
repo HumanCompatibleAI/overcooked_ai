@@ -1,9 +1,9 @@
 {
-    "grid":  """XXPXSXX
-		XX O  X
-		X1   XX
-		X   2 X
-		XSDPXXX""",
+    "grid":  """XXXOPXX
+		X 12 XX
+		S     D
+		XXX   D
+		XXXPXXX""",
     "start_bonus_orders": [],
     "start_all_orders" : [
         { "ingredients" : ["onion", "onion", "onion"]}
