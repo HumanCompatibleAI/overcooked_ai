@@ -5,6 +5,8 @@ from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, MotionPlanner, NO_COUNTERS_PARAMS
+from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
+from overcooked_ai_py.visualization.pygame_utils import run_dynamic_window
 
 DEFAULT_ENV_PARAMS = {
     "horizon": 400
@@ -172,7 +174,7 @@ class OvercookedEnv(object):
         # TODO: turn this into a "formatting action probs" function and add action symbols too
         action_probs = [None if "action_probs" not in agent_info.keys() else list(agent_info["action_probs"]) for agent_info in env_info["agent_infos"]]
 
-        action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs[0]] for player_action_probs in action_probs ]
+        action_probs = [ None if player_action_probs is None else [round(p, 2) for p in player_action_probs] for player_action_probs in action_probs ]
 
         if display_phi:
             state_potential_str = "\nState potential = " + str(env_info["phi_s_prime"]) + "\t"
@@ -538,7 +540,7 @@ class Overcooked(gym.Env):
     """
     env_name = "Overcooked-v0"
 
-    def custom_init(self, base_env, featurize_fn, baselines_reproducible=False):
+    def custom_init(self, base_env, featurize_fn, baselines_reproducible=False, display=False):
         """
         base_env: OvercookedEnv
         featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
@@ -559,13 +561,19 @@ class Overcooked(gym.Env):
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
         self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
+
+        if display:
+            self.visualizer = StateVisualizer()
+            print('Importing pygame')
+            self.window = None
+
         self.reset()
 
     def _setup_observation_space(self):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
-        obs_shape = self.featurize_fn(dummy_mdp, dummy_state)[0].shape
-        high = np.ones(obs_shape) * max(dummy_mdp.soup_cooking_time, dummy_mdp.num_items_for_soup, 5)
+        obs_shape = self.featurize_fn(dummy_state)[0].shape
+        high = np.ones(obs_shape) * float('inf')
         return gym.spaces.Box(high * 0, high, dtype=np.float32)
 
     def step(self, action):
@@ -577,16 +585,17 @@ class Overcooked(gym.Env):
         returns:
             observation: formatted to be standard input for self.agent_idx's policy
         """
-        assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
-        agent_action, other_agent_action = [Action.INDEX_TO_ACTION[a] for a in action]
-
+        #assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
+        #agent_action, other_agent_action = [Action.INDEX_TO_ACTION[a] for a in action]
+        agent_action, other_agent_action = action
+        
         if self.agent_idx == 0:
             joint_action = (agent_action, other_agent_action)
         else:
             joint_action = (other_agent_action, agent_action)
 
         next_state, reward, done, env_info = self.base_env.step(joint_action)
-        ob_p0, ob_p1 = self.featurize_fn(self.mdp, next_state)
+        ob_p0, ob_p1 = self.featurize_fn(next_state)
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
         else:
@@ -614,7 +623,7 @@ class Overcooked(gym.Env):
         self.base_env.reset()
         self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
-        ob_p0, ob_p1 = self.featurize_fn(self.mdp, self.base_env.state)
+        ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
 
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
@@ -625,4 +634,8 @@ class Overcooked(gym.Env):
                 "other_agent_env_idx": 1 - self.agent_idx}
 
     def render(self, mode="human", close=False):
-        pass
+        import pygame
+        grid = self.base_env.mdp.terrain_mtx
+        state = self.base_env.state
+        surface = self.visualizer.render_state(state, grid, action_probs=None)
+        self.window = run_dynamic_window(self.window, surface)

@@ -6,7 +6,6 @@ def run_static_resizeable_window(surface, fps=30):
     """
     window that can be resized and closed using gui
     """
-    pygame.init()
     clock = pygame.time.Clock()
     window = pygame.display.set_mode(surface.get_size(), HWSURFACE|DOUBLEBUF|RESIZABLE)
     window.blit(surface, (0, 0))
@@ -28,6 +27,14 @@ def run_static_resizeable_window(surface, fps=30):
         pygame.quit()
         if event.type != QUIT: # if user meant to quit error does not matter
             raise
+
+def run_dynamic_window(window, surface):
+    if not window:
+        window = pygame.display.set_mode(surface.get_size(), HWSURFACE|DOUBLEBUF|RESIZABLE)
+    else:
+        window.blit(surface, (0,0))
+    pygame.display.update()
+    return window
 
 def vstack_surfaces(surfaces, background_color=None):
     '''
