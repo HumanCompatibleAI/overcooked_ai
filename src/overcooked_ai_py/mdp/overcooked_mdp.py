@@ -2096,6 +2096,7 @@ class OvercookedGridworld(object):
             make_closest_feature(i, "empty_pot", pot_state["empty"])
             make_closest_feature(i, "one_onion_pot", pot_state["1_items"])
             make_closest_feature(i, "two_onion_pot", pot_state["2_items"])
+            make_closest_feature(i, "three_onion_pot", pot_state["3_items"])
             make_closest_feature(i, "cooking_pot", pot_state["cooking"])
             make_closest_feature(i, "ready_pot", pot_state["ready"])
 
