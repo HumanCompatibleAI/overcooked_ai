@@ -753,8 +753,8 @@ class OvercookedState(object):
         )
 
     def __str__(self):
-        return 'Players: {}, Objects: {}, Bonus orders: {} All orders: {} Timestep: {}'.format( 
-            str(self.players), str(list(self.objects.values())), str(self.bonus_orders), str(self.all_orders), str(self.timestep))
+        return 'Players: {}, Objects: {}'.format( 
+            str(self.players), str(list(self.objects.values())))
 
     def to_dict(self):
         return {
@@ -1969,7 +1969,7 @@ class OvercookedGridworld(object):
             all_features["p{}_closest_{}".format(idx, name)] = self.get_deltas_to_closest_location(player, locations,
                                                                                                    mlam)
 
-        IDX_TO_OBJ = ["onion", "soup", "dish"]
+        IDX_TO_OBJ = ["onion", "soup", "dish", "tomato"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
 
         counter_objects = self.get_counter_objects_dict(overcooked_state)
