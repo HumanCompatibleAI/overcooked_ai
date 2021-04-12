@@ -773,6 +773,31 @@ class OvercookedState(object):
         state_dict["objects"] = { ob.position : ob for ob in object_list }
         return OvercookedState(**state_dict)
 
+class ReducedOvercookedState(object):
+    """A reduced state in OvercookedGridworld. Used to specify only properties RL agents care about."""
+    def __init__(self, full_overcooked_state):
+        """
+        players (list(PlayerState)): Currently active PlayerStates (index corresponds to number)
+        objects (dict({tuple:list(ObjectState)})):  Dictionary mapping positions (x, y) to ObjectStates.
+            NOTE: Does NOT include objects held by players (they are in the PlayerState objects).
+        """
+        self.players = full_overcooked_state.players
+        self.objects = full_overcooked_state.objects
+
+    def __eq__(self, other):
+        return isinstance(other, ReducedOvercookedState) and \
+            self.players == other.players and \
+            set(self.objects.items()) == set(other.objects.items())
+
+    def __hash__(self):
+        return hash(
+             (self.players, tuple(self.objects.values()))
+        )
+
+    def __str__(self):
+        return 'Players: {}, Objects: {}'.format(
+            str(self.players), str(list(self.objects.values())))
+
 
 BASE_REW_SHAPING_PARAMS = {
     "PLACEMENT_IN_POT_REW": 3,
