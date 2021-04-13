@@ -2068,12 +2068,20 @@ class OvercookedGridworld(object):
         return ordered_features_p0, ordered_features_p1
 
 
-    def custom_featurize_state(self, overcooked_state, mlam, horizon=400):
+    def featurize(self, idx, overcooked_state, action, mlam, horizon=400):
         """
         Encode state with some manually designed features.
         NOTE: currently works for just two players.
         """
 
+        #TODO: what happens if we are in terminal state?
+        #      self.is_terminal(overcooked_state)
+        act2use = None
+        if idx == 0:
+            act2use = [action, Action.STAY]
+        else:
+            act2use = [Action.STAY, action]
+        nextState, _ = self.get_state_transition(overcooked_state, act2use)
         all_features = {}
 
         def make_closest_feature(idx, name, locations):
