@@ -805,7 +805,8 @@ BASE_REW_SHAPING_PARAMS = {
     "SOUP_PICKUP_REWARD": 5,
     "DISH_DISP_DISTANCE_REW": 0,
     "POT_DISTANCE_REW": 0,
-    "SOUP_DISTANCE_REW": 0
+    "SOUP_DISTANCE_REW": 0,
+    "DROP_REW": -1
 }
 
 EVENT_TYPES = [
@@ -1106,6 +1107,10 @@ class OvercookedGridworld(object):
         # Resolve interacts first
         sparse_reward_by_agent, shaped_reward_by_agent = self.resolve_interacts(new_state, joint_action, events_infos)
 
+        drop_reward = self.resolve_drops(new_state, joint_action, events_infos)
+        for i in range(self.num_players):
+            sparse_reward_by_agent[i] += drop_reward[i]
+
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
         
@@ -1127,6 +1132,22 @@ class OvercookedGridworld(object):
             infos["phi_s"] = self.potential_function(state, motion_planner)
             infos["phi_s_prime"] = self.potential_function(new_state, motion_planner)
         return new_state, infos
+
+    def resolve_drops(self, new_state, joint_action, event_infos):
+        """
+        Resolve drops if present.
+
+        """
+        drop_reward= [0] * self.num_players
+        for player_idx, (player, action) in enumerate(zip(new_state.players, joint_action)):
+            if action != 'drop':
+                continue
+            if player.has_object():
+                player.remove_object()
+            
+            drop_reward[player_idx] += self.reward_shaping_params["DROP_REW"]
+
+        return drop_reward
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
