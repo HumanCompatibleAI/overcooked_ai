@@ -1,4 +1,4 @@
-import itertools, copy
+import itertools, copy, math
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
@@ -2087,6 +2087,92 @@ class OvercookedGridworld(object):
         abs_pos_p1 = np.array(p1.position)
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
+
+
+    def featurize(self, idx, overcooked_state, action, mlam, horizon=400):
+        """
+        Encode state with some manually designed features.
+        NOTE: currently works for just two players.
+        """
+
+        #TODO: what happens if we are in terminal state?
+        #      self.is_terminal(overcooked_state)
+        act2use = None
+        if idx == 0:
+            act2use = [action, Action.STAY]
+        else:
+            act2use = [Action.STAY, action]
+        nextState, _ = self.get_state_transition(overcooked_state, act2use)
+        overcooked_state = nextState
+        all_features = {}
+
+        def make_closest_feature(idx, name, locations):
+            "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
+            delt = self.get_deltas_to_closest_location(player, locations,mlam)
+            all_features["p{}_closest_{}".format(idx, name)] = math.sqrt((delt[0] ** 2) + (delt[1] ** 2))
+
+        IDX_TO_OBJ = ["onion", "soup", "dish", "tomato"]
+        OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
+
+        counter_objects = self.get_counter_objects_dict(overcooked_state)
+        pot_state = self.get_pot_states(overcooked_state)
+
+        # Player Info
+        for i, player in enumerate(overcooked_state.players):
+            orientation_idx = Direction.DIRECTION_TO_INDEX[player.orientation]
+            all_features["p{}_orientation".format(i)] = orientation_idx#np.eye(4)[orientation_idx]
+            obj = player.held_object
+
+            if obj is None:
+                held_obj_name = "none"
+                all_features["p{}_objs".format(i)] = 0.0#np.zeros(len(IDX_TO_OBJ))
+            else:
+                held_obj_name = obj.name
+                obj_idx = OBJ_TO_IDX[held_obj_name]
+                all_features["p{}_objs".format(i)] = obj_idx#np.eye(len(IDX_TO_OBJ))[obj_idx]
+
+            # Closest feature of each type
+            if held_obj_name == "onion":
+                all_features["p{}_closest_onion".format(i)] = 0.0#(0, 0)
+            else:
+                make_closest_feature(i, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
+
+            make_closest_feature(i, "empty_pot", pot_state["empty"])
+            make_closest_feature(i, "one_onion_pot", pot_state["1_items"])
+            make_closest_feature(i, "two_onion_pot", pot_state["2_items"])
+            make_closest_feature(i, "cooking_pot", pot_state["cooking"])
+            make_closest_feature(i, "ready_pot", pot_state["ready"])
+
+            if held_obj_name == "dish":
+                all_features["p{}_closest_dish".format(i)] = 0.0#(0, 0)
+            else:
+                make_closest_feature(i, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
+
+            if held_obj_name == "soup":
+                all_features["p{}_closest_soup".format(i)] = 0.0#(0, 0)
+            else:
+                make_closest_feature(i, "soup", counter_objects["soup"])
+
+            make_closest_feature(i, "serving", self.get_serving_locations())
+
+            for direction, pos_and_feat in enumerate(self.get_adjacent_features(player)):
+                adj_pos, feat = pos_and_feat
+
+                if direction == player.orientation:
+                    # Check if counter we are facing is empty
+                    facing_counter = (feat == 'X' and adj_pos not in overcooked_state.objects.keys())
+                    facing_counter_feature = [1] if facing_counter else [0]
+                    # NOTE: Really, this feature should have been "closest empty counter"
+                    all_features["p{}_facing_empty_counter".format(i)] = facing_counter_feature
+
+                all_features["p{}_wall_{}".format(i, direction)] = 0 if feat == ' ' else 1
+
+        features_np = {k: np.array(v) for k, v in all_features.items()}
+
+        p0, p1 = overcooked_state.players
+        p0_dict = {k: v for k, v in features_np.items() if k[:2] == "p0"}
+        p1_dict = {k: v for k, v in features_np.items() if k[:2] == "p1"}
+        return p0_dict, p1_dict
 
 
     def get_deltas_to_closest_location(self, player, locations, mlam):
