@@ -2082,6 +2082,7 @@ class OvercookedGridworld(object):
         else:
             act2use = [Action.STAY, action]
         nextState, _ = self.get_state_transition(overcooked_state, act2use)
+        overcooked_state = nextState
         all_features = {}
 
         def make_closest_feature(idx, name, locations):
