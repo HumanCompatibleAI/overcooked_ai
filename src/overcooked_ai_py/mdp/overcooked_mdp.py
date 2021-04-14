@@ -2120,20 +2120,20 @@ class OvercookedGridworld(object):
         # Player Info
         for i, player in enumerate(overcooked_state.players):
             orientation_idx = Direction.DIRECTION_TO_INDEX[player.orientation]
-            all_features["p{}_orientation".format(i)] = orientation_idx#np.eye(4)[orientation_idx]
+            all_features["p{}_orientation".format(i)] = orientation_idx
             obj = player.held_object
 
             if obj is None:
                 held_obj_name = "none"
-                all_features["p{}_objs".format(i)] = 0.0#np.zeros(len(IDX_TO_OBJ))
+                all_features["p{}_objs".format(i)] = 0.0
             else:
                 held_obj_name = obj.name
                 obj_idx = OBJ_TO_IDX[held_obj_name]
-                all_features["p{}_objs".format(i)] = obj_idx#np.eye(len(IDX_TO_OBJ))[obj_idx]
+                all_features["p{}_objs".format(i)] = obj_idx
 
             # Closest feature of each type
             if held_obj_name == "onion":
-                all_features["p{}_closest_onion".format(i)] = 0.0#(0, 0)
+                all_features["p{}_closest_onion".format(i)] = 0.0
             else:
                 make_closest_feature(i, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
 
@@ -2144,12 +2144,12 @@ class OvercookedGridworld(object):
             make_closest_feature(i, "ready_pot", pot_state["ready"])
 
             if held_obj_name == "dish":
-                all_features["p{}_closest_dish".format(i)] = 0.0#(0, 0)
+                all_features["p{}_closest_dish".format(i)] = 0.0
             else:
                 make_closest_feature(i, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
 
             if held_obj_name == "soup":
-                all_features["p{}_closest_soup".format(i)] = 0.0#(0, 0)
+                all_features["p{}_closest_soup".format(i)] = 0.0
             else:
                 make_closest_feature(i, "soup", counter_objects["soup"])
 
