@@ -1180,6 +1180,8 @@ class OvercookedGridworld(object):
                     # Drop object on counter
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
+                    if player_idx == 1 and i_pos == (2,1):
+                        sparse_reward[player_idx] += 7 #earns the reward for picking up onion
                     
                 elif not player.has_object() and new_state.has_object(i_pos):
                     obj_name = new_state.get_object(i_pos).name
@@ -1195,7 +1197,8 @@ class OvercookedGridworld(object):
 
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
-                player.set_object(obj)
+                player.set_object(obj) #we don't actually pick it up anymore
+                #sparse_reward[player_idx] += 30 #earns the reward for picking up onion
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
@@ -1235,6 +1238,7 @@ class OvercookedGridworld(object):
                     if not new_state.has_object(i_pos):
                         # Pot was empty, add soup to it
                         new_state.add_object(SoupState(i_pos, ingredients=[]))
+                        sparse_reward[player_idx] += 30 #earns the reward for picking up onion
 
                     # Add ingredient if possible
                     soup = new_state.get_object(i_pos)
@@ -1248,6 +1252,7 @@ class OvercookedGridworld(object):
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
+                    new_state.remove_object(i_pos)
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
