@@ -300,6 +300,9 @@ class ObjectState(object):
             self.name == other.name and \
             self.position == other.position
 
+    def __gt__(self, other):
+        return self.position > other.position
+
     def __hash__(self):
         return hash((self.name, self.position))
 
@@ -790,13 +793,15 @@ class ReducedOvercookedState(object):
             set(self.objects.items()) == set(other.objects.items())
 
     def __hash__(self):
+        objects = {k: v for k, v in sorted(self.objects.items(), key=lambda item: item[1])}
         return hash(
-             (self.players, tuple(self.objects.values()))
+             (self.players, tuple(objects))
         )
 
     def __str__(self):
-        return 'Players: {}, Objects: {}'.format(
-            str(self.players), str(list(self.objects.values())))
+        objects = {k: v for k, v in sorted(self.objects.items(), key=lambda item: item[1])}
+        return 'Players: , Objects: {}'.format(
+            str(self.players), str(list(objects))) 
 
 
 BASE_REW_SHAPING_PARAMS = {
@@ -1181,7 +1186,7 @@ class OvercookedGridworld(object):
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
                     if player_idx == 1 and i_pos == (2,1):
-                        sparse_reward[player_idx] += 7 #earns the reward for picking up onion
+                        sparse_reward[player_idx] += 0 #earns the reward for picking up onion
                     
                 elif not player.has_object() and new_state.has_object(i_pos):
                     obj_name = new_state.get_object(i_pos).name

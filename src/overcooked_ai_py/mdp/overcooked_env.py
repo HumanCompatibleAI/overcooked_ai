@@ -87,6 +87,7 @@ class OvercookedEnv(object):
     @property
     def mlam(self):
         if self._mlam is None:
+            print("Test")
             print("Computing MediumLevelActionManager")
             self._mlam = MediumLevelActionManager.from_pickle_or_compute(self.mdp, self.mlam_params,
                                                                   force_compute=False)
@@ -611,7 +612,7 @@ class Overcooked(gym.Env):
                 "other_agent_env_idx": 1 - self.agent_idx}
         return obs, reward, done, env_info
 
-    def reset(self):
+    def reset(self, regen_mdp=True):
         """
         When training on individual maps, we want to randomize which agent is assigned to which
         starting location, in order to make sure that the agents are trained to be able to 
@@ -620,7 +621,7 @@ class Overcooked(gym.Env):
         NOTE: a nicer way to do this would be to just randomize starting positions, and not
         have to deal with randomizing indices.
         """
-        self.base_env.reset()
+        self.base_env.reset(regen_mdp)
         self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
         ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
