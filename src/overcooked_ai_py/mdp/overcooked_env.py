@@ -576,7 +576,7 @@ class Overcooked(gym.Env):
         high = np.ones(obs_shape) * float('inf')
         return gym.spaces.Box(high * 0, high, dtype=np.float32)
 
-    def step(self, action):
+    def step(self, action, action_as_ind=False):
         """
         action: 
             (agent with index self.agent_idx action, other agent action)
@@ -585,9 +585,11 @@ class Overcooked(gym.Env):
         returns:
             observation: formatted to be standard input for self.agent_idx's policy
         """
-        #assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
-        #agent_action, other_agent_action = [Action.INDEX_TO_ACTION[a] for a in action]
-        agent_action, other_agent_action = action
+        if action_as_ind:
+            assert all(self.action_space.contains(a) for a in action), "%r (%s) invalid"%(action, type(action))
+            agent_action, other_agent_action = [Action.INDEX_TO_ACTION[a] for a in action]
+        else:
+            agent_action, other_agent_action = action
         
         if self.agent_idx == 0:
             joint_action = (agent_action, other_agent_action)
@@ -611,7 +613,7 @@ class Overcooked(gym.Env):
                 "other_agent_env_idx": 1 - self.agent_idx}
         return obs, reward, done, env_info
 
-    def reset(self, regen_mdp=True):
+    def reset(self, regen_mdp=True, return_only_state=False):
         """
         When training on individual maps, we want to randomize which agent is assigned to which
         starting location, in order to make sure that the agents are trained to be able to 
@@ -629,9 +631,13 @@ class Overcooked(gym.Env):
             both_agents_ob = (ob_p0, ob_p1)
         else:
             both_agents_ob = (ob_p1, ob_p0)
-        return {"both_agent_obs": both_agents_ob, 
-                "overcooked_state": self.base_env.state, 
-                "other_agent_env_idx": 1 - self.agent_idx}
+
+        if return_only_state:
+            return self.featurize_fn(self.base_env.state)
+        else:
+            return {"both_agent_obs": both_agents_ob, 
+                    "overcooked_state": self.base_env.state, 
+                    "other_agent_env_idx": 1 - self.agent_idx}
 
     def render(self, mode="human", close=False):
         import pygame

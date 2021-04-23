@@ -1846,11 +1846,11 @@ class OvercookedGridworld(object):
     # TERMINAL GRAPHICS #
     #####################
     
- def flatten_state(self, state):
-        """Simplified state depiction """
-        state_string = self.state_string(state)
-        flattened = np.fromstring(state_string, np.int8)
-        return np.array(flattened), np.array(flattened)
+    def flatten_state(self, state):
+            """Simplified state depiction """
+            state_string = self.state_string(state)
+            flattened = np.fromstring(state_string, np.int8)
+            return np.array(flattened), np.array(flattened)
 
     def condensed_state(self, state):
         players_dict = {player.position: player for player in state.players}
