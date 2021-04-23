@@ -1214,8 +1214,8 @@ class OvercookedGridworld(object):
                 onion_pickup_reward = self.sparse_reward_opts["pickup_onion"]
                 if onion_pickup_reward > 0:
                     sparse_reward[player_idx] += onion_pickup_reward
-                else:
-                    player.set_object(obj) # actually pickup the onion
+                #else:
+                player.set_object(obj) # actually pickup the onion
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
@@ -1270,8 +1270,8 @@ class OvercookedGridworld(object):
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
-                    if self.sparse_reward_opts["add_onion_to_pot"] > 0:
-                        new_state.remove_object(i_pos)
+                    #if self.sparse_reward_opts["add_onion_to_pot"] > 0:
+                    #    new_state.remove_object(i_pos)
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
@@ -1940,6 +1940,7 @@ class OvercookedGridworld(object):
 
                     elif element == "P" and state.has_object((x, y)):
                         soup = state.get_object((x, y))
+                        print(soup)
                         # display soup
                         grid_string_add += str(soup)
 
@@ -1954,6 +1955,7 @@ class OvercookedGridworld(object):
                 state.bonus_orders
             )
         # grid_string += "State potential value: {}\n".format(self.potential_function(state))
+        #print(grid_string)
         return grid_string
 
     ###################
