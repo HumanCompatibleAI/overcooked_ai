@@ -300,6 +300,9 @@ class ObjectState(object):
             self.name == other.name and \
             self.position == other.position
 
+    def __gt__(self, other):
+        return self.position > other.position
+
     def __hash__(self):
         return hash((self.name, self.position))
 
@@ -790,13 +793,15 @@ class ReducedOvercookedState(object):
             set(self.objects.items()) == set(other.objects.items())
 
     def __hash__(self):
+        objects = {k: v for k, v in sorted(self.objects.items(), key=lambda item: item[1])}
         return hash(
-             (self.players, tuple(self.objects.values()))
+             (self.players, tuple(objects))
         )
 
     def __str__(self):
-        return 'Players: {}, Objects: {}'.format(
-            str(self.players), str(list(self.objects.values())))
+        objects = {k: v for k, v in sorted(self.objects.items(), key=lambda item: item[1])}
+        return 'Players: , Objects: {}'.format(
+            str(self.players), str(list(objects)))
 
 
 BASE_REW_SHAPING_PARAMS = {
@@ -861,6 +866,14 @@ POTENTIAL_CONSTANTS = {
     }
 }
 
+# WARNING: Behavior with multiple sparse rewards active at once is undefined.
+#          Some of the sparse reward settings below have side-effects that must be considered.
+DEFAULT_SPARSE_REWARD_OPTS = {
+    'deliver_soup': 20,
+    'add_onion_to_pot': 0,
+    'pickup_onion': 0
+}
+
 class OvercookedGridworld(object):
     """
     An MDP grid world based off of the Overcooked game.
@@ -872,7 +885,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], sparse_reward_opts=DEFAULT_SPARSE_REWARD_OPTS, rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -901,6 +914,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
+        self.sparse_reward_opts = sparse_reward_opts
 
 
     @staticmethod
@@ -972,6 +986,9 @@ class OvercookedGridworld(object):
             **kwargs
         }
         Recipe.configure(self.recipe_config)
+
+    def set_sparse_rewards(self, sparse_reward_opts):
+        self.sparse_reward_opts = sparse_reward_opts.copy()
 
     #####################
     # BASIC CLASS UTILS #
@@ -1180,7 +1197,6 @@ class OvercookedGridworld(object):
                     # Drop object on counter
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
-                    
                 elif not player.has_object() and new_state.has_object(i_pos):
                     obj_name = new_state.get_object(i_pos).name
                     self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx)
@@ -1195,7 +1211,11 @@ class OvercookedGridworld(object):
 
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
-                player.set_object(obj)
+                onion_pickup_reward = self.sparse_reward_opts["pickup_onion"]
+                if onion_pickup_reward > 0:
+                    sparse_reward[player_idx] += onion_pickup_reward
+                else:
+                    player.set_object(obj) # actually pickup the onion
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
@@ -1243,18 +1263,22 @@ class OvercookedGridworld(object):
                         obj = player.remove_object()
                         soup.add_ingredient(obj)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+                        sparse_reward[player_idx] += self.sparse_reward_opts["add_onion_to_pot"]
 
                         # Log potting
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
+                    if self.sparse_reward_opts["add_onion_to_pot"] > 0:
+                        new_state.remove_object(i_pos)
+
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':
 
                     delivery_rew = self.deliver_soup(new_state, player, obj)
-                    sparse_reward[player_idx] += delivery_rew
+                    sparse_reward[player_idx] += self.sparse_reward_opts["deliver_soup"]
 
                     # Log soup delivery
                     events_infos['soup_delivery'][player_idx] = True                        
@@ -1821,6 +1845,62 @@ class OvercookedGridworld(object):
     #####################
     # TERMINAL GRAPHICS #
     #####################
+    
+ def flatten_state(self, state):
+        """Simplified state depiction """
+        state_string = self.state_string(state)
+        flattened = np.fromstring(state_string, np.int8)
+        return np.array(flattened), np.array(flattened)
+
+    def condensed_state(self, state):
+        players_dict = {player.position: player for player in state.players}
+        state_arr = []
+        for y, terrain_row in enumerate(self.terrain_mtx):
+            for x, element in enumerate(terrain_row):
+
+                item = None
+                if (x, y) in players_dict.keys():
+
+                    player = players_dict[(x, y)]
+                    orientation = player.orientation
+                    assert orientation in Direction.ALL_DIRECTIONS
+
+                    player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                    assert len(player_idx_lst) == 1
+
+                    player_ind = player_idx_lst[0]
+                    orien_ind = Action.ACTION_TO_INDEX[orientation]
+
+                    player_object = player.held_object
+                    held_ind = 1
+                    if player_object:
+
+                        if player_object.name[0] == "s":
+                            held_ind = 2
+                        else:
+                            held_ind = 3
+                    item = (10*player_ind) + (5*held_ind) + (orien_ind)
+
+                else:
+                    if element == "X" and state.has_object((x,y)):
+                        item = 30
+                    elif element == "X":
+                        item = 40
+                    elif element == "D":
+                        item = 50
+                    elif element == "O":
+                        item = 60
+                    elif element == "P":
+                        item = 70
+                    elif element == "S":
+                        item = 80
+                    elif element == " ":
+                        item = 90
+                
+                state_arr.append(item)
+
+        return np.array(state_arr), np.array(state_arr)
+
 
     def state_string(self, state):
         """String representation of the current state"""
