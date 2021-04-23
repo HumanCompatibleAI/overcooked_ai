@@ -801,7 +801,7 @@ class ReducedOvercookedState(object):
     def __str__(self):
         objects = {k: v for k, v in sorted(self.objects.items(), key=lambda item: item[1])}
         return 'Players: , Objects: {}'.format(
-            str(self.players), str(list(objects))) 
+            str(self.players), str(list(objects)))
 
 
 BASE_REW_SHAPING_PARAMS = {
@@ -866,6 +866,14 @@ POTENTIAL_CONSTANTS = {
     }
 }
 
+# WARNING: Behavior with multiple sparse rewards active at once is undefined.
+#          Some of the sparse reward settings below have side-effects that must be considered.
+DEFAULT_SPARSE_REWARD_OPTS = {
+    'deliver_soup': 20,
+    'add_onion_to_pot': 0,
+    'pickup_onion': 0
+}
+
 class OvercookedGridworld(object):
     """
     An MDP grid world based off of the Overcooked game.
@@ -877,7 +885,7 @@ class OvercookedGridworld(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
+    def __init__(self, terrain, start_player_positions, start_bonus_orders=[], sparse_reward_opts=DEFAULT_SPARSE_REWARD_OPTS, rew_shaping_params=None, layout_name="unnamed_layout", start_all_orders=[], num_items_for_soup=3, order_bonus=2, start_state=None, **kwargs):
         """
         terrain: a matrix of strings that encode the MDP layout
         layout_name: string identifier of the layout
@@ -906,6 +914,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
+        self.sparse_reward_opts = sparse_reward_opts
 
 
     @staticmethod
@@ -977,6 +986,9 @@ class OvercookedGridworld(object):
             **kwargs
         }
         Recipe.configure(self.recipe_config)
+
+    def set_sparse_rewards(self, sparse_reward_opts):
+        self.sparse_reward_opts = sparse_reward_opts.copy()
 
     #####################
     # BASIC CLASS UTILS #
@@ -1185,9 +1197,6 @@ class OvercookedGridworld(object):
                     # Drop object on counter
                     obj = player.remove_object()
                     new_state.add_object(obj, i_pos)
-                    if player_idx == 1 and i_pos == (2,1):
-                        sparse_reward[player_idx] += 0 #earns the reward for picking up onion
-                    
                 elif not player.has_object() and new_state.has_object(i_pos):
                     obj_name = new_state.get_object(i_pos).name
                     self.log_object_pickup(events_infos, new_state, obj_name, pot_states, player_idx)
@@ -1202,8 +1211,11 @@ class OvercookedGridworld(object):
 
                 # Onion pickup from dispenser
                 obj = ObjectState('onion', pos)
-                player.set_object(obj) #we don't actually pick it up anymore
-                #sparse_reward[player_idx] += 30 #earns the reward for picking up onion
+                onion_pickup_reward = self.sparse_reward_opts["pickup_onion"]
+                if onion_pickup_reward > 0:
+                    sparse_reward[player_idx] += onion_pickup_reward
+                else:
+                    player.set_object(obj) # actually pickup the onion
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
@@ -1243,7 +1255,6 @@ class OvercookedGridworld(object):
                     if not new_state.has_object(i_pos):
                         # Pot was empty, add soup to it
                         new_state.add_object(SoupState(i_pos, ingredients=[]))
-                        sparse_reward[player_idx] += 30 #earns the reward for picking up onion
 
                     # Add ingredient if possible
                     soup = new_state.get_object(i_pos)
@@ -1252,19 +1263,22 @@ class OvercookedGridworld(object):
                         obj = player.remove_object()
                         soup.add_ingredient(obj)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+                        sparse_reward[player_idx] += self.sparse_reward_opts["add_onion_to_pot"]
 
                         # Log potting
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
-                    new_state.remove_object(i_pos)
+
+                    if self.sparse_reward_opts["add_onion_to_pot"] > 0:
+                        new_state.remove_object(i_pos)
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':
 
                     delivery_rew = self.deliver_soup(new_state, player, obj)
-                    sparse_reward[player_idx] += delivery_rew
+                    sparse_reward[player_idx] += self.sparse_reward_opts["deliver_soup"]
 
                     # Log soup delivery
                     events_infos['soup_delivery'][player_idx] = True                        
