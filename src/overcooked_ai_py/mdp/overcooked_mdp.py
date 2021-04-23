@@ -1845,6 +1845,62 @@ class OvercookedGridworld(object):
     #####################
     # TERMINAL GRAPHICS #
     #####################
+    
+ def flatten_state(self, state):
+        """Simplified state depiction """
+        state_string = self.state_string(state)
+        flattened = np.fromstring(state_string, np.int8)
+        return np.array(flattened), np.array(flattened)
+
+    def condensed_state(self, state):
+        players_dict = {player.position: player for player in state.players}
+        state_arr = []
+        for y, terrain_row in enumerate(self.terrain_mtx):
+            for x, element in enumerate(terrain_row):
+
+                item = None
+                if (x, y) in players_dict.keys():
+
+                    player = players_dict[(x, y)]
+                    orientation = player.orientation
+                    assert orientation in Direction.ALL_DIRECTIONS
+
+                    player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                    assert len(player_idx_lst) == 1
+
+                    player_ind = player_idx_lst[0]
+                    orien_ind = Action.ACTION_TO_INDEX[orientation]
+
+                    player_object = player.held_object
+                    held_ind = 1
+                    if player_object:
+
+                        if player_object.name[0] == "s":
+                            held_ind = 2
+                        else:
+                            held_ind = 3
+                    item = (10*player_ind) + (5*held_ind) + (orien_ind)
+
+                else:
+                    if element == "X" and state.has_object((x,y)):
+                        item = 30
+                    elif element == "X":
+                        item = 40
+                    elif element == "D":
+                        item = 50
+                    elif element == "O":
+                        item = 60
+                    elif element == "P":
+                        item = 70
+                    elif element == "S":
+                        item = 80
+                    elif element == " ":
+                        item = 90
+                
+                state_arr.append(item)
+
+        return np.array(state_arr), np.array(state_arr)
+
 
     def state_string(self, state):
         """String representation of the current state"""
