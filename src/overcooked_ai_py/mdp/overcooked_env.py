@@ -87,7 +87,6 @@ class OvercookedEnv(object):
     @property
     def mlam(self):
         if self._mlam is None:
-            print("Test")
             print("Computing MediumLevelActionManager")
             self._mlam = MediumLevelActionManager.from_pickle_or_compute(self.mdp, self.mlam_params,
                                                                   force_compute=False)
