@@ -355,6 +355,33 @@ class SoupState(ObjectState):
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
+    #Only works for onion based recipes
+    def soup_str(self):
+        num_ingredient = len(self.ingredients)
+        print(num_ingredient)
+        if num_ingredient == 0:
+            ingredient_str = "___"
+        elif num_ingredient == 1:
+            ingredient_str = "o__"
+        elif num_ingredient == 2:
+            ingredient_str = "oo_"
+        else:
+            ingredient_str = "ooo"
+        
+        if self.is_cooking:
+            cooking_time = str(self._cooking_tick)
+        elif self.is_ready:
+            cooking_time = "20"
+        else:
+            cooking_time = "00"
+
+        if self.is_ready:
+            ready = "1"
+        else: 
+            ready = "0"
+        
+        return ingredient_str + cooking_time + ready
+
     def __str__(self):
         res = "{"
         for ingredient in sorted(self.ingredients):
@@ -1930,19 +1957,27 @@ class OvercookedGridworld(object):
                     else:
                         grid_string_add += str(player_idx_lst[0])
                 else:
+                    #print(grid_string_add)
                     grid_string_add += element
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
-                            grid_string_add += str(state_obj)
+                            print(state_obj)
+                            grid_string_add += len(str(state_obj))
                         else:
                             grid_string_add += state_obj.name[:1]
+                    elif element == "P":
 
-                    elif element == "P" and state.has_object((x, y)):
-                        soup = state.get_object((x, y))
-                        print(soup)
+                        if state.has_object((x, y)):
+                            soup = state.get_object((x, y))
+                            print(soup.soup_str())
+                            str_len = len(str(soup))
+                            grid_string_add += soup.soup_str()
+                        else:
+                            grid_string_add += "      "
+
+
                         # display soup
-                        grid_string_add += str(soup)
 
                 grid_string += grid_string_add
                 grid_string += "".join([" "] * (7 - len(grid_string_add)))
