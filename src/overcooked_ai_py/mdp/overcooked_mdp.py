@@ -482,6 +482,7 @@ class SoupState(ObjectState):
         if len(self.ingredients) == 0:
             raise ValueError("Must add at least one ingredient to soup before you can begin cooking")
         self._cooking_tick = 0
+        #self._cooking_tick = self.cook_time #another way to have begin_cooking also finish cooking
 
     def cook(self):
         if self.is_idle:
@@ -1106,7 +1107,7 @@ class OvercookedGridworld(object):
                     m = int(np.random.randint(low=0, high=4-n))
                     q = np.random.rand()
                     cooking_tick = 0 if q < rnd_obj_prob_thresh else -1
-                    start_state.objects[pot_loc] = SoupState.get_soup(pot_loc, num_onions=n, num_tomatoes=m, cooking_tick=cooking_tick)
+                    start_state.objects[pot_loc] = SoupState.get_soup(pot_loc, num_onions=n, num_tomatoes=m, cooking_tick=cooking_tick, cook_time=0)
 
             # For each player, add a random object with prob rnd_obj_prob_thresh
             for player in start_state.players:
@@ -1118,7 +1119,7 @@ class OvercookedGridworld(object):
                     m = int(np.random.randint(low=0, high=4-n))
                     if obj == "soup":
                         player.set_object(
-                            SoupState.get_soup(player.position, num_onions=n, num_tomatoes=m, finished=True)
+                            SoupState.get_soup(player.position, num_onions=n, num_tomatoes=m, finished=True, cook_time=0)
                         )
                     else:
                         player.set_object(ObjectState(obj, player.position))
@@ -1281,7 +1282,7 @@ class OvercookedGridworld(object):
 
                     if not new_state.has_object(i_pos):
                         # Pot was empty, add soup to it
-                        new_state.add_object(SoupState(i_pos, ingredients=[]))
+                        new_state.add_object(SoupState(i_pos, ingredients=[], cook_time=0))
 
                     # Add ingredient if possible
                     soup = new_state.get_object(i_pos)
