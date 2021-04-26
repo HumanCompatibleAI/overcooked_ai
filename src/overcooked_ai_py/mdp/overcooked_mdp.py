@@ -14,7 +14,7 @@ class Recipe:
     ALL_INGREDIENTS = [ONION, TOMATO]
 
     ALL_RECIPES_CACHE = {}
-    STR_REP = {'tomato': "†", 'onion': "ø"}
+    STR_REP = {'tomato': "†", 'onion': "o"}
 
     _computed = False
     _configured = False
@@ -358,7 +358,7 @@ class SoupState(ObjectState):
     #Only works for onion based recipes
     def soup_str(self):
         num_ingredient = len(self.ingredients)
-        print(num_ingredient)
+
         if num_ingredient == 0:
             ingredient_str = "___"
         elif num_ingredient == 1:
@@ -389,7 +389,7 @@ class SoupState(ObjectState):
         if self.is_cooking:
             res += str(self._cooking_tick)
         elif self.is_ready:
-            res += str("✓")
+            res += str("y")
         return res
 
     @ObjectState.position.setter
@@ -1947,30 +1947,34 @@ class OvercookedGridworld(object):
 
                     grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
+                    player_obj_str = ""
                     if player_object:
-                        grid_string_add += str(player_idx_lst[0])
+                        player_obj_str += str(player_idx_lst[0])
                         if player_object.name[0] == "s":
                             # this is a soup
-                            grid_string_add += str(player_object)
+                            player_obj_str += str(player_object)
                         else:
-                            grid_string_add += player_object.name[:1]
+                            player_obj_str += player_object.name[:1]
                     else:
-                        grid_string_add += str(player_idx_lst[0])
+                        player_obj_str += str(player_idx_lst[0])
+                    player_obj_str = player_obj_str.zfill(15)
+                    grid_string_add += player_obj_str
                 else:
                     #print(grid_string_add)
                     grid_string_add += element
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
-                            print(state_obj)
-                            grid_string_add += len(str(state_obj))
+                            grid_string_add += str(len(str(state_obj)))
+                            print(grid_string_add)
                         else:
                             grid_string_add += state_obj.name[:1]
                     elif element == "P":
 
                         if state.has_object((x, y)):
                             soup = state.get_object((x, y))
-                            print(soup.soup_str())
+                            #print(soup.soup_str())
+                            #print(len(soup.soup_str()))
                             str_len = len(str(soup))
                             grid_string_add += soup.soup_str()
                         else:
@@ -1989,8 +1993,9 @@ class OvercookedGridworld(object):
             grid_string += "Bonus orders: {}\n".format(
                 state.bonus_orders
             )
-        # grid_string += "State potential value: {}\n".format(self.potential_function(state))
         #print(grid_string)
+        #print(len(grid_string))
+        # grid_string += "State potential value: {}\n".format(self.potential_function(state))
         return grid_string
 
     ###################
