@@ -14,7 +14,7 @@ class Recipe:
     ALL_INGREDIENTS = [ONION, TOMATO]
 
     ALL_RECIPES_CACHE = {}
-    STR_REP = {'tomato': "†", 'onion': "ø"}
+    STR_REP = {'tomato': "†", 'onion': "o"}
 
     _computed = False
     _configured = False
@@ -355,6 +355,33 @@ class SoupState(ObjectState):
         ingredients_str = self._ingredients.__repr__()
         return "{}\nIngredients:\t{}\nCooking Tick:\t{}".format(supercls_str, ingredients_str, self._cooking_tick)
 
+    #Only works for onion based recipes
+    def soup_str(self):
+        num_ingredient = len(self.ingredients)
+
+        if num_ingredient == 0:
+            ingredient_str = "___"
+        elif num_ingredient == 1:
+            ingredient_str = "o__"
+        elif num_ingredient == 2:
+            ingredient_str = "oo_"
+        else:
+            ingredient_str = "ooo"
+        
+        if self.is_cooking:
+            cooking_time = str(self._cooking_tick)
+        elif self.is_ready:
+            cooking_time = "20"
+        else:
+            cooking_time = "00"
+
+        if self.is_ready:
+            ready = "1"
+        else: 
+            ready = "0"
+        
+        return ingredient_str + cooking_time + ready
+
     def __str__(self):
         res = "{"
         for ingredient in sorted(self.ingredients):
@@ -362,7 +389,7 @@ class SoupState(ObjectState):
         if self.is_cooking:
             res += str(self._cooking_tick)
         elif self.is_ready:
-            res += str("✓")
+            res += str("y")
         return res
 
     @ObjectState.position.setter
@@ -1214,8 +1241,8 @@ class OvercookedGridworld(object):
                 onion_pickup_reward = self.sparse_reward_opts["pickup_onion"]
                 if onion_pickup_reward > 0:
                     sparse_reward[player_idx] += onion_pickup_reward
-                else:
-                    player.set_object(obj) # actually pickup the onion
+                #else:
+                player.set_object(obj) # actually pickup the onion
 
             elif terrain_type == 'T' and player.held_object is None:
                 # Tomato pickup from dispenser
@@ -1270,8 +1297,8 @@ class OvercookedGridworld(object):
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
-                    if self.sparse_reward_opts["add_onion_to_pot"] > 0:
-                        new_state.remove_object(i_pos)
+                    #if self.sparse_reward_opts["add_onion_to_pot"] > 0:
+                    #    new_state.remove_object(i_pos)
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
@@ -1920,28 +1947,41 @@ class OvercookedGridworld(object):
 
                     grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
+                    player_obj_str = ""
                     if player_object:
-                        grid_string_add += str(player_idx_lst[0])
+                        player_obj_str += str(player_idx_lst[0])
                         if player_object.name[0] == "s":
                             # this is a soup
-                            grid_string_add += str(player_object)
+                            player_obj_str += str(player_object)
                         else:
-                            grid_string_add += player_object.name[:1]
+                            player_obj_str += player_object.name[:1]
                     else:
-                        grid_string_add += str(player_idx_lst[0])
+                        player_obj_str += str(player_idx_lst[0])
+                    player_obj_str = player_obj_str.zfill(15)
+                    grid_string_add += player_obj_str
                 else:
+                    #print(grid_string_add)
                     grid_string_add += element
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
                         if state_obj.name[0] == "s":
-                            grid_string_add += str(state_obj)
+                            grid_string_add += str(len(str(state_obj)))
+                            print(grid_string_add)
                         else:
                             grid_string_add += state_obj.name[:1]
+                    elif element == "P":
 
-                    elif element == "P" and state.has_object((x, y)):
-                        soup = state.get_object((x, y))
+                        if state.has_object((x, y)):
+                            soup = state.get_object((x, y))
+                            #print(soup.soup_str())
+                            #print(len(soup.soup_str()))
+                            str_len = len(str(soup))
+                            grid_string_add += soup.soup_str()
+                        else:
+                            grid_string_add += "      "
+
+
                         # display soup
-                        grid_string_add += str(soup)
 
                 grid_string += grid_string_add
                 grid_string += "".join([" "] * (7 - len(grid_string_add)))
@@ -1953,6 +1993,8 @@ class OvercookedGridworld(object):
             grid_string += "Bonus orders: {}\n".format(
                 state.bonus_orders
             )
+        #print(grid_string)
+        #print(len(grid_string))
         # grid_string += "State potential value: {}\n".format(self.potential_function(state))
         return grid_string
 
