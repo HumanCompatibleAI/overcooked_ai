@@ -624,7 +624,7 @@ class Overcooked(gym.Env):
         """
         self.base_env.reset(regen_mdp)
         self.mdp = self.base_env.mdp
-        self.agent_idx = np.random.choice([0, 1])
+        self.agent_idx = 0
         ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
 
         if self.agent_idx == 0:
