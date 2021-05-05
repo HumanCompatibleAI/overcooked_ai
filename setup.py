@@ -20,7 +20,7 @@ setup(name='overcooked_ai',
       package_data={
         'overcooked_ai_py' : [
           'data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle',
-          'data/graphics/*.png', 'data/graphics/*.json',
+          'data/graphics/*.png', 'data/graphics/*.json', 'data/fonts/*.ttf',
         ],
       },
       install_requires=[
