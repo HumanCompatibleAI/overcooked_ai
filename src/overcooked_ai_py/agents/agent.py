@@ -253,7 +253,7 @@ class GreedyHumanModel(Agent):
     """
 
     def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
-                 auto_unstuck=True):
+                 auto_unstuck=True, prob_wait=0.5):
         self.mlam = mlam
         self.mdp = self.mlam.mdp
 
@@ -268,6 +268,8 @@ class GreedyHumanModel(Agent):
         # Whether to automatically take an action to get the agent unstuck if it's in the same
         # state as the previous turn. If false, the agent is history-less, while if true it has history.
         self.auto_unstuck = auto_unstuck
+
+        self.prob_wait = prob_wait
         self.reset()
 
     def reset(self):
@@ -316,9 +318,13 @@ class GreedyHumanModel(Agent):
                 chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
                     self.agent_index]
                 action_probs = self.a_probs_from_action(chosen_action)
-
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
+        action_probs = (1 - self.prob_wait) * action_probs + np.array([0, 0, 0, 0, self.prob_wait, 0])
+
+        if np.random.random() < self.prob_wait:
+            return Action.ALL_ACTIONS[4], {"action_probs": action_probs}
+
         return chosen_action, {"action_probs": action_probs}
 
     def choose_motion_goal(self, start_pos_and_or, motion_goals):
