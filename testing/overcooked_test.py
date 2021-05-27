@@ -1,10 +1,11 @@
 import unittest, os, shutil
-import json
+import json, copy
 import numpy as np
 from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
+from overcooked_ai_py.mdp.overcooked_trajectory import append_trajectories, DEFAULT_TRAJ_KEYS, TIMESTEP_TRAJ_KEYS, EPISODE_TRAJ_KEYS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent, RandomAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
@@ -1002,6 +1003,38 @@ class TestGymEnvironment(unittest.TestCase):
         np.random.seed(0)
 
     # TODO: write more tests here
+
+class TestTrajectories(unittest.TestCase):
+
+    def setUp(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        self.mlam = MediumLevelActionManager.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.greedy_human_model_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
+        np.random.seed(0)
+
+    def test_append(self):
+        traj_one = self.env.get_rollouts(self.greedy_human_model_pair, num_games=3)
+        traj_two = self.env.get_rollouts(self.greedy_human_model_pair, num_games=3)
+
+        combined = append_trajectories(traj_one, traj_two)
+
+        # Ensure proper keys
+        self.assertEqual(set(combined.keys()), DEFAULT_TRAJ_KEYS)
+
+        # Ensure proper shapes
+        for key in TIMESTEP_TRAJ_KEYS:
+            shape_one = traj_one[key].shape
+            shape_two = traj_two[key].shape
+            shape_combined = combined[key].shape
+            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
+            self.assertEqual(shape_combined[1], shape_one[1])
+            self.assertEqual(shape_combined[1], shape_two[1])
+        for key in EPISODE_TRAJ_KEYS:
+            shape_one = traj_one[key].shape
+            shape_two = traj_two[key].shape
+            shape_combined = combined[key].shape
+            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
 
 if __name__ == '__main__':
     unittest.main()

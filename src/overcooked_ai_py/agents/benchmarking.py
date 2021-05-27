@@ -8,6 +8,7 @@ from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanMod
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.mdp.overcooked_trajectory import DEFAULT_TRAJ_KEYS
 
 
 class AgentEvaluator(object):
@@ -164,7 +165,7 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_standard_traj_keys(traj_keys_set):
-        default_traj_keys = OvercookedEnv.DEFAULT_TRAJ_KEYS
+        default_traj_keys = DEFAULT_TRAJ_KEYS
         assert traj_keys_set == set(default_traj_keys), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
             [k for k in default_traj_keys if k not in traj_keys_set], [k for k in traj_keys_set if k not in default_traj_keys]
         )
@@ -241,7 +242,7 @@ class AgentEvaluator(object):
     @staticmethod
     def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
-        assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectory.keys())
+        assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
         AgentEvaluator.check_trajectories(trajectory)
         trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
         save_as_json(trajectory, filename)

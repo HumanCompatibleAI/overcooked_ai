@@ -4,6 +4,7 @@ import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
+from overcooked_ai_py.mdp.overcooked_trajectory import TIMESTEP_TRAJ_KEYS, EPISODE_TRAJ_KEYS, DEFAULT_TRAJ_KEYS
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, MotionPlanner, NO_COUNTERS_PARAMS
 
 DEFAULT_ENV_PARAMS = {
@@ -22,30 +23,7 @@ class OvercookedEnv(object):
     E.g. of how to instantiate OvercookedEnv:
     > mdp = OvercookedGridworld(...)
     > env = OvercookedEnv.from_mdp(mdp, horizon=400)
-
-    The standard format for Overcooked trajectories is:
-    trajs = {
-        # With shape (n_episodes, game_len), where game_len might vary across games:
-        "ep_states":    [ [traj_1_states], [traj_2_states], ... ],                          # Individual trajectory states
-        "ep_actions":   [ [traj_1_joint_actions], [traj_2_joint_actions], ... ],            # Trajectory joint actions, by agent
-        "ep_rewards":   [ [traj_1_timestep_rewards], [traj_2_timestep_rewards], ... ],      # (Sparse) reward values by timestep
-        "ep_dones":     [ [traj_1_timestep_dones], [traj_2_timestep_dones], ... ],          # Done values (should be all 0s except last one for each traj) TODO: add this to traj checks
-        "ep_infos":     [ [traj_1_timestep_infos], [traj_2_traj_1_timestep_infos], ... ],   # Info dictionaries
-
-        # With shape (n_episodes, ):
-        "ep_returns":   [ cumulative_traj1_reward, cumulative_traj2_reward, ... ],          # Sum of sparse rewards across each episode
-        "ep_lengths":   [ traj1_length, traj2_length, ... ],                                # Lengths (in env timesteps) of each episode
-        "mdp_params":   [ traj1_mdp_params, traj2_mdp_params, ... ],                        # Custom Mdp params to for each episode
-        "env_params":   [ traj1_env_params, traj2_env_params, ... ],                        # Custom Env params for each episode
-
-        # Custom metadata key value pairs
-        "metadatas":    [{custom metadata key:value pairs for traj 1}, {...}, ...]          # Each metadata dictionary is of similar format to the trajectories dictionary
-    }
     """
-
-    TIMESTEP_TRAJ_KEYS = ["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"]
-    EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "metadatas"]
-    DEFAULT_TRAJ_KEYS = TIMESTEP_TRAJ_KEYS + EPISODE_TRAJ_KEYS + ["metadatas"]
 
 
     #########################
@@ -399,7 +377,7 @@ class OvercookedEnv(object):
 
         NOTE: this is the standard trajectories format used throughout the codebase
         """
-        trajectories = { k:[] for k in self.DEFAULT_TRAJ_KEYS }
+        trajectories = { k:[] for k in DEFAULT_TRAJ_KEYS }
         metadata_fn = (lambda x: {}) if metadata_fn is None else metadata_fn
         metadata_info_fn = (lambda x: "") if metadata_info_fn is None else metadata_info_fn
         range_iterator = tqdm.trange(num_games, desc="", leave=True) if info else range(num_games)
