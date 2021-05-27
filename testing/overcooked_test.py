@@ -1,5 +1,5 @@
 import unittest, os, shutil
-import json
+import json, time
 import numpy as np
 from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -762,6 +762,26 @@ class TestFeaturizations(unittest.TestCase):
             # save_pickle(featurized_observations, pickle_path)
             expected_featurization = load_pickle(pickle_path)
             self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+
+    def test_state_featurization_speed(self):
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
+        
+        average_times = {}
+
+        for num_pots in range(3):
+            total_time = 0
+            total_states = 0
+            for ep_states in trajs["ep_states"]:
+                for state in ep_states:
+                    start_time = time.time()
+                    featurized_obs = self.base_mdp.featurize_state(state, self.mlam, num_pots=num_pots)
+                    total_time += time.time() - start_time
+                    total_states += 1
+            average_times[num_pots] = total_time / total_states
+
+        for num_pots, average_time in average_times.items():
+            self.assertLess(average_time, 2e-3*num_pots + 5e-4)
+
 
 
 class TestOvercookedEnvironment(unittest.TestCase):

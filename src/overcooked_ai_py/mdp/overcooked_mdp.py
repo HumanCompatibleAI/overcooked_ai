@@ -591,7 +591,7 @@ class PlayerState(object):
     @staticmethod
     def from_dict(player_dict):
         player_dict = copy.deepcopy(player_dict)
-        held_obj = player_dict["held_object"]
+        held_obj = player_dict.get("held_object", None)
         if held_obj is not None:
             player_dict["held_object"] = SoupState.from_dict(held_obj)
         return PlayerState(**player_dict)
