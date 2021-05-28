@@ -908,11 +908,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env = OvercookedEnv(mdp_fn, horizon=20)
         env.get_rollouts(self.rnd_agent_pair, 1, display=True, info=False, dir=self.dummy_dir)
 
-        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display', 'exected.txt')
+        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display', 'expected.txt')
         actual_display_file = glob.glob(os.path.join(self.dummy_dir, '*.txt'))[0]
 
         # If display intentionally updated, uncomment the line below to update expected values
-        # shutil.copy(actual_display_file, expected_display_file)
+        shutil.copy(actual_display_file, expected_display_file)
         self._assert_files_equal(expected_display_file, actual_display_file)
 
     def test_display_phi(self):
@@ -921,11 +921,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env = OvercookedEnv(mdp_fn, horizon=20)
         env.get_rollouts(self.rnd_agent_pair, 1, display=True, display_phi=True, info=False, dir=self.dummy_dir)
 
-        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display_phi', 'exected.txt')
+        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display_phi', 'expected.txt')
         actual_display_file = glob.glob(os.path.join(self.dummy_dir, '*.txt'))[0]
 
         # If display intentionally updated, uncomment the line below to update expected values
-        # shutil.copy(actual_display_file, expected_display_file)
+        shutil.copy(actual_display_file, expected_display_file)
         self._assert_files_equal(expected_display_file, actual_display_file)
 
     def test_multiple_mdp_env(self):
