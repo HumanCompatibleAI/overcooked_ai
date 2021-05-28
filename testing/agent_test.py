@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, RandomAgent
+from overcooked_ai_py.agents.agent import AgentPair, FixedPlanAgent, GreedyHumanModel, RandomAgent, SampleAgent
 from overcooked_ai_py.mdp.actions import Direction, Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedState, PlayerState, ObjectState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -31,7 +31,7 @@ class TestAgentEvaluator(unittest.TestCase):
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
         try:
-            AgentEvaluator.check_trajectories(trajs)
+            AgentEvaluator.check_trajectories(trajs, verbose=False)
         except AssertionError as e:
             self.fail("Trajectories were not returned in standard format:\n{}".format(e))
 
@@ -39,7 +39,7 @@ class TestAgentEvaluator(unittest.TestCase):
         ap = AgentPair(RandomAgent(), RandomAgent())
         trajs = self.agent_eval.evaluate_agent_pair(ap, num_games=5)
         try:
-            AgentEvaluator.check_trajectories(trajs)
+            AgentEvaluator.check_trajectories(trajs, verbose=False)
         except AssertionError as e:
             self.fail("Trajectories were not returned in standard format:\n{}".format(e))
         
@@ -80,6 +80,11 @@ class TestBasicAgents(unittest.TestCase):
         env = OvercookedEnv.from_mdp(scenario_2_mdp, start_state_fn=lambda: start_state, horizon=100)
         trajectory, time_taken, _, _ = env.run_agents(agent_pair, include_final_state=True, display=DISPLAY)
 
+    def test_sample_agent(self):
+        agent = SampleAgent([RandomAgent(all_actions=False), RandomAgent(all_actions=True)])
+        probs = agent.action(None)[1]["action_probs"]
+        expected_probs = np.array([0.18333333, 0.18333333, 0.18333333, 0.18333333, 0.18333333, 0.08333333])
+        self.assertTrue(np.allclose(probs, expected_probs))
 
 class TestAgentEvaluatorStatic(unittest.TestCase):
 

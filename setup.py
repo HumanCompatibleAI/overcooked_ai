@@ -18,12 +18,17 @@ setup(name='overcooked_ai',
       keywords=['Overcooked', 'AI', 'Reinforcement Learning'],
       package_dir={"": "src"},
       package_data={
-        'overcooked_ai_py' : ['data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle']
+        'overcooked_ai_py' : [
+          'data/layouts/*.layout', 'data/planners/*.py', 'data/human_data/*.pickle',
+          'data/graphics/*.png', 'data/graphics/*.json', 'data/fonts/*.ttf',
+        ],
       },
       install_requires=[
         'numpy',
         'tqdm',
         'gym',
-        'ipython'
+        'ipython',
+        'pygame',
+        "ipywidgets"
       ]
     )

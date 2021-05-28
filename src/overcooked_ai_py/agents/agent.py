@@ -458,7 +458,20 @@ class GreedyHumanModel(Agent):
 
         return motion_goals
 
+class SampleAgent(Agent):
+    """ Agent that samples action using the average action_probs across multiple agents
+    """
+    def __init__(self, agents):
+        self.agents = agents
 
+    def action(self, state):
+        action_probs = np.zeros(Action.NUM_ACTIONS)
+        for agent in self.agents:
+            action_probs += agent.action(state)[1]["action_probs"]
+        action_probs = action_probs/len(self.agents)
+        return Action.sample(action_probs), {"action_probs": action_probs}
+    """
+    """
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
 # class CoupledPlanningAgent(Agent):
 #     """
