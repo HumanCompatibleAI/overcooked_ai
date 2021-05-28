@@ -11,7 +11,8 @@ from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanMode
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS, MotionPlanner
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir, load_from_json, save_as_json
-from utils import TESTING_DATA_DIR, generate_serialized_trajectory
+from overcooked_ai_py.static import TESTING_DATA_DIR
+from utils import generate_serialized_trajectory
 
 START_ORDER_LIST = ["any"]
 n, s = Direction.NORTH, Direction.SOUTH
