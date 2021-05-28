@@ -1,4 +1,4 @@
-import itertools, copy
+import itertools, copy, warnings
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
@@ -1070,7 +1070,6 @@ class OvercookedGridworld(object):
         (not soup deliveries).
         """
         events_infos = { event : [False] * self.num_players for event in EVENT_TYPES }
-
         assert not self.is_terminal(state), "Trying to find successor of a terminal state: {}".format(state)
         for action, action_set in zip(joint_action, self.get_actions(state)):
             if action not in action_set:
@@ -1836,6 +1835,13 @@ class OvercookedGridworld(object):
 
     @property
     def lossless_state_encoding_shape(self):
+        warnings.warn(
+            "Using the `lossless_state_encoding_shape` property is deprecated. Please use `get_lossless_state_encoding_shape` method instead",
+            DeprecationWarning
+        )
+        return np.array(list(self.shape) + [26])
+
+    def get_lossless_state_encoding_shape(self):
         return np.array(list(self.shape) + [26])
 
 
@@ -1954,54 +1960,75 @@ class OvercookedGridworld(object):
 
     @property
     def featurize_state_shape(self, num_pots=2):
-        # TODO: make this a function instead of a property so that num_pots can be varied by user
+        warnings.warn(
+            "Using the `featurize_state_shape` property is deprecated. Please use `get_featurize_state_shape` method instead",
+            DeprecationWarning
+        )
         num_pot_features = 8
         base_features = 54
         total_features = self.num_players * num_pots * num_pot_features + base_features
         return (total_features,)
 
+    def get_featurize_state_shape(self, num_pots=2):
+        num_pot_features = 10
+        base_features = 28
+        total_features = self.num_players * (num_pots * num_pot_features + base_features)
+        return (total_features,)
+
     def featurize_state(self, overcooked_state, mlam, num_pots=2, **kwargs):
         """
-        Encode state with some manually designed features.
-        NOTE: currently works for just two players.
+        Encode state with some manually designed features. Works for arbitrary number of players
         """
 
         all_features = {}
 
+        def concat_dicts(a, b):
+            return {**a, **b}
+
         def make_closest_feature(idx, player, name, locations):
-            "Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict"
+            """
+            Compute (x, y) deltas to closest feature of type `name`, and save it in the features dict
+            """
+            feat_dict = {}
             obj = None
             held_obj = player.held_object
             held_obj_name = held_obj.name if held_obj else "none"
             if held_obj_name == name:
                 obj = held_obj
-                all_features["p{}_closest_{}".format(i, name)] = (0, 0)
+                feat_dict["p{}_closest_{}".format(i, name)] = (0, 0)
             else:
                 loc, deltas = self.get_deltas_to_closest_location(player, locations, mlam)
                 if loc and overcooked_state.has_object(loc):
                     obj = overcooked_state.get_object(loc)
-                all_features["p{}_closest_{}".format(idx, name)] = deltas
+                feat_dict["p{}_closest_{}".format(idx, name)] = deltas
 
             if name == 'soup':
                 num_onions = num_tomatoes = 0
                 if obj:
                     ingredients_cnt = Counter(obj.ingredients)
                     num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
-                all_features["p{}_closest_soup_n_onions".format(i)] = num_onions
-                all_features["p{}_closest_soup_n_tomatoes".format(i)] = num_tomatoes
+                feat_dict["p{}_closest_soup_n_onions".format(i)] = [num_onions]
+                feat_dict["p{}_closest_soup_n_tomatoes".format(i)] = [num_tomatoes]
+
+            return feat_dict
 
         def make_pot_feature(idx, player, pot_idx, pot_loc, pot_states):
+            """
+            Encode pot at pot_loc relative to 'player'
+            """
             # Pot doesn't exist
+            feat_dict = {}
             if not pot_loc:
-                all_features["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = 0
-                all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = 0
-                return
+                feat_dict["p{}_closest_pot_{}_exists".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}".format(idx, pot_idx)] = (0, 0)
+                return feat_dict
             
             # Get position information
             deltas = self.get_deltas_to_location(player, pot_loc)
@@ -2022,14 +2049,17 @@ class OvercookedGridworld(object):
                 cook_time_remaining = 0 if soup.is_idle else soup.cook_time_remaining
             
             # Encode pot and soup info
-            all_features["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = is_empty
-            all_features["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = is_full
-            all_features["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = is_cooking
-            all_features["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = is_ready
-            all_features["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = num_onions
-            all_features["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = num_tomatoes
-            all_features["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = cook_time_remaining
-            all_features["p{}_closest_pot_{}".format(idx, pot_idx)] = deltas
+            feat_dict["p{}_closest_pot_{}_exists".format(idx, pot_idx)] = [1]
+            feat_dict["p{}_closest_pot_{}_is_empty".format(idx, pot_idx)] = [is_empty]
+            feat_dict["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = [is_full]
+            feat_dict["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = [is_cooking]
+            feat_dict["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = [is_ready]
+            feat_dict["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = [num_onions]
+            feat_dict["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = [num_tomatoes]
+            feat_dict["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = [cook_time_remaining]
+            feat_dict["p{}_closest_pot_{}".format(idx, pot_idx)] = deltas
+
+            return feat_dict
 
             
 
@@ -2055,56 +2085,66 @@ class OvercookedGridworld(object):
                 all_features["p{}_objs".format(i)] = np.eye(len(IDX_TO_OBJ))[obj_idx]
 
             # Closest feature for each object type
-            make_closest_feature(i, player, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"])
-            make_closest_feature(i, player, "tomato", self.get_tomato_dispenser_locations() + counter_objects["tomato"])
-            make_closest_feature(i, player, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"])
-            make_closest_feature(i, player, "soup", counter_objects["soup"])
-            make_closest_feature(i, player, "serving", self.get_serving_locations())
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "tomato", self.get_tomato_dispenser_locations() + counter_objects["tomato"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "soup", counter_objects["soup"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "serving", self.get_serving_locations()))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "empty_counter", self.get_empty_counter_locations(overcooked_state)))
 
             # Closest pots info
             pot_locations = self.get_pot_locations().copy()
             for pot_idx in range(num_pots):
                 _, closest_pot_loc = mlam.motion_planner.min_cost_to_feature(player.pos_and_or, pot_locations, with_argmin=True)
-                make_pot_feature(i, player, pot_idx, closest_pot_loc, pot_states)
+                pot_features = make_pot_feature(i, player, pot_idx, closest_pot_loc, pot_states)
+                all_features = concat_dicts(all_features, pot_features)
 
                 if closest_pot_loc:
                     pot_locations.remove(closest_pot_loc)
 
             # Adjacent features info
             for direction, pos_and_feat in enumerate(self.get_adjacent_features(player)):
-                adj_pos, feat = pos_and_feat
-
-                if direction == player.orientation:
-                    # Check if counter we are facing is empty
-                    facing_counter = (feat == 'X' and adj_pos not in overcooked_state.objects.keys())
-                    facing_counter_feature = [1] if facing_counter else [0]
-                    # NOTE: Really, this feature should have been "closest empty counter"
-                    all_features["p{}_facing_empty_counter".format(i)] = facing_counter_feature
-
+                _, feat = pos_and_feat
                 all_features["p{}_wall_{}".format(i, direction)] = [0] if feat == ' ' else [1]
 
-        # Convert feature dict created above into np array for each player
-        # NOTE: This is the portion that assumes n=2 players
+        # Convert all list and tuple values to np.arrays
         features_np = {k: np.array(v) for k, v in all_features.items()}
-        features_np = {k : np.expand_dims(v, 0) if not v.shape else v for k, v in features_np.items()}
-        p0, p1 = overcooked_state.players
-        p0_dict = {k: v for k, v in features_np.items() if k[:2] == "p0"}
-        p1_dict = {k: v for k, v in features_np.items() if k[:2] == "p1"}
-        p0_features = np.concatenate(list(p0_dict.values()))
-        p1_features = np.concatenate(list(p1_dict.values()))
 
-        # Relative player positions
-        p1_rel_to_p0 = np.array(pos_distance(p1.position, p0.position))
-        p0_rel_to_p1 = np.array(pos_distance(p0.position, p1.position))
+        player_features = [] # Non-position player-specific features
+        player_absolute_positions = [] # Position player-specific features
+        player_relative_positions = [] # Relative position player-specific features
 
-        # Absolute player positions
-        abs_pos_p0 = np.array(p0.position)
-        abs_pos_p1 = np.array(p1.position)
+        # Compute all player-centric features for each player
+        for i, player_i in enumerate(overcooked_state.players):
+            # All absolute player-centric features
+            player_i_dict = {k: v for k, v in features_np.items() if k[:2] == "p{}".format(i)}
+            features = np.concatenate(list(player_i_dict.values()))
+            abs_pos = np.array(player_i.position)
 
-        # Player-centric observations for each player
-        ordered_features_p0 = np.squeeze(np.concatenate([p0_features, p1_features, p1_rel_to_p0, abs_pos_p0]))
-        ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
-        return ordered_features_p0, ordered_features_p1
+            # Calculate position relative to all other players
+            rel_pos = []
+            for player_j in overcooked_state.players:
+                if player_i == player_j:
+                    continue
+                pj_rel_to_pi = np.array(pos_distance(player_j.position, player_i.position))
+                rel_pos.append(pj_rel_to_pi)
+            rel_pos = np.concatenate(rel_pos)
+
+            player_features.append(features)
+            player_absolute_positions.append(abs_pos)
+            player_relative_positions.append(rel_pos)
+        
+        # Compute a symmetric, player-centric encoding of features for each player
+        ordered_features = []
+        for i, player_i in enumerate(overcooked_state.players):
+            player_i_features = player_features[i]
+            player_i_abs_pos = player_absolute_positions[i]
+            player_i_rel_pos = player_relative_positions[i]
+            other_player_features = np.concatenate([feats for j, feats in enumerate(player_features) if j != i])
+            player_i_ordered_features = np.squeeze(np.concatenate([player_i_features, other_player_features, player_i_rel_pos, player_i_abs_pos]))
+            ordered_features.append(player_i_ordered_features)
+
+        return ordered_features
 
 
     def get_deltas_to_closest_location(self, player, locations, mlam):
