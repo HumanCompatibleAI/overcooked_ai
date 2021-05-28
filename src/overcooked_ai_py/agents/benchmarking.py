@@ -152,7 +152,7 @@ class AgentEvaluator(object):
         return trajs_0, trajs_1
 
     @staticmethod
-    def check_trajectories(trajectories, from_json=False):
+    def check_trajectories(trajectories, from_json=False, **kwargs):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
         If the trajectories were saves as json, do not check that they have standard traj keys.
@@ -160,7 +160,7 @@ class AgentEvaluator(object):
         if not from_json:
             AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
-        AgentEvaluator._check_trajectories_dynamics(trajectories)
+        AgentEvaluator._check_trajectories_dynamics(trajectories, **kwargs)
         # TODO: Check shapes?
 
     @staticmethod
@@ -182,10 +182,11 @@ class AgentEvaluator(object):
             # TODO: check that are all lists
 
     @staticmethod
-    def _check_trajectories_dynamics(trajectories):
+    def _check_trajectories_dynamics(trajectories, verbose=True):
         if any(env_params["_variable_mdp"] for env_params in trajectories["env_params"]):
-            print("Skipping trajectory consistency checking because MDP was recognized as variable. "
-                  "Trajectory consistency checking is not yet supported for variable MDPs.")
+            if verbose:
+                print("Skipping trajectory consistency checking because MDP was recognized as variable. "
+                    "Trajectory consistency checking is not yet supported for variable MDPs.")
             return
 
         _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)

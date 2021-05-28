@@ -31,7 +31,7 @@ class TestAgentEvaluator(unittest.TestCase):
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
         try:
-            AgentEvaluator.check_trajectories(trajs)
+            AgentEvaluator.check_trajectories(trajs, verbose=False)
         except AssertionError as e:
             self.fail("Trajectories were not returned in standard format:\n{}".format(e))
 
@@ -39,7 +39,7 @@ class TestAgentEvaluator(unittest.TestCase):
         ap = AgentPair(RandomAgent(), RandomAgent())
         trajs = self.agent_eval.evaluate_agent_pair(ap, num_games=5)
         try:
-            AgentEvaluator.check_trajectories(trajs)
+            AgentEvaluator.check_trajectories(trajs, verbose=False)
         except AssertionError as e:
             self.fail("Trajectories were not returned in standard format:\n{}".format(e))
         

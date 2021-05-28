@@ -393,7 +393,7 @@ class TestGridworld(unittest.TestCase):
         generate_serialized_trajectory(self.base_mdp, traj_path)
 
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
-        AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
+        AgentEvaluator.check_trajectories(test_trajectory, from_json=True, verbose=False)
 
     def test_mdp_serialization(self):
         # Where to store serialized states -- will be overwritten each timestep

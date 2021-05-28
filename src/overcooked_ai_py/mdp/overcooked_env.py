@@ -30,7 +30,7 @@ class OvercookedEnv(object):
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1, initial_info={}):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=0, num_mdp=1, initial_info={}):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
@@ -63,7 +63,8 @@ class OvercookedEnv(object):
     @property
     def mlam(self):
         if self._mlam is None:
-            print("Computing MediumLevelActionManager")
+            if self.info_level > 0:
+                print("Computing MediumLevelActionManager")
             self._mlam = MediumLevelActionManager.from_pickle_or_compute(self.mdp, self.mlam_params,
                                                                   force_compute=False)
         return self._mlam
@@ -74,6 +75,8 @@ class OvercookedEnv(object):
             if self._mlam is not None:
                 self._mp = self.mlam.motion_planner
             else:
+                if self.info_level > 0:
+                    print("Computing MotionPlanner")
                 self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
                                                                 force_compute=False)
         return self._mp
@@ -361,7 +364,7 @@ class OvercookedEnv(object):
 
         total_sparse = sum(self.game_stats["cumulative_sparse_rewards_by_agent"])
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
-        return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
+        return np.array(trajectory, dtype=object), self.state.timestep, total_sparse, total_shaped
 
     def get_rollouts(self, agent_pair, num_games, display=False, dir=None, final_state=False, display_phi=False,
                      display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
@@ -421,7 +424,7 @@ class OvercookedEnv(object):
 
         # TODO: should probably transfer check methods over to Env class
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-        AgentEvaluator.check_trajectories(trajectories)
+        AgentEvaluator.check_trajectories(trajectories, verbose=info)
         return trajectories
 
 
