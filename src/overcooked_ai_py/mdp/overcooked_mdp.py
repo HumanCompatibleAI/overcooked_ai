@@ -1964,9 +1964,9 @@ class OvercookedGridworld(object):
             "Using the `featurize_state_shape` property is deprecated. Please use `get_featurize_state_shape` method instead",
             DeprecationWarning
         )
-        num_pot_features = 8
-        base_features = 54
-        total_features = self.num_players * num_pots * num_pot_features + base_features
+        num_pot_features = 10
+        base_features = 28
+        total_features = self.num_players * (num_pots * num_pot_features + base_features)
         return (total_features,)
 
     def get_featurize_state_shape(self, num_pots=2):
