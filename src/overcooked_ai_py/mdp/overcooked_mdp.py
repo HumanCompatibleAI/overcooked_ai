@@ -1959,15 +1959,12 @@ class OvercookedGridworld(object):
         return final_obs_for_players
 
     @property
-    def featurize_state_shape(self, num_pots=2):
+    def featurize_state_shape(self):
         warnings.warn(
             "Using the `featurize_state_shape` property is deprecated. Please use `get_featurize_state_shape` method instead",
             DeprecationWarning
         )
-        num_pot_features = 10
-        base_features = 28
-        total_features = self.num_players * (num_pots * num_pot_features + base_features)
-        return (total_features,)
+        return self.get_featurize_state_shape(2)
 
     def get_featurize_state_shape(self, num_pots=2):
         num_pot_features = 10
@@ -1978,6 +1975,41 @@ class OvercookedGridworld(object):
     def featurize_state(self, overcooked_state, mlam, num_pots=2, **kwargs):
         """
         Encode state with some manually designed features. Works for arbitrary number of players
+
+        Arguments:
+            overcooked_state (OvercookedState): state we wish to featurize
+            mlam (MediumLevelActionManager): to be used for distance computations necessary for our higher-level feature encodings
+            num_pots (int): Encode the state (ingredients, whether cooking or not, etc) of the 'num_pots' closest pots to each player. 
+                If i < num_pots pots are reachable by player i, then pots [i+1, num_pots] are encoded as all zeros. Changing this 
+                impacts the shape of the feature encoding
+        
+        Returns:
+            ordered_features (list[np.Array]): The ith element contains a player-centric featurized view for the ith player
+
+            The encoding for player i is as follows:
+
+                [player_i_features, other_player_features player_i_dist_to_other_players, player_i_position]
+
+                player_{i}_features (length num_pots*10 + 24):
+                    pi_orientation: length 4 one-hot-encoding of direction currently facing
+                    pi_obj: length 4 one-hot-encoding of object currently being held (all 0s if no object held)
+                    pi_wall_{j}: {0, 1} boolean value of whether player i has wall immediately in direction j
+                    pi_closest_{onion|tomato|dish|soup|serving|empty_counter}: (dx, dy) where dx = x dist to item, dy = y dist to item. (0, 0) if item is currently held
+                    pi_cloest_soup_n_{onions|tomatoes}: int value for number of this ingredient in closest soup
+                    pi_closest_pot_{j}_exists: {0, 1} depending on whether jth closest pot found. If 0, then all other pot features are 0. Note: can
+                        be 0 even if there are more than j pots on layout, if the pot is not reachable by player i
+                    pi_closest_pot_{j}_{is_empty|is_full|is_cooking|is_ready}: {0, 1} depending on boolean value for jth closest pot
+                    pi_closest_pot_{j}_{num_onions|num_tomatoes}: int value for number of this ingredient in jth closest pot
+                    pi_closest_pot_{j}_cook_time: int value for seconds remaining on soup. -1 if no soup is cooking
+                    pi_closest_pot_{j}: (dx, dy) to jth closest pot from player i location
+
+                other_player_features (length (num_players - 1)*(num_pots*10 + 24)):
+                    ordered concatenation of player_{j}_features for j != i
+                
+                player_i_dist_to_other_players (length (num_players - 1)*2):
+                    [player_j.pos - player_i.pos for j != i]
+
+                player_i_position (length 2)
         """
 
         all_features = {}
