@@ -33,10 +33,9 @@ jobs:
       run: pip install -e .
     - name: Run tests and generate coverage report
       run: |
-        python -m unittest discover -s testing/ -p "*_test.py"
+        coverage run -m unittest discover -s testing/ -p "*_test.py"
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
-        flags: no-planners
         name: codecov-report
         fail_ci_if_error: false

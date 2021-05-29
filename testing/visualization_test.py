@@ -6,7 +6,7 @@ from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, OvercookedS
 from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
 from overcooked_ai_py.utils import load_from_json, generate_temporary_file_path
 from overcooked_ai_py.mdp.overcooked_mdp import Recipe
-from utils import TESTING_DATA_DIR
+from overcooked_ai_py.static import TESTING_DATA_DIR
 
 def get_file_count(directory_path):
     path, dirs, files = next(os.walk(directory_path))

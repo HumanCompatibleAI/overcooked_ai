@@ -8,6 +8,7 @@ from overcooked_ai_py.agents.agent import AgentPair, RandomAgent, GreedyHumanMod
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Action, OvercookedState
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+from overcooked_ai_py.mdp.overcooked_trajectory import DEFAULT_TRAJ_KEYS
 
 
 class AgentEvaluator(object):
@@ -151,7 +152,7 @@ class AgentEvaluator(object):
         return trajs_0, trajs_1
 
     @staticmethod
-    def check_trajectories(trajectories, from_json=False):
+    def check_trajectories(trajectories, from_json=False, **kwargs):
         """
         Checks that of trajectories are in standard format and are consistent with dynamics of mdp.
         If the trajectories were saves as json, do not check that they have standard traj keys.
@@ -159,12 +160,12 @@ class AgentEvaluator(object):
         if not from_json:
             AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
-        AgentEvaluator._check_trajectories_dynamics(trajectories)
+        AgentEvaluator._check_trajectories_dynamics(trajectories, **kwargs)
         # TODO: Check shapes?
 
     @staticmethod
     def _check_standard_traj_keys(traj_keys_set):
-        default_traj_keys = OvercookedEnv.DEFAULT_TRAJ_KEYS
+        default_traj_keys = DEFAULT_TRAJ_KEYS
         assert traj_keys_set == set(default_traj_keys), "Keys of traj dict did not match standard form.\nMissing keys: {}\nAdditional keys: {}".format(
             [k for k in default_traj_keys if k not in traj_keys_set], [k for k in traj_keys_set if k not in default_traj_keys]
         )
@@ -181,10 +182,11 @@ class AgentEvaluator(object):
             # TODO: check that are all lists
 
     @staticmethod
-    def _check_trajectories_dynamics(trajectories):
+    def _check_trajectories_dynamics(trajectories, verbose=True):
         if any(env_params["_variable_mdp"] for env_params in trajectories["env_params"]):
-            print("Skipping trajectory consistency checking because MDP was recognized as variable. "
-                  "Trajectory consistency checking is not yet supported for variable MDPs.")
+            if verbose:
+                print("Skipping trajectory consistency checking because MDP was recognized as variable. "
+                    "Trajectory consistency checking is not yet supported for variable MDPs.")
             return
 
         _, envs = AgentEvaluator.get_mdps_and_envs_from_trajectories(trajectories)
@@ -241,7 +243,7 @@ class AgentEvaluator(object):
     @staticmethod
     def save_traj_as_json(trajectory, filename):
         """Saves the `idx`th trajectory as a list of state action pairs"""
-        assert set(OvercookedEnv.DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(OvercookedEnv.DEFAULT_TRAJ_KEYS, trajectory.keys())
+        assert set(DEFAULT_TRAJ_KEYS) == set(trajectory.keys()), "{} vs\n{}".format(DEFAULT_TRAJ_KEYS, trajectory.keys())
         AgentEvaluator.check_trajectories(trajectory)
         trajectory = AgentEvaluator.make_trajectories_json_serializable(trajectory)
         save_as_json(trajectory, filename)

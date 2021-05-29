@@ -75,11 +75,13 @@ class MotionPlanner(object):
             mp = MotionPlanner.from_file(filename)
 
             if mp.counter_goals != counter_goals or mp.mdp != mdp:
-                print("motion planner with different counter goal or mdp found, computing from scratch")
+                if info:
+                    print("motion planner with different counter goal or mdp found, computing from scratch")
                 return MotionPlanner.compute_mp(filename, mdp, counter_goals)
 
         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
-            print("Recomputing motion planner due to:", e)
+            if info:
+                print("Recomputing motion planner due to:", e)
             return MotionPlanner.compute_mp(filename, mdp, counter_goals)
 
         if info:
@@ -148,7 +150,7 @@ class MotionPlanner(object):
             all_plans[plan_key] = (action_plan, pos_and_or_path, plan_cost)
         return all_plans
 
-    def is_valid_motion_start_goal_pair(self, start_pos_and_or, goal_pos_and_or, debug=False):
+    def is_valid_motion_start_goal_pair(self, start_pos_and_or, goal_pos_and_or):
         if not self.is_valid_motion_goal(goal_pos_and_or):
             return False
         # the valid motion start goal needs to be in the same connected component
@@ -299,7 +301,7 @@ class MotionPlanner(object):
         best_feature = None
         for feature_pos in feature_pos_list:
             for feature_goal in self.motion_goals_for_pos[feature_pos]:
-                if not self.is_valid_motion_start_goal_pair(start_pos_and_or, feature_goal, debug=debug):
+                if not self.is_valid_motion_start_goal_pair(start_pos_and_or, feature_goal):
                     continue
                 curr_dist = self.get_gridworld_distance(start_pos_and_or, feature_goal)
                 if curr_dist < min_dist:
@@ -351,6 +353,7 @@ class JointMotionPlanner(object):
         # (increases number of plans by a factor of 4)
         # but removes additional fudge factor <= 1 for each
         # joint motion plan
+        self.debug = debug
         self.start_orientations = params["start_orientations"]
 
         # Enable both agents to have the same motion goal
@@ -363,7 +366,7 @@ class JointMotionPlanner(object):
         # starting positions to goal positions (without
         # accounting for orientations)
         self.joint_graph_problem = self._joint_graph_from_grid()
-        self.all_plans = self._populate_all_plans(debug)
+        self.all_plans = self._populate_all_plans()
 
     def get_low_level_action_plan(self, start_jm_state, goal_jm_state):
         """
@@ -416,7 +419,7 @@ class JointMotionPlanner(object):
         joint_action_plan, end_jm_state, plan_lengths = self.all_plans[plan_key]
         return joint_action_plan, end_jm_state, plan_lengths
 
-    def _populate_all_plans(self, debug=False):
+    def _populate_all_plans(self):
         """Pre-compute all valid plans"""
         all_plans = {}
 
@@ -430,9 +433,8 @@ class JointMotionPlanner(object):
         possible_joint_goal_states = list(itertools.product(valid_player_states, repeat=2))
         valid_joint_goal_states = list(filter(self.is_valid_joint_motion_goal, possible_joint_goal_states))
 
-        if debug: print("Number of plans being pre-calculated: ", len(valid_joint_start_states) * len(valid_joint_goal_states))
+        if self.debug: print("Number of plans being pre-calculated: ", len(valid_joint_start_states) * len(valid_joint_goal_states))
         for joint_start_state, joint_goal_state in itertools.product(valid_joint_start_states, valid_joint_goal_states):
-            
             # If orientations not present, joint_start_state just includes positions.
             if not self.start_orientations:
                 dummy_orientation = Direction.NORTH
@@ -674,7 +676,7 @@ class JointMotionPlanner(object):
         # (otherwise Environment will terminate)
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
         dummy_state = OvercookedState.from_players_pos_and_or(joint_start_state, all_orders=self.mdp.start_all_orders)
-        env = OvercookedEnv.from_mdp(self.mdp, horizon=200) # Plans should be shorter than 200 timesteps, or something is likely wrong
+        env = OvercookedEnv.from_mdp(self.mdp, horizon=200, info_level=int(self.debug)) # Plans should be shorter than 200 timesteps, or something is likely wrong
         successor_state, is_done = env.execute_plan(dummy_state, joint_action_plan)
         assert not is_done
         return successor_state.players_pos_and_or
@@ -789,36 +791,40 @@ class MediumLevelActionManager(object):
         return load_saved_action_manager(filename)
 
     @staticmethod
-    def from_pickle_or_compute(mdp, mlam_params, custom_filename=None, force_compute=False, info=True):
+    def from_pickle_or_compute(mdp, mlam_params, custom_filename=None, force_compute=False, info=False):
         assert isinstance(mdp, OvercookedGridworld)
 
         filename = custom_filename if custom_filename is not None else mdp.layout_name + "_am.pkl"
 
         if force_compute:
-            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params, info=info)
 
         try:
             mlam = MediumLevelActionManager.from_file(filename)
 
             if mlam.params != mlam_params or mlam.mdp != mdp:
-                print("medium level action manager with different params or mdp found, computing from scratch")
-                return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+                if info:
+                    print("medium level action manager with different params or mdp found, computing from scratch")
+                return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params, info=info)
 
         except (FileNotFoundError, ModuleNotFoundError, EOFError, AttributeError) as e:
-            print("Recomputing planner due to:", e)
-            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params)
+            if info:
+                print("Recomputing planner due to:", e)
+            return MediumLevelActionManager.compute_mlam(filename, mdp, mlam_params, info=info)
 
         if info:
             print("Loaded MediumLevelActionManager from {}".format(os.path.join(PLANNERS_DIR, filename)))
         return mlam
 
     @staticmethod
-    def compute_mlam(filename, mdp, mlam_params):
+    def compute_mlam(filename, mdp, mlam_params, info=False):
         final_filepath = os.path.join(PLANNERS_DIR, filename)
-        print("Computing MediumLevelActionManager to be saved in {}".format(final_filepath))
+        if info:
+            print("Computing MediumLevelActionManager to be saved in {}".format(final_filepath))
         start_time = time.time()
         mlam = MediumLevelActionManager(mdp, mlam_params=mlam_params)
-        print("It took {} seconds to create mlam".format(time.time() - start_time))
+        if info:
+            print("It took {} seconds to create mlam".format(time.time() - start_time))
         mlam.save_to_file(final_filepath)
         return mlam
 

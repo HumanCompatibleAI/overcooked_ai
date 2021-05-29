@@ -1,16 +1,18 @@
-import unittest, os, shutil
-import json
+import unittest, os, shutil, glob
+import json, copy
 import numpy as np
 from math import factorial
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_mdp import PlayerState, OvercookedGridworld, OvercookedState, ObjectState, SoupState, Recipe
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv, DEFAULT_ENV_PARAMS
+from overcooked_ai_py.mdp.overcooked_trajectory import append_trajectories, DEFAULT_TRAJ_KEYS, TIMESTEP_TRAJ_KEYS, EPISODE_TRAJ_KEYS
 from overcooked_ai_py.mdp.layout_generator import LayoutGenerator, ONION_DISPENSER, TOMATO_DISPENSER, POT, DISH_DISPENSER, SERVING_LOC
 from overcooked_ai_py.agents.agent import AgentGroup, AgentPair, GreedyHumanModel, FixedPlanAgent, RandomAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS, MotionPlanner
 from overcooked_ai_py.utils import save_pickle, load_pickle, iterate_over_json_files_in_dir, load_from_json, save_as_json
-from utils import TESTING_DATA_DIR, generate_serialized_trajectory
+from overcooked_ai_py.static import TESTING_DATA_DIR
+from utils import generate_serialized_trajectory
 
 START_ORDER_LIST = ["any"]
 n, s = Direction.NORTH, Direction.SOUTH
@@ -271,6 +273,8 @@ class TestGridworld(unittest.TestCase):
 
     # TODO: write more smaller targeted tests to be loaded from jsons
 
+    verbose = False
+
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("mdp_test")
 
@@ -354,7 +358,7 @@ class TestGridworld(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.base_mdp.get_state_transition(bad_state, stay)
 
-        env = OvercookedEnv.from_mdp(self.base_mdp)
+        env = OvercookedEnv.from_mdp(self.base_mdp, info_level=0)
 
         def check_transition(action, expected_path, recompute=False):
             # Compute actual values
@@ -389,10 +393,10 @@ class TestGridworld(unittest.TestCase):
         traj_path = os.path.join(TESTING_DATA_DIR, 'test_mdp_dynamics', 'expected.json')
 
         # NOTE: uncomment the following line to recompute trajectories if MDP dymamics were deliberately updated
-        generate_serialized_trajectory(self.base_mdp, traj_path)
+        # generate_serialized_trajectory(self.base_mdp, traj_path)
 
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
-        AgentEvaluator.check_trajectories(test_trajectory, from_json=True)
+        AgentEvaluator.check_trajectories(test_trajectory, from_json=True, verbose=False)
 
     def test_mdp_serialization(self):
         # Where to store serialized states -- will be overwritten each timestep
@@ -430,45 +434,53 @@ class TestGridworld(unittest.TestCase):
         val0 = self.base_mdp.potential_function(state, mp)
 
         # Pick up onion
-        print("pick up onion")
-        print(self.base_mdp.state_string(state))
-        print("potential: ", self.base_mdp.potential_function(state, mp))
+        if self.verbose:
+            print("pick up onion")
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
         actions = [Direction.EAST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val1 = self.base_mdp.potential_function(state, mp)
         
 
         # Pick up tomato
-        print("pick up tomtato")
+        if self.verbose:
+            print("pick up tomtato")
         actions = [Direction.WEST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val2 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val0, val1, "Picking up onion should increase potential")
         self.assertLess(val1, val2, "Picking up tomato should increase potential")
 
         # Pot tomato
-        print("pot tomato")
+        if self.verbose:
+            print("pot tomato")
         actions = [Direction.EAST, Direction.NORTH, Action.INTERACT, Direction.WEST]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val3 = self.base_mdp.potential_function(state, mp)
         
         # Pot onion
-        print("pot onion")
+        if self.verbose:
+            print("pot onion")
         actions = [Direction.WEST, Direction.NORTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val4 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val2, val3, "Potting tomato should increase potential")
@@ -477,40 +489,48 @@ class TestGridworld(unittest.TestCase):
         ## Repeat on second pot ##
 
         # Pick up onion
-        print("pick up onion")
+        if self.verbose:
+            print("pick up onion")
         state, _ = self.base_mdp.get_state_transition(state, [Action.INTERACT, Action.STAY])
         val5 = self.base_mdp.potential_function(state, mp)
-        print(self.base_mdp.state_string(state))
-        print("potential: ", self.base_mdp.potential_function(state, mp))
+        if self.verbose:
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
 
         # Pick up tomato
-        print("pick up tomato")
+        if self.verbose:
+            print("pick up tomato")
         actions = [Direction.SOUTH, Direction.EAST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val6 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val4, val5, "Picking up onion should increase potential")
         self.assertLess(val5, val6, "Picking up tomato should increase potential")
 
         # Pot onion
-        print("pot onion")
+        if self.verbose:
+            print("pot onion")
         actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH, Action.INTERACT, Direction.WEST]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val7 = self.base_mdp.potential_function(state, mp)
 
         # Pot tomato
-        print("pot tomato")
+        if self.verbose:
+            print("pot tomato")
         actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val8 = self.base_mdp.potential_function(state, mp)
 
         
@@ -521,21 +541,25 @@ class TestGridworld(unittest.TestCase):
         ## Useless pickups ##
         
         # pickup tomato
-        print("pickup tomato")
+        if self.verbose:
+            print("pickup tomato")
         actions = [Action.INTERACT, Direction.NORTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val9 = self.base_mdp.potential_function(state, mp)
 
         # pickup tomato
-        print("pickup tomato")
+        if self.verbose:
+            print("pickup tomato")
         actions = [Direction.EAST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val10 = self.base_mdp.potential_function(state, mp)
 
         self.assertLessEqual(val9, val8, "Extraneous pickup should not increase potential")
@@ -544,12 +568,14 @@ class TestGridworld(unittest.TestCase):
         ## Catastrophic soup failure ##
         
         # pot tomato
-        print("pot catastrophic tomato")
+        if self.verbose:
+            print("pot catastrophic tomato")
         actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val11 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val11, val10, "Catastrophic potting should decrease potential")
@@ -557,30 +583,36 @@ class TestGridworld(unittest.TestCase):
         ## Bonus soup creation
 
         # pick up onion
-        print("pick up onion")
+        if self.verbose:
+            print("pick up onion")
         actions = [Direction.NORTH, Action.INTERACT, Direction.WEST, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val12 = self.base_mdp.potential_function(state, mp)
 
         # pot onion
-        print("pot onion")
+        if self.verbose:
+            print("pot onion")
         actions = [Direction.EAST, Direction.NORTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val13 = self.base_mdp.potential_function(state, mp)
 
         # Cook soup
-        print("cook soup")
+        if self.verbose:
+            print("cook soup")
         actions = [Action.INTERACT, Direction.WEST]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val14 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val11, val12, "Useful onion pickup should increase potential")
@@ -590,28 +622,34 @@ class TestGridworld(unittest.TestCase):
         ## Soup pickup ##
 
         # Pick up dish
-        print("pick up dish")
+        if self.verbose:
+            print("pick up dish")
         actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val15 = self.base_mdp.potential_function(state, mp)
 
         # Move towards pot
-        print("move towards pot")
+        if self.verbose:
+            print("move towards pot")
         actions = [Direction.EAST, Direction.NORTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val16 = self.base_mdp.potential_function(state, mp)
 
         # Pickup soup
-        print("pickup soup")
+        if self.verbose:
+            print("pickup soup")
         state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, Action.INTERACT])
-        print(self.base_mdp.state_string(state))
-        print("potential: ", self.base_mdp.potential_function(state, mp))
+        if self.verbose:
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
         val17 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val14, val15, "Useful dish pickups should increase potential")
@@ -621,38 +659,45 @@ class TestGridworld(unittest.TestCase):
         ## Removing failed soup from pot
 
         # move towards failed soup
-        print("move torwards failed soup")
+        if self.verbose:
+            print("move torwards failed soup")
         actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val18 = self.base_mdp.potential_function(state, mp)
 
         # Cook failed soup
         actions = [Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val19 = self.base_mdp.potential_function(state, mp)
 
         # Pickup dish
-        print("pickup dish")
+        if self.verbose:
+            print("pickup dish")
         actions = [Direction.WEST, Direction.SOUTH, Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val20 = self.base_mdp.potential_function(state, mp)
 
         # Move towards soup
-        print("move towards soup")
+        if self.verbose:
+            print("move towards soup")
         actions = [Direction.EAST, Direction.SOUTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val21 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val17, val18, "Moving towards failed soup should increase potential")
@@ -666,24 +711,29 @@ class TestGridworld(unittest.TestCase):
         actions = [Action.INTERACT]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val22 = self.base_mdp.potential_function(state, mp)
 
         # Move towards serving area
-        print("move towards servering area")
+        if self.verbose:
+            print("move towards servering area")
         actions = [Direction.EAST, Direction.SOUTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [action, Action.STAY])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val23 = self.base_mdp.potential_function(state, mp)
 
         # Move away from serving area
-        print("move away from serving area")
+        if self.verbose:
+            print("move away from serving area")
         state, _ = self.base_mdp.get_state_transition(state, [Direction.NORTH, Action.STAY])
-        print(self.base_mdp.state_string(state))
-        print("potential: ", self.base_mdp.potential_function(state, mp))
+        if self.verbose:
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
         val24 = self.base_mdp.potential_function(state, mp)
 
         self.assertLess(val21, val22, "Picking up failed soup should increase potential")
@@ -693,19 +743,23 @@ class TestGridworld(unittest.TestCase):
         ## Deliver successful soup ##
 
         # Move towards serving area
-        print("move towards serving area")
+        if self.verbose:
+            print("move towards serving area")
         actions = [Direction.SOUTH, Direction.EAST, Direction.SOUTH]
         for action in actions:
             state, _ = self.base_mdp.get_state_transition(state, [Action.STAY, action])
-            print(self.base_mdp.state_string(state))
-            print("potential: ", self.base_mdp.potential_function(state, mp))
+            if self.verbose:
+                print(self.base_mdp.state_string(state))
+                print("potential: ", self.base_mdp.potential_function(state, mp))
         val25 = self.base_mdp.potential_function(state, mp)
 
         # Deliver soup
-        print("deliver successful soup")
+        if self.verbose:
+            print("deliver successful soup")
         state, rewards = self.base_mdp.get_state_transition(state, [Action.STAY, Action.INTERACT])
-        print(self.base_mdp.state_string(state))
-        print("potential: ", self.base_mdp.potential_function(state, mp))
+        if self.verbose:
+            print(self.base_mdp.state_string(state))
+            print("potential: ", self.base_mdp.potential_function(state, mp))
 
         self.assertLess(val24, val25, "Moving towards serving area with valid soup increases potential")
         self.assertEqual(sum(rewards['sparse_reward_by_agent']), 50, "Soup was not properly devivered, probably an error with MDP logic")
@@ -725,22 +779,26 @@ class TestFeaturizations(unittest.TestCase):
     def setUp(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlam = MediumLevelActionManager.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
-        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS, info_level=0)
         self.greedy_human_model_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
         np.random.seed(0)
 
     def test_lossless_state_featurization_shape(self):
         s = self.base_mdp.get_standard_start_state()
         obs = self.base_mdp.lossless_state_encoding(s)[0]
-        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.lossless_state_encoding_shape), "{} vs {}".format(obs.shape, self.base_mdp.lossless_state_encoding_shape))
+        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.get_lossless_state_encoding_shape()), "{} vs {}".format(obs.shape, self.base_mdp.get_lossless_state_encoding_shape()))
 
     def test_state_featurization_shape(self):
         s = self.base_mdp.get_standard_start_state()
-        obs = self.base_mdp.featurize_state(s, self.mlam)[0]
-        self.assertTrue(np.array_equal(obs.shape, self.base_mdp.featurize_state_shape), "{} vs {}".format(obs.shape, self.base_mdp.featurize_state_shape))
+
+        for num_pots in range(3):
+            obs_0, obs_1 = self.base_mdp.featurize_state(s, self.mlam, num_pots=num_pots)
+            expected_shape = self.base_mdp.get_featurize_state_shape(num_pots=num_pots)
+            self.assertTrue(np.array_equal(obs_0.shape, expected_shape), "{} vs {}".format(obs_0.shape, expected_shape))
+            self.assertTrue(np.array_equal(obs_1.shape, expected_shape), "{} vs {}".format(obs_1.shape, expected_shape))
 
     def test_lossless_state_featurization(self):
-        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5, info=False)
         featurized_observations = [[self.base_mdp.lossless_state_encoding(state) for state in ep_states] for ep_states in trajs["ep_states"]]
         
         pickle_path = os.path.join(TESTING_DATA_DIR, "test_lossless_state_featurization", "expected")
@@ -752,27 +810,45 @@ class TestFeaturizations(unittest.TestCase):
         self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
     def test_state_featurization(self):
-        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5)
-        featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam) for state in ep_states] for ep_states in trajs["ep_states"]]
-        pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected')
-        # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
-        # featurizations by uncommenting the following line:
-        # save_pickle(featurized_observations, pickle_path)
-        expected_featurization = load_pickle(pickle_path)
-        self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5, info=False)
+
+        for num_pots in range(3):
+            featurized_observations = [[self.base_mdp.featurize_state(state, self.mlam, num_pots=num_pots) for state in ep_states] for ep_states in trajs["ep_states"]]
+            pickle_path = os.path.join(TESTING_DATA_DIR, "test_state_featurization", 'expected_{}'.format(num_pots))
+            # NOTE: If the featurizations are updated intentionally, you can overwrite the expected
+            # featurizations by uncommenting the following line:
+            # save_pickle(featurized_observations, pickle_path)
+            expected_featurization = load_pickle(pickle_path)
+            self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
 
 class TestOvercookedEnvironment(unittest.TestCase):
 
+    dummy_dir = 'overcooked_test_temp'
+
     def setUp(self):
+        if not os.path.exists(self.dummy_dir):
+            os.makedirs(self.dummy_dir)
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, info_level=0, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([stay, w, w]), FixedPlanAgent([stay, e, e]))
         np.random.seed(0)
 
+    def tearDown(self):
+        shutil.rmtree(self.dummy_dir)
+
+    def _assert_files_equal(self, file_1, file_2):
+        with open(file_1, 'r') as f:
+            lines_1 = f.readlines()
+        with open(file_2, 'r') as f:
+            lines_2 = f.readlines()
+
+        for line_1, line_2 in zip(lines_1, lines_2):
+            self.assertEqual(line_1, line_2)
+
     def test_constructor(self):
         try:
-            OvercookedEnv.from_mdp(self.base_mdp, horizon=10)
+            OvercookedEnv.from_mdp(self.base_mdp, horizon=10, info_level=0)
         except Exception as e:
             self.fail("Failed to instantiate OvercookedEnv:\n{}".format(e))
 
@@ -795,14 +871,14 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
     def test_rollouts(self):
         try:
-            self.env.get_rollouts(self.rnd_agent_pair, 3)
+            self.env.get_rollouts(self.rnd_agent_pair, 3, info=False)
         except Exception as e:
             print(e.with_traceback())
             self.fail("Failed to get rollouts from environment:\n{}".format(e))
 
     def test_one_player_env(self):
         mdp = OvercookedGridworld.from_layout_name("cramped_room_single")
-        env = OvercookedEnv.from_mdp(mdp, horizon=12)
+        env = OvercookedEnv.from_mdp(mdp, horizon=12, info_level=0)
         a0 = FixedPlanAgent([stay, w, w, e, e, n, e, interact, w, n, interact])
         ag = AgentGroup(a0)
         env.run_agents(ag, display=False)
@@ -814,7 +890,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_four_player_env_fixed(self):
         mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
         assert mdp.num_players == 4
-        env = OvercookedEnv.from_mdp(mdp, horizon=16)
+        env = OvercookedEnv.from_mdp(mdp, horizon=16, info_level=0)
         a0 = FixedPlanAgent([stay, w, w])
         a1 = FixedPlanAgent([stay, stay, e, e, n, n, n, e, interact, n, n, w, w, w, n, interact, e])
         a2 = FixedPlanAgent([stay, w, interact, n, n, e, e, e, n, e, n, interact, w])
@@ -830,13 +906,27 @@ class TestOvercookedEnvironment(unittest.TestCase):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
         mdp_fn = lambda _ignored: mdp0
         env = OvercookedEnv(mdp_fn, horizon=20)
-        env.get_rollouts(self.rnd_agent_pair, 1, display=True)
+        env.get_rollouts(self.rnd_agent_pair, 1, display=True, info=False, dir=self.dummy_dir)
+
+        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display', 'expected.txt')
+        actual_display_file = glob.glob(os.path.join(self.dummy_dir, '*.txt'))[0]
+
+        # If display intentionally updated, uncomment the line below to update expected values
+        shutil.copy(actual_display_file, expected_display_file)
+        self._assert_files_equal(expected_display_file, actual_display_file)
 
     def test_display_phi(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
         mdp_fn = lambda _ignored: mdp0
         env = OvercookedEnv(mdp_fn, horizon=20)
-        env.get_rollouts(self.rnd_agent_pair, 1, display=True, display_phi=True)
+        env.get_rollouts(self.rnd_agent_pair, 1, display=True, display_phi=True, info=False, dir=self.dummy_dir)
+
+        expected_display_file = os.path.join(TESTING_DATA_DIR, 'test_display_phi', 'expected.txt')
+        actual_display_file = glob.glob(os.path.join(self.dummy_dir, '*.txt'))[0]
+
+        # If display intentionally updated, uncomment the line below to update expected values
+        shutil.copy(actual_display_file, expected_display_file)
+        self._assert_files_equal(expected_display_file, actual_display_file)
 
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
@@ -845,12 +935,12 @@ class TestOvercookedEnvironment(unittest.TestCase):
         
         # Default env
         env = OvercookedEnv(mdp_fn, horizon=100)
-        env.get_rollouts(self.rnd_agent_pair, 5)
+        env.get_rollouts(self.rnd_agent_pair, 5, info=False)
 
     def test_starting_position_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=True, rnd_obj_prob_thresh=0.0)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn, info_level=0)
         start_state = env.state.players_pos_and_or
         for _ in range(3):
             env.reset()
@@ -860,7 +950,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_starting_obj_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         start_state_fn = self.base_mdp.get_random_start_state_fn(random_start_pos=False, rnd_obj_prob_thresh=0.8)
-        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn)
+        env = OvercookedEnv.from_mdp(self.base_mdp, start_state_fn, info_level=0)
         start_state = env.state.all_objects_list
         for _ in range(3):
             env.reset()
@@ -1000,6 +1090,38 @@ class TestGymEnvironment(unittest.TestCase):
         np.random.seed(0)
 
     # TODO: write more tests here
+
+class TestTrajectories(unittest.TestCase):
+
+    def setUp(self):
+        self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        self.mlam = MediumLevelActionManager.from_pickle_or_compute(self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True)
+        self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS, info_level=0)
+        self.greedy_human_model_pair = AgentPair(GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam))
+        np.random.seed(0)
+
+    def test_append(self):
+        traj_one = self.env.get_rollouts(self.greedy_human_model_pair, num_games=3, info=False)
+        traj_two = self.env.get_rollouts(self.greedy_human_model_pair, num_games=3, info=False)
+
+        combined = append_trajectories(traj_one, traj_two)
+
+        # Ensure proper keys
+        self.assertEqual(set(combined.keys()), DEFAULT_TRAJ_KEYS)
+
+        # Ensure proper shapes
+        for key in TIMESTEP_TRAJ_KEYS:
+            shape_one = traj_one[key].shape
+            shape_two = traj_two[key].shape
+            shape_combined = combined[key].shape
+            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
+            self.assertEqual(shape_combined[1], shape_one[1])
+            self.assertEqual(shape_combined[1], shape_two[1])
+        for key in EPISODE_TRAJ_KEYS:
+            shape_one = traj_one[key].shape
+            shape_two = traj_two[key].shape
+            shape_combined = combined[key].shape
+            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
 
 if __name__ == '__main__':
     unittest.main()
