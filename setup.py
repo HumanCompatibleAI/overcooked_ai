@@ -6,14 +6,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='overcooked_ai',
-      version='1.0.4',
+      version='1.1.0',
       description='Cooperative multi-agent environment based on Overcooked',
       long_description=long_description,
       long_description_content_type="text/markdown",
       author='Nathan Miller',
       author_email='nathan_miller23@berkeley.edu',
       url='https://github.com/HumanCompatibleAI/overcooked_ai',
-      download_url='https://github.com/HumanCompatibleAI/overcooked_ai/archive/1.0.4.tar.gz',
+      download_url='https://github.com/HumanCompatibleAI/overcooked_ai/archive/refs/tags/1.1.0.tar.gz',
       packages=find_packages('src'),
       keywords=['Overcooked', 'AI', 'Reinforcement Learning'],
       package_dir={"": "src"},
