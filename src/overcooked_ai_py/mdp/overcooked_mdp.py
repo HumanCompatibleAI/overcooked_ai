@@ -1694,6 +1694,7 @@ class OvercookedGridworld(object):
         is_off_dist = self.is_off_distribution(state)
         for i in range(self.num_players):
             events_infos[event_key][i] = is_off_dist
+        return is_off_dist
     
     def is_off_distribution(self, state, off_dist_objects=['dish']):
         full_counters = []
