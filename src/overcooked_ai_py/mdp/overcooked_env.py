@@ -245,7 +245,9 @@ class OvercookedEnv(object):
         events_dict = { k : [ [] for _ in range(self.mdp.num_players) ] for k in EVENT_TYPES }
         rewards_dict = {
             "cumulative_sparse_rewards_by_agent": np.array([0] * self.mdp.num_players),
-            "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
+            "cumulative_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players),
+            "cumulative_off_dist_sparse_rewards_by_agent": np.array([0] * self.mdp.num_players),
+            "cumulative_off_dist_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
         }
         self.game_stats = {**events_dict, **rewards_dict}
 
@@ -285,6 +287,8 @@ class OvercookedEnv(object):
             "ep_game_stats": self.game_stats,
             "ep_sparse_r": sum(self.game_stats["cumulative_sparse_rewards_by_agent"]),
             "ep_shaped_r": sum(self.game_stats["cumulative_shaped_rewards_by_agent"]),
+            "ep_off_dist_sparse_r": sum(self.game_stats["cumulative_off_dist_sparse_rewards_by_agent"]),
+            "ep_off_dist_shaped_r": sum(self.game_stats["cumulative_off_dist_shaped_rewards_by_agent"]),
             "ep_sparse_r_by_agent": self.game_stats["cumulative_sparse_rewards_by_agent"],
             "ep_shaped_r_by_agent": self.game_stats["cumulative_shaped_rewards_by_agent"],
             "ep_length": self.state.timestep
@@ -296,8 +300,17 @@ class OvercookedEnv(object):
         Update the game stats dict based on the events of the current step
         NOTE: the timer ticks after events are logged, so there can be events from time 0 to time self.horizon - 1
         """
-        self.game_stats["cumulative_sparse_rewards_by_agent"] += np.array(infos["sparse_reward_by_agent"])
-        self.game_stats["cumulative_shaped_rewards_by_agent"] += np.array(infos["shaped_reward_by_agent"])
+        is_off_dist = infos['is_off_distribution']
+
+        curr_sparse_reward = np.array(infos["sparse_reward_by_agent"])
+        curr_shaped_reward = np.array(infos["shaped_reward_by_agent"])
+
+        self.game_stats["cumulative_sparse_rewards_by_agent"] += curr_sparse_reward
+        self.game_stats["cumulative_shaped_rewards_by_agent"] += curr_shaped_reward
+
+        if is_off_dist:
+            self.game_stats["cumulative_off_dist_sparse_rewards_by_agent"] += curr_sparse_reward
+            self.game_stats["cumulative_off_dist_shaped_rewards_by_agent"] += curr_shaped_reward
 
         for event_type, bool_list_by_agent in infos["event_infos"].items():
             # For each event type, store the timestep if it occurred

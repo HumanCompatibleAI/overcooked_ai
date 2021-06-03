@@ -817,7 +817,10 @@ EVENT_TYPES = [
     'catastrophic_onion_potting',
     'catastrophic_tomato_potting',
     'useless_onion_potting',
-    'useless_tomato_potting'
+    'useless_tomato_potting',
+
+    # Off distribution events
+    'is_off_distribution'
 ]
 
 POTENTIAL_CONSTANTS = {
@@ -833,6 +836,11 @@ POTENTIAL_CONSTANTS = {
         'pot_onion_steps' : 5,
         'pot_tomato_steps' : 6
     }
+}
+
+OFF_DISTRIBUTION_COUNTERS = {
+    "default" : [],
+    "soup_coordination" : [(1, 0), (9, 4), (0, 3), (10, 1), (5, 1), (5, 3)]
 }
 
 class OvercookedGridworld(object):
@@ -1089,9 +1097,10 @@ class OvercookedGridworld(object):
         # Finally, environment effects
         self.step_environment_effects(new_state)
 
-        # Additional dense reward logic
-        # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
+        # Off-distribution logging
+        is_off_distribution = self.log_off_distribution(new_state, events_infos)
         infos = {
+            "is_off_distribution" : is_off_distribution,
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
@@ -1376,6 +1385,12 @@ class OvercookedGridworld(object):
 
     def get_counter_locations(self):
         return list(self.terrain_pos_dict['X'])
+
+    def get_off_distribution_counter_locations(self):
+        all_counter_locs = self.get_counter_locations()
+        off_dist_counters = OFF_DISTRIBUTION_COUNTERS.get(self.layout_name, OFF_DISTRIBUTION_COUNTERS['default'])
+        assert set(off_dist_counters).issubset(all_counter_locs), "Invalid OOD counter location!"
+        return off_dist_counters
 
     @property
     def num_pots(self):
@@ -1673,6 +1688,20 @@ class OvercookedGridworld(object):
             if USEFUL_DROP_FNS[obj_name](state, pot_states, player_index):
                 obj_useful_key = "useful_" + obj_name + "_drop"
                 events_infos[obj_useful_key][player_index] = True
+
+    def log_off_distribution(self, state, events_infos):
+        event_key = 'is_off_distribution'
+        is_off_dist = self.is_off_distribution(state)
+        for i in range(self.num_players):
+            events_infos[event_key][i] = is_off_dist
+    
+    def is_off_distribution(self, state, off_dist_objects=['dish']):
+        full_counters = []
+        for obj in off_dist_objects:
+            full_counters.extend(self.get_counter_objects_dict(state)[obj])
+        off_dist_counters = self.get_off_distribution_counter_locations()
+        full_off_dist_counters = set(full_counters).intersection(off_dist_counters)
+        return bool(full_off_dist_counters)
 
     def is_dish_pickup_useful(self, state, pot_states, player_index=None):
         """
