@@ -2,6 +2,8 @@ import itertools, math, os, dill
 import numpy as np
 from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
+from overcooked_ai_py.mdp.overcooked_mdp import Recipe
+from overcooked_ai_py.utils import OvercookedException
 
 
 class Agent(object):
@@ -75,9 +77,15 @@ class Agent(object):
     def load(cls, path):
         if os.path.isdir(path):
             path = os.path.join(path, cls.agent_file_name)
-        with open(path, 'rb') as f:
-            obj = dill.load(f)
-        return obj
+        try:
+            with open(path, 'rb') as f:
+                obj = dill.load(f)
+            return obj
+        except OvercookedException:
+            Recipe.configure({})
+            with open(path, 'rb') as f:
+                obj = dill.load(f)
+            return obj
 
 
 class AgentGroup(object):
