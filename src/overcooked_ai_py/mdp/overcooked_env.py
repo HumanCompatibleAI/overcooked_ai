@@ -265,7 +265,7 @@ class OvercookedEnv(object):
             gamma (float): discount rate
         """
         state = state if state else self.state
-        return self.mdp.potential_function(state, mp=mlam.motion_planner ,gamma=gamma)
+        return self.mdp.potential_function(state, mp=self.mp, gamma=gamma)
 
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
