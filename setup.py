@@ -24,6 +24,7 @@ setup(name='overcooked_ai',
         ],
       },
       install_requires=[
+        'dill',
         'numpy',
         'scipy',
         'tqdm',
