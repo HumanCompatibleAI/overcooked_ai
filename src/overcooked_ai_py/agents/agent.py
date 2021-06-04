@@ -6,6 +6,8 @@ from overcooked_ai_py.mdp.actions import Action
 
 class Agent(object):
 
+    agent_file_name = 'agent.pickle'
+
     def __init__(self):
         self.reset()
 
@@ -64,7 +66,7 @@ class Agent(object):
             raise IOError("Must specify a path to directory! Got: {}".format(path))
         if not os.path.exists(path):
             os.makedirs(path)
-        pickle_path = os.path.join(path, 'agent.pickle')
+        pickle_path = os.path.join(path, self.agent_file_name)
         with open(pickle_path, 'wb') as f:
             dill.dump(self, f)
         return path
@@ -72,7 +74,7 @@ class Agent(object):
     @classmethod
     def load(cls, path):
         if os.path.isdir(path):
-            path = os.path.join(path, 'agent.pickle')
+            path = os.path.join(path, cls.agent_file_name)
         with open(path, 'rb') as f:
             obj = dill.load(f)
         return obj
