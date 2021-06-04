@@ -2,7 +2,7 @@ import itertools, copy, warnings
 import numpy as np
 from functools import reduce
 from collections import defaultdict, Counter
-from overcooked_ai_py.utils import pos_distance, read_layout_dict, classproperty
+from overcooked_ai_py.utils import pos_distance, read_layout_dict, classproperty, OvercookedException
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
@@ -22,7 +22,7 @@ class Recipe:
     
     def __new__(cls, ingredients):
         if not cls._configured:
-            raise ValueError("Recipe class must be configured before recipes can be created")
+            raise OvercookedException("Recipe class must be configured before recipes can be created")
         # Some basic argument verification
         if not ingredients or not hasattr(ingredients, '__iter__') or len(ingredients) == 0:
             raise ValueError("Invalid input recipe. Must be ingredients iterable with non-zero length")
