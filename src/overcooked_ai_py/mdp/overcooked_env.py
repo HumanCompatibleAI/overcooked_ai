@@ -250,6 +250,7 @@ class OvercookedEnv(object):
             "cumulative_off_dist_shaped_rewards_by_agent": np.array([0] * self.mdp.num_players)
         }
         self.game_stats = {**events_dict, **rewards_dict}
+        return self.state
 
     def is_done(self):
         """Whether the episode is over."""
@@ -266,6 +267,16 @@ class OvercookedEnv(object):
         """
         state = state if state else self.state
         return self.mdp.potential_function(state, mp=self.mp, gamma=gamma, potential_constants=potential_constants)
+
+    def is_off_dist(self, state=None):
+        """
+        Returns whether the environment's current statie is off distribution, if no state is provided
+        Otherwise return whether `state` is off distribution
+        args:
+            state (OvercookedState): the current state we are considering
+        """
+        state = state if state else self.state
+        return self.mdp.is_off_distribution(state)
 
     def _prepare_info_dict(self, joint_agent_action_info, mdp_infos):
         """
