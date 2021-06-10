@@ -291,6 +291,7 @@ class OvercookedEnv(object):
         env_info["shaped_r_by_agent"] = mdp_infos["shaped_reward_by_agent"]
         env_info["phi_s"] = mdp_infos["phi_s"] if "phi_s" in mdp_infos else None
         env_info["phi_s_prime"] = mdp_infos["phi_s_prime"] if "phi_s_prime" in mdp_infos else None
+        env_info["is_off_distribution"] = mdp_infos['is_off_distribution']
         return env_info
 
     def _add_episode_info(self, env_info):
