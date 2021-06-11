@@ -821,6 +821,33 @@ class TestFeaturizations(unittest.TestCase):
             expected_featurization = load_pickle(pickle_path)
             self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
 
+    def test_state_featurization_symmetry(self):
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5, info=False)
+        states = [state for ep_states in trajs['ep_states'] for state in ep_states]
+        
+        for state in states:
+            p0_obs, p1_obs = self.base_mdp.featurize_state(state, self.mlam, num_pots=2)
+            state = state.reverse_players()
+            p0_obs_swapped, p1_obs_swapped = self.base_mdp.featurize_state(state, self.mlam, num_pots=2)
+            state = state.reverse_players()
+
+            self.assertTrue(np.array_equal(p0_obs, p1_obs_swapped))
+            self.assertTrue(np.array_equal(p1_obs, p0_obs_swapped))
+
+    def test_lossless_state_featurization_symmetry(self):
+        trajs = self.env.get_rollouts(self.greedy_human_model_pair, num_games=5, info=False)
+        states = [state for ep_states in trajs['ep_states'] for state in ep_states]
+        
+        for state in states:
+            p0_obs, p1_obs = self.base_mdp.lossless_state_encoding(state)
+            state = state.reverse_players()
+            p0_obs_swapped, p1_obs_swapped = self.base_mdp.lossless_state_encoding(state)
+            state = state.reverse_players()
+
+            self.assertTrue(np.array_equal(p0_obs, p1_obs_swapped))
+            self.assertTrue(np.array_equal(p1_obs, p0_obs_swapped))
+
+
 
 class TestOvercookedEnvironment(unittest.TestCase):
 

@@ -708,6 +708,14 @@ class OvercookedState(object):
         del self.objects[pos]
         return obj
 
+    def reverse_players(self):
+        reversed = []
+        for player in self.players:
+            reversed.insert(0, player)
+        self.players = tuple(reversed)
+        return self
+
+
     @classmethod
     def from_players_pos_and_or(cls, players_pos_and_or, bonus_orders=[], all_orders=[]):
         """
