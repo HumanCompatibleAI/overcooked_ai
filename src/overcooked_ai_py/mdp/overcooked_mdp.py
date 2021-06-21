@@ -836,6 +836,13 @@ POTENTIAL_CONSTANTS = {
     }
 }
 
+THREE_ONION_DEFAULT_PARAMS = {
+    "start_bonus_orders": [],
+    "start_all_orders" : [
+        { "ingredients" : ["onion", "onion", "onion"]}
+    ],
+}
+
 class OvercookedGridworld(object):
     """
     An MDP grid world based off of the Overcooked game.
