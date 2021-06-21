@@ -848,7 +848,8 @@ POTENTIAL_CONSTANTS = {
 
 OFF_DISTRIBUTION_COUNTERS = {
     "default" : [],
-    "soup_coordination" : [(1, 0), (9, 4), (0, 3), (10, 1), (5, 1), (5, 3)]
+    "soup_coordination" : [(1, 0), (9, 4), (0, 3), (10, 1), (5, 1), (5, 3)],
+    "asymmetric_advantages_tomato" : [(4, 3), (0, 3), (8, 3), (2, 4), (6, 4)]
 }
 
 class OvercookedGridworld(object):
