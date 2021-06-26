@@ -849,7 +849,8 @@ POTENTIAL_CONSTANTS = {
 OFF_DISTRIBUTION_COUNTERS = {
     "default" : [],
     "soup_coordination" : [(1, 0), (9, 4), (0, 3), (10, 1), (5, 1), (5, 3)],
-    "asymmetric_advantages_tomato" : [(4, 3), (0, 3), (8, 3), (2, 4), (6, 4)]
+    "asymmetric_advantages_tomato" : [(4, 3), (0, 3), (8, 3), (2, 4), (6, 4)],
+    "you_shall_not_pass" : []
 }
 
 class OvercookedGridworld(object):
@@ -885,7 +886,7 @@ class OvercookedGridworld(object):
         self.start_player_positions = start_player_positions
         self.num_players = len(start_player_positions)
         self.start_bonus_orders = start_bonus_orders
-        self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if rew_shaping_params is None else rew_shaping_params
+        self.reward_shaping_params = BASE_REW_SHAPING_PARAMS if not rew_shaping_params else rew_shaping_params
         self.layout_name = layout_name
         self.order_bonus = order_bonus
         self.start_state = start_state
@@ -947,14 +948,23 @@ class OvercookedGridworld(object):
         # After removing player positions from grid we have a terrain mtx
         mdp_config["terrain"] = layout_grid
         mdp_config["start_player_positions"] = player_positions
-
         for k, v in params_to_overwrite.items():
             curr_val = mdp_config.get(k, None)
             if debug:
                 print("Overwriting mdp layout standard config value {}:{} -> {}".format(k, curr_val, v))
             mdp_config[k] = v
-
         return OvercookedGridworld(**mdp_config)
+
+    @classmethod
+    def set_ood_counters(cls, layout_name, counter_pos_list):
+        global OFF_DISTRIBUTION_COUNTERS
+        dummy_mdp = cls.from_layout_name(layout_name)
+
+        if not set(counter_pos_list).issubset(dummy_mdp.get_counter_locations()):
+            raise ValueError("`counter_pos_list` must be a subset of all counter positions!")
+
+        OFF_DISTRIBUTION_COUNTERS[layout_name] = counter_pos_list
+
 
     def _configure_recipes(self, start_all_orders, num_items_for_soup, **kwargs):
         self.recipe_config = {
