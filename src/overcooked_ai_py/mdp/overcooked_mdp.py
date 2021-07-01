@@ -850,7 +850,8 @@ OFF_DISTRIBUTION_COUNTERS = {
     "default" : [],
     "soup_coordination" : [(1, 0), (9, 4), (0, 3), (10, 1), (5, 1), (5, 3)],
     "asymmetric_advantages_tomato" : [(4, 3), (0, 3), (8, 3), (2, 4), (6, 4)],
-    "you_shall_not_pass" : []
+    "you_shall_not_pass" : [],
+    "counter_circuit" : [(2, 2), (3, 2), (4, 2)]
 }
 
 class OvercookedGridworld(object):
