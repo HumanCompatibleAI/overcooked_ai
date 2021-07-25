@@ -106,9 +106,16 @@ class LayoutGenerator(object):
         """
         # if outer_shape is not defined, we have to be using one of the defualt layout from names bank
         if outer_shape is None:
-            assert type(mdp_params) is dict and "layout_name" in mdp_params
+            assert type(mdp_params) is dict and "layout_name" in mdp_params, "If outer shape is not specified, layout_name needs to be"
+
+        if mdp_params is not None and "layout_name" in mdp_params:
             mdp = OvercookedGridworld.from_layout_name(**mdp_params)
+            mdp_outer_shape = mdp.shape
+            if outer_shape:
+                assert mdp_outer_shape[0] == outer_shape[0] and mdp_outer_shape[1] == outer_shape[1] ,  \
+                    "shape mismatch with layout %s and expected outer shape %s" % (mdp_params["layout_name"], str(outer_shape))
             mdp_fn = lambda _ignored: mdp
+
         else:
             # there is no schedule, we are using the same set of mdp_params all the time
             if mdp_params_schedule_fn is None:
