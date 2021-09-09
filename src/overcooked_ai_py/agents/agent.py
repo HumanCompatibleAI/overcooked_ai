@@ -320,6 +320,7 @@ class GreedyHumanModel(Agent):
                 action_probs = self.a_probs_from_action(chosen_action)
             # NOTE: Assumes that calls to the action method are sequential
             self.prev_state = state
+
         action_probs = (1 - self.prob_wait) * action_probs + np.array([0, 0, 0, 0, self.prob_wait, 0])
 
         if np.random.random() < self.prob_wait:
@@ -336,9 +337,14 @@ class GreedyHumanModel(Agent):
         if self.hl_boltzmann_rational:
             possible_plans = [self.mlam.motion_planner.get_plan(start_pos_and_or, goal) for goal in motion_goals]
             plan_costs = [plan[2] for plan in possible_plans]
-            goal_idx, action_probs = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
+            goal_idx, plan_probs = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
             chosen_goal = motion_goals[goal_idx]
             chosen_goal_action = possible_plans[goal_idx][0][0]
+            action_probs = np.array([0, 0, 0, 0, 0, 0])
+            for goal_idx_possible in range(len(plan_probs)):
+                possible_goal_action = possible_plans[goal_idx_possible][0][0]
+                possible_action_idx = Action.ACTION_TO_INDEX[possible_goal_action]
+                action_probs[possible_action_idx] += plan_probs[goal_idx_possible]
         else:
             chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
             action_probs = self.a_probs_from_action(chosen_goal_action)
