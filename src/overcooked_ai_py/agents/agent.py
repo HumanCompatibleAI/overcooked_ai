@@ -275,6 +275,7 @@ class GreedyHumanModel(Agent):
     def reset(self):
         super().reset()
         self.prev_state = None
+        self.mdp = self.mlam.mdp
 
     def actions(self, states, agent_indices):
         actions_and_infos_n = []
