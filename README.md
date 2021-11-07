@@ -18,11 +18,19 @@ You can **try out the game [here](https://humancompatibleai.github.io/overcooked
 
 Check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl) for the DRL implementations compatible with the environment and reproducible results to our paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* (also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)).
 
+For simple usage of the environment, it's worthwhile considering using [this environment wrapper](https://github.com/Stanford-ILIAD/PantheonRL).
+
 ## Research Papers using Overcooked-AI 📑
 
+
 - Carroll, Micah, Rohin Shah, Mark K. Ho, Thomas L. Griffiths, Sanjit A. Seshia, Pieter Abbeel, and Anca Dragan. [_"On the utility of learning about humans for human-ai coordination."_](https://arxiv.org/abs/1910.05789) NeurIPS 2019.
+- Charakorn, Rujikorn, Poramate Manoonpong, and Nat Dilokthanakul. [“Investigating Partner Diversification Methods in Cooperative Multi-Agent Deep Reinforcement Learning.”](https://www.rujikorn.com/files/papers/diversity_ICONIP2020.pdf) Neural Information Processing. ICONIP 2020.
 - Knott, Paul, Micah Carroll, Sam Devlin, Kamil Ciosek, Katja Hofmann, Anca D. Dragan, and Rohin Shah. [_"Evaluating the Robustness of Collaborative Agents."_](https://arxiv.org/abs/2101.05507) AAMAS 2021.
 - Nalepka, Patrick, Jordan P. Gregory-Dunsmore, James Simpson, Gaurav Patil, and Michael J. Richardson. [_"Interaction Flexibility in Artificial Agents Teaming with Humans."_](https://www.researchgate.net/publication/351533529_Interaction_Flexibility_in_Artificial_Agents_Teaming_with_Humans) Cogsci 2021.
+- Fontaine, Matthew C., Ya-Chuan Hsu, Yulun Zhang, Bryon Tjakana, and Stefanos Nikolaidis. [“On the Importance of Environments in Human-Robot Coordination”](http://arxiv.org/abs/2106.10853) RSS 2021.
+- Sarkar, Bidipta, Aditi Talati, Andy Shih, and Dorsa Sadigh. [“PantheonRL: A MARL Library for Dynamic Training Interactions”](https://iliad.stanford.edu/pdfs/publications/sarkar2022pantheonrl.pdf). AAAI 2022.
+
+
 
 ## Installation ☑️
 
