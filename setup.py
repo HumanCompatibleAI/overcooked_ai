@@ -25,10 +25,11 @@ setup(name='overcooked_ai',
       },
       install_requires=[
         'numpy',
+        'scipy',
         'tqdm',
         'gym',
         'ipython',
         'pygame',
-        "ipywidgets"
+        'ipywidgets'
       ]
     )
