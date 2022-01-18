@@ -1,6 +1,6 @@
 {
     "grid":  """XPX
-                O O
+                O T
                 X1S
                 XDX""",
     "start_bonus_orders": [],
