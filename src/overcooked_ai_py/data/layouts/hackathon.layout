@@ -1,8 +1,8 @@
 {
-    "grid":  """XPX
-                T T
-                X1S
-                XDX""",
+    "grid":  """XPXXX
+                T   T
+                X1  S
+                XDXXX  """,
     "start_bonus_orders": [],
     "start_all_orders" : [
         { "ingredients" : ["onion", "onion", "onion"]}
