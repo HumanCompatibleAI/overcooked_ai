@@ -7,14 +7,15 @@ from overcooked_ai_py.mdp.actions import Action, Direction
 
 
 class Recipe:
-    MAX_NUM_INGREDIENTS = 3
+    MAX_NUM_INGREDIENTS = 5
 
-    TOMATO = 'tomato'
-    ONION = 'onion'
-    ALL_INGREDIENTS = [ONION, TOMATO]
+    LAPTOP = 'laptop'
+    PROJECTOR = 'projector'
+    SOLAR_CELL = 'laptop'
+    ALL_INGREDIENTS = [LAPTOP, PROJECTOR, SOLAR_CELL]
 
     ALL_RECIPES_CACHE = {}
-    STR_REP = {'tomato': "†", 'onion': "ø"}
+    STR_REP = {'laptop': "†", 'projector': "ø"}
 
     _computed = False
     _configured = False
@@ -44,12 +45,13 @@ class Recipe:
         return (self._ingredients,)
 
     def __int__(self):
-        num_tomatoes = len([_ for _ in self.ingredients if _ == Recipe.TOMATO])
-        num_onions = len([_ for _ in self.ingredients if _ == Recipe.ONION])
+        num_laptops = len([_ for _ in self.ingredients if _ == Recipe.LAPTOP])
+        num_projectors = len([_ for _ in self.ingredients if _ == Recipe.PROJECTOR])
+        num_solar_cells = len([_ for _ in self.ingredients if _ == Recipe.SOLAR_CELL])
 
-        mixed_mask = int(bool(num_tomatoes * num_onions))
+        mixed_mask = int(bool(num_laptops * num_projectors * num_solar_cells))
         mixed_shift = (Recipe.MAX_NUM_INGREDIENTS + 1)**len(Recipe.ALL_INGREDIENTS)
-        encoding = num_onions + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_tomatoes
+        encoding = num_projectors + num_solar_cells + (Recipe.MAX_NUM_INGREDIENTS + 1) * num_laptops
 
         return mixed_mask * encoding * mixed_shift + encoding
 
@@ -108,10 +110,11 @@ class Recipe:
             return self._delivery_reward
         if self._value_mapping and self in self._value_mapping:
             return self._value_mapping[self]
-        if self._onion_value and self._tomato_value:
-            num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
-            num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
-            return self._tomato_value * num_tomatoes + self._onion_value * num_onions
+        if self._projector_value and self._laptop_value and self._solar_cell_value:
+            num_projectors = len([ingredient for ingredient in self.ingredients if ingredient == self.PROJECTOR])
+            num_laptops = len([ingredient for ingredient in self.ingredients if ingredient == self.LAPTOP])
+            num_solar_cells = len([ingredient for ingredient in self.ingredients if ingredient == self.SOLAR_CELL])
+            return self._laptop_value * num_laptops + self._projector_value * num_projectors + self._solar_cell_value * num_solar_cells
         return 20
 
     @property
@@ -120,10 +123,10 @@ class Recipe:
             return self._cook_time
         if self._time_mapping and self in self._time_mapping:
             return self._time_mapping[self]
-        if self._onion_time and self._tomato_time:
-            num_onions = len([ingredient for ingredient in self.ingredients if ingredient == self.ONION])
-            num_tomatoes = len([ingredient for ingredient in self.ingredients if ingredient == self.TOMATO])
-            return self._onion_time * num_onions + self._tomato_time * num_tomatoes
+        if self._projector_time and self._laptop_time:
+            num_projectors = len([ingredient for ingredient in self.ingredients if ingredient == self.PROJECTOR])
+            num_laptops = len([ingredient for ingredient in self.ingredients if ingredient == self.LAPTOP])
+            return self._projector_time * num_projectors + self._laptop_time * num_laptops
         return 20
 
     def to_dict(self):
@@ -161,33 +164,43 @@ class Recipe:
         cls._conf = conf
         cls._configured = True
         cls._computed = False
-        cls.MAX_NUM_INGREDIENTS = conf.get('max_num_ingredients', 3)
+        cls.MAX_NUM_INGREDIENTS = conf.get('max_num_ingredients', 5)
 
         cls._cook_time = None
         cls._delivery_reward = None
         cls._value_mapping = None
         cls._time_mapping = None
-        cls._onion_value = None
-        cls._onion_time = None
-        cls._tomato_value = None
-        cls._tomato_time = None
+        cls._projector_value = None
+        cls._projector_time = None
+        cls._laptop_value = None
+        cls._laptop_time = None
+        cls._solar_cell_value = None
+        cls._solar_cell_time = None
 
         ## Basic checks for validity ##
 
         # Mutual Exclusion
-        if 'tomato_time' in conf and not 'onion_time' in conf or 'onion_time' in conf and not 'tomato_time' in conf:
-            raise ValueError("Must specify both 'onion_time' and 'tomato_time'")
-        if 'tomato_value' in conf and not 'onion_value' in conf or 'onion_value' in conf and not 'tomato_value' in conf:
-            raise ValueError("Must specify both 'onion_value' and 'tomato_value'")
-        if 'tomato_value' in conf and 'delivery_reward' in conf:
+        if 'laptop_time' in conf and not 'projector_time' in conf or 'projector_time' in conf and not 'laptop_time' in conf  or 'solar_cell_time' in conf and not 'projector_time' in conf or 'solar_cell_time' in conf and not 'laptop_time' in conf or 'laptop_time' in conf and not 'solar_cell_time' in conf or 'projector_time' in conf and not 'solar_cell_time':
+            raise ValueError("Must specify both 'projector_time', 'laptop_time' and 'solar_cell_time")
+        if 'laptop_time' in conf and not 'projector_time' in conf or 'projector_value' in conf and not 'laptop_value' in conf  or 'solar_cell_value' in conf and not 'projector_value' in conf or 'solar_cell_value' in conf and not 'laptop_value' in conf or 'laptop_value' in conf and not 'solar_cell_value' in conf or 'projector_value' in conf and not 'solar_cell_value':
+            raise ValueError("Must specify both 'projector_value', 'laptop_value' and solar_cell_value")
+        if 'laptop_value' in conf and 'delivery_reward' in conf:
             raise ValueError("'delivery_reward' incompatible with '<ingredient>_value'")
-        if 'tomato_value' in conf and 'recipe_values' in conf:
+        if 'laptop_value' in conf and 'recipe_values' in conf:
             raise ValueError("'recipe_values' incompatible with '<ingredient>_value'")
         if 'recipe_values' in conf and 'delivery_reward' in conf:
             raise ValueError("'delivery_reward' incompatible with 'recipe_values'")
-        if 'tomato_time' in conf and 'cook_time' in conf:
+        if 'laptop_time' in conf and 'cook_time' in conf:
             raise ValueError("'cook_time' incompatible with '<ingredient>_time")
-        if 'tomato_time' in conf and 'recipe_times' in conf:
+        if 'laptop_time' in conf and 'recipe_times' in conf:
+            raise ValueError("'recipe_times' incompatible with '<ingredient>_time'")
+        if 'projector_time' in conf and 'cook_time' in conf:
+            raise ValueError("'cook_time' incompatible with '<ingredient>_time")
+        if 'projector_time' in conf and 'recipe_times' in conf:
+            raise ValueError("'recipe_times' incompatible with '<ingredient>_time'")
+        if 'solar_cell_time' in conf and 'cook_time' in conf:
+            raise ValueError("'cook_time' incompatible with '<ingredient>_time")
+        if 'solar_cell_time' in conf and 'recipe_times' in conf:
             raise ValueError("'recipe_times' incompatible with '<ingredient>_time'")
         if 'recipe_times' in conf and 'cook_time' in conf:
             raise ValueError("'delivery_reward' incompatible with 'recipe_times'")
@@ -223,20 +236,26 @@ class Recipe:
                 cls.from_dict(recipe) : time for (recipe, time) in zip(conf['all_orders'], conf['recipe_times'])
             }
 
-        if 'tomato_time' in conf:
-            cls._tomato_time = conf['tomato_time']
+        if 'laptop_time' in conf:
+            cls._laptop_time = conf['laptop_time']
 
-        if 'onion_time' in conf:
-            cls._onion_time = conf['onion_time']
+        if 'projector_time' in conf:
+            cls._projector_time = conf['projector_time']
 
-        if 'tomato_value' in conf:
-            cls._tomato_value = conf['tomato_value']
+        if 'laptop_value' in conf:
+            cls._laptop_value = conf['laptop_value']
 
-        if 'onion_value' in conf:
-            cls._onion_value = conf['onion_value']
+        if 'projector_value' in conf:
+            cls._projector_value = conf['projector_value']
+
+        if 'solar_cell_time' in conf:
+            cls._solar_cell_time = conf['solar_cell_time']
+
+        if 'solar_cell_value' in conf:
+            cls._solar_cell_value = conf['solar_cell_value']
     
     @classmethod
-    def generate_random_recipes(cls, n=1, min_size=2, max_size=3, ingredients=None, recipes=None, unique=True):
+    def generate_random_recipes(cls, n=1, min_size=2, max_size=5, ingredients=None, recipes=None, unique=True):
         """
         n (int): how many recipes generate
         min_size (int): min generated recipe size
@@ -290,7 +309,7 @@ class ObjectState(object):
         self._position = new_pos
 
     def is_valid(self):
-        return self.name in ['onion', 'tomato', 'dish']
+        return self.name in ['projector', 'laptop', 'solar_cell', 'container']
 
     def deepcopy(self):
         return ObjectState(self.name, self.position)
@@ -489,28 +508,31 @@ class SoupState(ObjectState):
             ingredient, num_ingredient, time = obj_dict['state']
             cooking_tick = -1 if time == 0 else time
             finished = time >= 20
-            if ingredient == Recipe.TOMATO:
-                return SoupState.get_soup(obj_dict['position'], num_tomatoes=num_ingredient, cooking_tick=cooking_tick, finished=finished)
+            if ingredient == Recipe.LAPTOP:
+                return SoupState.get_soup(obj_dict['position'], num_laptops=num_ingredient, cooking_tick=cooking_tick, finished=finished)
+            elif ingredient == Recipe.SOLAR_CELL:
+                return SoupState.get_soup(obj_dict['position'], num_solar_cells=num_ingredient, cooking_tick=cooking_tick, finished=finished)
             else:
-                return SoupState.get_soup(obj_dict['position'], num_onions=num_ingredient, cooking_tick=cooking_tick, finished=finished)
+                return SoupState.get_soup(obj_dict['position'], num_projectors=num_ingredient, cooking_tick=cooking_tick, finished=finished)
 
         ingredients_objs = [ObjectState.from_dict(ing_dict) for ing_dict in obj_dict['_ingredients']]
         obj_dict['ingredients'] = ingredients_objs
         return cls(**obj_dict)
 
     @classmethod
-    def get_soup(cls, position, num_onions=1, num_tomatoes=0, cooking_tick=-1, finished=False, **kwargs):
-        if num_onions < 0 or num_tomatoes < 0:
+    def get_soup(cls, position, num_projectors=1, num_laptops=0, num_solar_cells=0, cooking_tick=-1, finished=False, **kwargs):
+        if num_projectors < 0 or num_laptops < 0 or num_solar_cells < 0:
             raise ValueError("Number of active ingredients must be positive")
-        if num_onions + num_tomatoes > Recipe.MAX_NUM_INGREDIENTS:
+        if num_projectors + num_laptops + num_solar_cells > Recipe.MAX_NUM_INGREDIENTS:
             raise ValueError("Too many ingredients specified for this soup")
-        if cooking_tick >= 0 and num_tomatoes + num_onions == 0:
+        if cooking_tick >= 0 and num_laptops + num_projectors + num_solar_cells == 0:
             raise ValueError("_cooking_tick must be -1 for empty soup")
-        if finished and num_tomatoes + num_onions == 0:
+        if finished and num_laptops + num_projectors + num_solar_cells == 0:
             raise ValueError("Empty soup cannot be finished")
-        onions = [ObjectState(Recipe.ONION, position) for _ in range(num_onions)]
-        tomatoes = [ObjectState(Recipe.TOMATO, position) for _ in range(num_tomatoes)]
-        ingredients = onions + tomatoes
+        projectors = [ObjectState(Recipe.PROJECTOR, position) for _ in range(num_projectors)]
+        laptops = [ObjectState(Recipe.LAPTOP, position) for _ in range(num_laptops)]
+        solar_cells = [ObjectState(Recipe.SOLAR_CELL, position) for _ in range(num_solar_cells)] 
+        ingredients = projectors + laptops + solar_cells
         soup = cls(position, ingredients, cooking_tick)
         if finished:
             soup.auto_finish()
@@ -784,19 +806,26 @@ BASE_REW_SHAPING_PARAMS = {
 }
 
 EVENT_TYPES = [
-    # Tomato events
-    'tomato_pickup',
-    'useful_tomato_pickup',
-    'tomato_drop',
-    'useful_tomato_drop',
-    'potting_tomato',
+    # Solar Cells events
+    'solar_cell_pickup',
+    'useful_solar_cell_pickup',
+    'solar_cell_drop',
+    'useful_solar_cell_drop',
+    'potting_solar_cell',
 
-    # Onion events
-    'onion_pickup',
-    'useful_onion_pickup',
-    'onion_drop',
-    'useful_onion_drop',
-    'potting_onion',
+    # Laptop events
+    'laptop_pickup',
+    'useful_laptop_pickup',
+    'laptop_drop',
+    'useful_laptop_drop',
+    'potting_laptop',
+
+    # Projector events
+    'projector_pickup',
+    'useful_projector_pickup',
+    'projector_drop',
+    'useful_projector_drop',
+    'potting_projector',
 
     # Dish events
     'dish_pickup',
@@ -810,28 +839,34 @@ EVENT_TYPES = [
     'soup_drop',
 
     # Potting events
-    'optimal_onion_potting',
-    'optimal_tomato_potting',
-    'viable_onion_potting',
-    'viable_tomato_potting',
-    'catastrophic_onion_potting',
-    'catastrophic_tomato_potting',
-    'useless_onion_potting',
-    'useless_tomato_potting'
+    'optimal_projector_potting',
+    'optimal_laptop_potting',
+    'optimal_solar_cell_potting',
+    'viable_projector_potting',
+    'viable_laptop_potting',
+    'viable_solar_cell_potting',
+    'catastrophic_projector_potting',
+    'catastrophic_laptop_potting',
+    'catastrophic_solar_cell_potting',
+    'useless_projector_potting',
+    'useless_laptop_potting',
+    'useless_solar_cell_potting'
 ]
 
 POTENTIAL_CONSTANTS = {
     'default' : {
         'max_delivery_steps' : 10,
         'max_pickup_steps' : 10,
-        'pot_onion_steps' : 10,
-        'pot_tomato_steps' : 10
+        'pot_projector_steps' : 10,
+        'pot_solar_cell_steps': 10,
+        'pot_laptop_steps' : 10
     },
-    'mdp_test_tomato' : {
+    'mdp_test_laptop' : {
         'max_delivery_steps' : 4,
         'max_pickup_steps' : 4,
-        'pot_onion_steps' : 5,
-        'pot_tomato_steps' : 6
+        'pot_projector_steps' : 5,
+        'pot_solar_cell_steps': 5,
+        'pot_laptop_steps' : 6
     }
 }
 
@@ -1026,7 +1061,7 @@ class OvercookedGridworld(object):
                 return start_state
 
             # Arbitrary hard-coding for randomization of objects
-            # For each pot, add a random amount of onions and tomatoes with prob rnd_obj_prob_thresh
+            # For each pot, add a random amount of projectors and laptops with prob rnd_obj_prob_thresh
             # Begin the soup cooking with probability rnd_obj_prob_thresh
             pots = self.get_pot_states(start_state)["empty"]
             for pot_loc in pots:
@@ -1034,21 +1069,22 @@ class OvercookedGridworld(object):
                 if p < rnd_obj_prob_thresh:
                     n = int(np.random.randint(low=1, high=4))
                     m = int(np.random.randint(low=0, high=4-n))
+                    s = int(np.random.randint(low=0, high=4-n))
                     q = np.random.rand()
                     cooking_tick = 0 if q < rnd_obj_prob_thresh else -1
-                    start_state.objects[pot_loc] = SoupState.get_soup(pot_loc, num_onions=n, num_tomatoes=m, cooking_tick=cooking_tick)
+                    start_state.objects[pot_loc] = SoupState.get_soup(pot_loc, num_projectors=n, num_laptops=m, num_solar_cells=s, cooking_tick=cooking_tick)
 
             # For each player, add a random object with prob rnd_obj_prob_thresh
             for player in start_state.players:
                 p = np.random.rand()
                 if p < rnd_obj_prob_thresh:
                     # Different objects have different probabilities
-                    obj = np.random.choice(["dish", "onion", "soup"], p=[0.2, 0.6, 0.2])
+                    obj = np.random.choice(["dish", "projector", "soup"], p=[0.2, 0.6, 0.2])
                     n = int(np.random.randint(low=1, high=4))
                     m = int(np.random.randint(low=0, high=4-n))
                     if obj == "soup":
                         player.set_object(
-                            SoupState.get_soup(player.position, num_onions=n, num_tomatoes=m, finished=True)
+                            SoupState.get_soup(player.position, num_projectors=n, num_laptops=m, num_solar_cells=s, finished=True)
                         )
                     else:
                         player.set_object(ObjectState(obj, player.position))
@@ -1144,15 +1180,19 @@ class OvercookedGridworld(object):
                     
 
             elif terrain_type == 'O' and player.held_object is None:
-                self.log_object_pickup(events_infos, new_state, "onion", pot_states, player_idx)
+                self.log_object_pickup(events_infos, new_state, "projector", pot_states, player_idx)
 
-                # Onion pickup from dispenser
-                obj = ObjectState('onion', pos)
+                # Projector pickup from dispenser
+                obj = ObjectState('projector', pos)
                 player.set_object(obj)
 
             elif terrain_type == 'T' and player.held_object is None:
-                # Tomato pickup from dispenser
-                player.set_object(ObjectState('tomato', pos))
+                # Laptop pickup from dispenser
+                player.set_object(ObjectState('laptop', pos))
+
+            elif terrain_type == 'C' and player.held_object is None:
+                # Solar Cell pickup from dispenser
+                player.set_object(ObjectState('solar_cell', pos))
 
             elif terrain_type == 'D' and player.held_object is None:
                 self.log_object_pickup(events_infos, new_state, "dish", pot_states, player_idx)
@@ -1199,8 +1239,8 @@ class OvercookedGridworld(object):
 
                         # Log potting
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
-                        if obj.name == Recipe.ONION:
-                            events_infos['potting_onion'][player_idx] = True
+                        if obj.name == Recipe.PROJECTOR:
+                            events_infos['potting_projector'][player_idx] = True
 
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
@@ -1235,12 +1275,13 @@ class OvercookedGridworld(object):
             prev_ingredients = list(base_recipe.ingredients) if base_recipe else []
             for ingredient in prev_ingredients:
                 missing_ingredients.remove(ingredient)
-            n_tomatoes = len([i for i in missing_ingredients if i == Recipe.TOMATO])
-            n_onions = len([i for i in missing_ingredients if i == Recipe.ONION])
+            n_laptops = len([i for i in missing_ingredients if i == Recipe.LAPTOP])
+            n_projectors = len([i for i in missing_ingredients if i == Recipe.PROJECTOR])
+            n_solar_cells = len([i for i in missing_ingredients if i == Recipe.SOLAR_CELL])
 
-            gamma, pot_onion_steps, pot_tomato_steps = potential_params['gamma'], potential_params['pot_onion_steps'], potential_params['pot_tomato_steps']
+            gamma, pot_projector_steps, pot_laptop_steps, pot_solar_cell_steps = potential_params['gamma'], potential_params['pot_projector_steps'], potential_params['pot_laptop_steps'], potential_params['pot_solar_cell_steps']
 
-            return gamma**recipe.time * gamma**(pot_onion_steps * n_onions) * gamma**(pot_tomato_steps * n_tomatoes) * self.get_recipe_value(state, recipe, discounted=False)
+            return gamma**recipe.time * gamma**(pot_projector_steps * n_projectors) * gamma**(pot_laptop_steps * n_laptops) * gamma**(pot_solar_cell_steps * n_solar_cells) * self.get_recipe_value(state, recipe, discounted=False)
 
     def deliver_soup(self, state, player, soup):
         """
@@ -1362,11 +1403,14 @@ class OvercookedGridworld(object):
     def get_dish_dispenser_locations(self):
         return list(self.terrain_pos_dict['D'])
 
-    def get_onion_dispenser_locations(self):
+    def get_projector_dispenser_locations(self):
         return list(self.terrain_pos_dict['O'])
 
-    def get_tomato_dispenser_locations(self):
+    def get_laptop_dispenser_locations(self):
         return list(self.terrain_pos_dict['T'])
+
+    def get_solar_cell_locations(self):
+        return list(self.terrain_pos_dict['C'])
 
     def get_serving_locations(self):
         return list(self.terrain_pos_dict['S'])
@@ -1464,7 +1508,7 @@ class OvercookedGridworld(object):
         - Held objects have the same position as the player holding them
         - Non-held objects are on terrain
         - No two players or non-held objects occupy the same position
-        - Objects have a valid state (eg. no pot with 4 onions)
+        - Objects have a valid state (eg. no pot with 4 projectors)
         """
         all_objects = list(state.objects.values())
         for player_state in state.players:
@@ -1580,7 +1624,7 @@ class OvercookedGridworld(object):
         grid:  A sequence of sequences of spaces, representing a grid of a
         certain height and width. grid[y][x] is the space at row y and column
         x. A space must be either 'X' (representing a counter), ' ' (an empty
-        space), 'O' (onion supply), 'P' (pot), 'D' (dish supply), 'S' (serving
+        space), 'O' (projector supply), 'P' (pot), 'D' (dish supply), 'S' (serving
         location), '1' (player 1) and '2' (player 2).
         """
         height = len(grid)
@@ -1648,8 +1692,9 @@ class OvercookedGridworld(object):
         events_infos[obj_pickup_key][player_index] = True
         
         USEFUL_PICKUP_FNS = {
-            "tomato" : self.is_ingredient_pickup_useful,
-            "onion": self.is_ingredient_pickup_useful,
+            "laptop" : self.is_ingredient_pickup_useful,
+            "projector": self.is_ingredient_pickup_useful,
+            "solar_cell": self.is_ingredient_pickup_useful,
             "dish": self.is_dish_pickup_useful
         }
         if obj_name in USEFUL_PICKUP_FNS:
@@ -1665,8 +1710,9 @@ class OvercookedGridworld(object):
         events_infos[obj_drop_key][player_index] = True
         
         USEFUL_DROP_FNS = {
-            "tomato" : self.is_ingredient_drop_useful,
-            "onion": self.is_ingredient_drop_useful,
+            "laptop" : self.is_ingredient_drop_useful,
+            "projector": self.is_ingredient_drop_useful,
+            "solar_cell": self.is_ingredient_drop_useful,
             "dish": self.is_dish_drop_useful
         }
         if obj_name in USEFUL_DROP_FNS:
@@ -1699,14 +1745,14 @@ class OvercookedGridworld(object):
         """
         NOTE: this only works if self.num_players == 2
         Useful if:
-        - Onion is needed (all pots are non-full)
-        - Nobody is holding onions
+        - Projector is needed (all pots are non-full)
+        - Nobody is holding projectors
         """
         if self.num_players != 2: return False
         all_non_full = len(self.get_full_pots(pot_states)) == 0
         other_player = state.players[1 - player_index]
-        other_player_holding_onion = other_player.has_object() and other_player.get_object().name == "onion"
-        return all_non_full and not other_player_holding_onion
+        other_player_holding_projector = other_player.has_object() and other_player.get_object().name == "projector"
+        return all_non_full and not other_player_holding_projector
 
     def is_ingredient_pickup_useful(self, state, pot_states, player_index):
         """
@@ -1849,10 +1895,10 @@ class OvercookedGridworld(object):
         """Featurizes a OvercookedState object into a stack of boolean masks that are easily readable by a CNN"""
         assert self.num_players == 2, "Functionality has to be added to support encondings for > 2 players"
         assert type(debug) is bool
-        base_map_features = ["pot_loc", "counter_loc", "onion_disp_loc", "tomato_disp_loc",
+        base_map_features = ["pot_loc", "counter_loc", "projector_disp_loc", "laptop_disp_loc", "solar_cell_disp_loc"
                              "dish_disp_loc", "serve_loc"]
-        variable_map_features = ["onions_in_pot", "tomatoes_in_pot", "onions_in_soup", "tomatoes_in_soup",
-                                 "soup_cook_time_remaining", "soup_done", "dishes", "onions", "tomatoes"]
+        variable_map_features = ["projectors_in_pot", "laptops_in_pot", "projectors_in_soup", "laptops_in_soup", "solar_cells_in_pot", "solar_cells_in_soup",
+                                 "soup_cook_time_remaining", "soup_done", "dishes", "projectors", "laptops", "solar_cells"]
         urgency_features = ["urgency"]
         all_objects = overcooked_state.all_objects_list
 
@@ -1882,11 +1928,14 @@ class OvercookedGridworld(object):
             for loc in self.get_pot_locations():
                 state_mask_dict["pot_loc"][loc] = 1
 
-            for loc in self.get_onion_dispenser_locations():
-                state_mask_dict["onion_disp_loc"][loc] = 1
+            for loc in self.get_projector_dispenser_locations():
+                state_mask_dict["projector_disp_loc"][loc] = 1
 
-            for loc in self.get_tomato_dispenser_locations():
-                state_mask_dict["tomato_disp_loc"][loc] = 1
+            for loc in self.get_laptop_dispenser_locations():
+                state_mask_dict["laptop_disp_loc"][loc] = 1
+
+            for loc in self.get_solar_cell_dispenser_locations():
+                state_mask_dict["solar_cell_disp_loc"][loc] = 1
 
             for loc in self.get_dish_dispenser_locations():
                 state_mask_dict["dish_disp_loc"][loc] = 1
@@ -1903,35 +1952,40 @@ class OvercookedGridworld(object):
             # OBJECT & STATE LAYERS
             for obj in all_objects:
                 if obj.name == "soup":
-                    # removed the next line because onion doesn't have to be in all the soups?
-                    # if Recipe.ONION in obj.ingredients:
+                    # removed the next line because projector doesn't have to be in all the soups?
+                    # if Recipe.PROJECTOR in obj.ingredients:
                     # get the ingredients into a {object: number} dictionary
                     ingredients_dict = Counter(obj.ingredients)
-                    # assert "onion" in ingredients_dict.keys()
+                    # assert "projector" in ingredients_dict.keys()
                     if obj.position in self.get_pot_locations():
                         if obj.is_idle:
-                            # onions_in_pot and tomatoes_in_pot are used when the soup is idling, and ingredients could still be added
-                            state_mask_dict["onions_in_pot"] += make_layer(obj.position, ingredients_dict["onion"])
-                            state_mask_dict["tomatoes_in_pot"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            # projectors_in_pot and laptops_in_pot are used when the soup is idling, and ingredients could still be added
+                            state_mask_dict["projectors_in_pot"] += make_layer(obj.position, ingredients_dict["projector"])
+                            state_mask_dict["laptops_in_pot"] += make_layer(obj.position, ingredients_dict["laptop"])
+                            state_mask_dict["solar_cells_in_pot"] += make_layer(obj.position, ingredients_dict["solar_cell"])
                         else:
-                            state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
-                            state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                            state_mask_dict["projectors_in_soup"] += make_layer(obj.position, ingredients_dict["projector"])
+                            state_mask_dict["laptops_in_soup"] += make_layer(obj.position, ingredients_dict["laptop"])
+                            state_mask_dict["solar_cells_in_soup"] += make_layer(obj.position, ingredients_dict["solar_cell"])
                             state_mask_dict["soup_cook_time_remaining"] += make_layer(obj.position, obj.cook_time - obj._cooking_tick)
                             if obj.is_ready:
                                 state_mask_dict["soup_done"] += make_layer(obj.position, 1)
 
                     else:
                         # If player soup is not in a pot, treat it like a soup that is cooked with remaining time 0
-                        state_mask_dict["onions_in_soup"] += make_layer(obj.position, ingredients_dict["onion"])
-                        state_mask_dict["tomatoes_in_soup"] += make_layer(obj.position, ingredients_dict["tomato"])
+                        state_mask_dict["projectors_in_soup"] += make_layer(obj.position, ingredients_dict["projector"])
+                        state_mask_dict["laptops_in_soup"] += make_layer(obj.position, ingredients_dict["laptop"])
+                        state_mask_dict["solar_cells_in_soup"] += make_layer(obj.position, ingredients_dict["solar_cell"])
                         state_mask_dict["soup_done"] += make_layer(obj.position, 1)
 
                 elif obj.name == "dish":
                     state_mask_dict["dishes"] += make_layer(obj.position, 1)
-                elif obj.name == "onion":
-                    state_mask_dict["onions"] += make_layer(obj.position, 1)
-                elif obj.name == "tomato":
-                    state_mask_dict["tomatoes"] += make_layer(obj.position, 1)
+                elif obj.name == "projector":
+                    state_mask_dict["projectors"] += make_layer(obj.position, 1)
+                elif obj.name == "laptop":
+                    state_mask_dict["laptops"] += make_layer(obj.position, 1)
+                elif obj.name == "solar_cell":
+                    state_mask_dict["solar_cells"] += make_layer(obj.position, 1)
                 else:
                     raise ValueError("Unrecognized object")
 
@@ -1994,12 +2048,12 @@ class OvercookedGridworld(object):
                     pi_orientation: length 4 one-hot-encoding of direction currently facing
                     pi_obj: length 4 one-hot-encoding of object currently being held (all 0s if no object held)
                     pi_wall_{j}: {0, 1} boolean value of whether player i has wall immediately in direction j
-                    pi_closest_{onion|tomato|dish|soup|serving|empty_counter}: (dx, dy) where dx = x dist to item, dy = y dist to item. (0, 0) if item is currently held
-                    pi_cloest_soup_n_{onions|tomatoes}: int value for number of this ingredient in closest soup
+                    pi_closest_{projector|laptop|dish|soup|serving|empty_counter}: (dx, dy) where dx = x dist to item, dy = y dist to item. (0, 0) if item is currently held
+                    pi_cloest_soup_n_{projectors|laptops}: int value for number of this ingredient in closest soup
                     pi_closest_pot_{j}_exists: {0, 1} depending on whether jth closest pot found. If 0, then all other pot features are 0. Note: can
                         be 0 even if there are more than j pots on layout, if the pot is not reachable by player i
                     pi_closest_pot_{j}_{is_empty|is_full|is_cooking|is_ready}: {0, 1} depending on boolean value for jth closest pot
-                    pi_closest_pot_{j}_{num_onions|num_tomatoes}: int value for number of this ingredient in jth closest pot
+                    pi_closest_pot_{j}_{num_projectors|num_laptops}: int value for number of this ingredient in jth closest pot
                     pi_closest_pot_{j}_cook_time: int value for seconds remaining on soup. -1 if no soup is cooking
                     pi_closest_pot_{j}: (dx, dy) to jth closest pot from player i location
 
@@ -2035,12 +2089,13 @@ class OvercookedGridworld(object):
                 feat_dict["p{}_closest_{}".format(idx, name)] = deltas
 
             if name == 'soup':
-                num_onions = num_tomatoes = 0
+                num_projectors = num_laptops = num_solar_cells = 0
                 if obj:
                     ingredients_cnt = Counter(obj.ingredients)
-                    num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
-                feat_dict["p{}_closest_soup_n_onions".format(i)] = [num_onions]
-                feat_dict["p{}_closest_soup_n_tomatoes".format(i)] = [num_tomatoes]
+                    num_projectors, num_laptops = ingredients_cnt['projector'], ingredients_cnt['laptop'], ingredients_cnt['solar_cell']
+                feat_dict["p{}_closest_soup_n_projectors".format(i)] = [num_projectors]
+                feat_dict["p{}_closest_soup_n_laptops".format(i)] = [num_laptops]
+                feat_dict["p{}_closest_soup_n_solar_cells".format(i)] = [num_solar_cells]
 
             return feat_dict
 
@@ -2056,8 +2111,9 @@ class OvercookedGridworld(object):
                 feat_dict["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = [0]
                 feat_dict["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = [0]
                 feat_dict["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = [0]
-                feat_dict["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = [0]
-                feat_dict["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_num_projectors".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_num_laptops".format(idx, pot_idx)] = [0]
+                feat_dict["p{}_closest_pot_{}_num_solar_cells".format(idx, pot_idx)] = [0]
                 feat_dict["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = [0]
                 feat_dict["p{}_closest_pot_{}".format(idx, pot_idx)] = (0, 0)
                 return feat_dict
@@ -2072,12 +2128,12 @@ class OvercookedGridworld(object):
             is_ready = int(pot_loc in self.get_ready_pots(pot_states))
 
             # Get soup state info
-            num_onions = num_tomatoes = 0
+            num_projectors = num_laptops = num_solar_cells = 0
             cook_time_remaining = 0
             if not is_empty:
                 soup = overcooked_state.get_object(pot_loc)
                 ingredients_cnt = Counter(soup.ingredients)
-                num_onions, num_tomatoes = ingredients_cnt['onion'], ingredients_cnt['tomato']
+                num_projectors, num_laptops, num_solar_cells = ingredients_cnt['projector'], ingredients_cnt['laptop'], ingredients_cnt['solar_cell']
                 cook_time_remaining = 0 if soup.is_idle else soup.cook_time_remaining
             
             # Encode pot and soup info
@@ -2086,8 +2142,9 @@ class OvercookedGridworld(object):
             feat_dict["p{}_closest_pot_{}_is_full".format(idx, pot_idx)] = [is_full]
             feat_dict["p{}_closest_pot_{}_is_cooking".format(idx, pot_idx)] = [is_cooking]
             feat_dict["p{}_closest_pot_{}_is_ready".format(idx, pot_idx)] = [is_ready]
-            feat_dict["p{}_closest_pot_{}_num_onions".format(idx, pot_idx)] = [num_onions]
-            feat_dict["p{}_closest_pot_{}_num_tomatoes".format(idx, pot_idx)] = [num_tomatoes]
+            feat_dict["p{}_closest_pot_{}_num_projectors".format(idx, pot_idx)] = [num_projectors]
+            feat_dict["p{}_closest_pot_{}_num_laptops".format(idx, pot_idx)] = [num_laptops]
+            feat_dict["p{}_closest_pot_{}_num_solar_cells".format(idx, pot_idx)] = [num_solar_cells]
             feat_dict["p{}_closest_pot_{}_cook_time".format(idx, pot_idx)] = [cook_time_remaining]
             feat_dict["p{}_closest_pot_{}".format(idx, pot_idx)] = deltas
 
@@ -2096,7 +2153,7 @@ class OvercookedGridworld(object):
             
 
 
-        IDX_TO_OBJ = ["onion", "soup", "dish", "tomato"]
+        IDX_TO_OBJ = ["projector", "soup", "dish", "laptop", "solar_cell"]
         OBJ_TO_IDX = {o_name: idx for idx, o_name in enumerate(IDX_TO_OBJ)}
 
         counter_objects = self.get_counter_objects_dict(overcooked_state)
@@ -2117,8 +2174,9 @@ class OvercookedGridworld(object):
                 all_features["p{}_objs".format(i)] = np.eye(len(IDX_TO_OBJ))[obj_idx]
 
             # Closest feature for each object type
-            all_features = concat_dicts(all_features, make_closest_feature(i, player, "onion", self.get_onion_dispenser_locations() + counter_objects["onion"]))
-            all_features = concat_dicts(all_features, make_closest_feature(i, player, "tomato", self.get_tomato_dispenser_locations() + counter_objects["tomato"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "projector", self.get_projector_dispenser_locations() + counter_objects["projector"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "laptop", self.get_laptop_dispenser_locations() + counter_objects["laptop"]))
+            all_features = concat_dicts(all_features, make_closest_feature(i, player, "solar_cell", self.get_solar_cell_dispenser_locations() + counter_objects["solar_cell"]))
             all_features = concat_dicts(all_features, make_closest_feature(i, player, "dish", self.get_dish_dispenser_locations() + counter_objects["dish"]))
             all_features = concat_dicts(all_features, make_closest_feature(i, player, "soup", counter_objects["soup"]))
             all_features = concat_dicts(all_features, make_closest_feature(i, player, "serving", self.get_serving_locations()))
@@ -2244,14 +2302,15 @@ class OvercookedGridworld(object):
         Returns
             phi(state), the potential of the state
         """
-        if not hasattr(Recipe, '_tomato_value') or not hasattr(Recipe, '_onion_value'):
-            raise ValueError("Potential function requires Recipe onion and tomato values to work properly")
+        if not hasattr(Recipe, '_laptop_value') or not hasattr(Recipe, '_projector_value') or not hasattr(Recipe, '_solar_cell_value') :
+            raise ValueError("Potential function requires Recipe projector and laptop values to work properly")
 
         # Constants needed for potential function
         potential_params = {
             'gamma' : gamma,
-            'tomato_value' : Recipe._tomato_value if Recipe._tomato_value else 13,
-            'onion_value' : Recipe._onion_value if Recipe._tomato_value else 21,
+            'laptop_value' : Recipe._laptop_value if Recipe._laptop_value else 13,
+            'projector_value' : Recipe._projector_value if Recipe._laptop_value else 21,
+            'solar_cell_value' : Recipe._solar_cell_value if Recipe._laptop_value else 21,
             **POTENTIAL_CONSTANTS.get(self.layout_name, POTENTIAL_CONSTANTS['default'])
         }
         pot_states = self.get_pot_states(state)
@@ -2278,8 +2337,9 @@ class OvercookedGridworld(object):
         # Note that these lists are mutually exclusive
         players_holding_soups = [player for player in state.players if player.has_object() and player.get_object().name == 'soup']
         players_holding_dishes = [player for player in state.players if player.has_object() and player.get_object().name == 'dish']
-        players_holding_tomatoes = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.TOMATO]
-        players_holding_onions = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.ONION]
+        players_holding_laptops = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.LAPTOP]
+        players_holding_projectors = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.PROJECTOR]
+        players_holding_solar_cells = [player for player in state.players if player.has_object() and player.get_object().name == Recipe.SOLAR_CELL]
         players_holding_nothing = [player for player in state.players if not player.has_object()]
 
         ### Step 4 potential ###
@@ -2353,7 +2413,14 @@ class OvercookedGridworld(object):
             # that are closer to being completed)
             for ingredient in missing_ingredients:
                 # Players who might have an ingredient we need
-                pertinent_players = players_holding_tomatoes if ingredient == Recipe.TOMATO else players_holding_onions
+                if ingredient == Recipe.LAPTOP:
+                    pertinent_players = players_holding_laptops
+                elif ingredient == Recipe.PROJECTOR:
+                    pertinent_players = players_holding_projectors
+                else:
+                    pertinent_players = players_holding_solar_cells
+                
+                # pertinent_players = players_holding_laptops if ingredient == Recipe.LAPTOP else players_holding_projectors
                 dist = np.inf
                 closest_player = None
 
@@ -2386,20 +2453,26 @@ class OvercookedGridworld(object):
 
         ### Step 1 Potential ###
 
-        # Add potential for each tomato that is left over after using all others to complete optimal recipes
-        for player in players_holding_tomatoes:
+        # Add potential for each laptop that is left over after using all others to complete optimal recipes
+        for player in players_holding_laptops:
             # will be inf if there exists no empty pot that is reachable
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
             is_useful = int(dist < np.inf)
-            discount = gamma**(min(potential_params['pot_tomato_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
-            potential += discount * potential_params['tomato_value']
+            discount = gamma**(min(potential_params['pot_laptop_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
+            potential += discount * potential_params['laptop_value']
 
-        # Add potential for each onion that is remaining after using others to complete optimal recipes if possible
-        for player in players_holding_onions:
+        # Add potential for each projector that is remaining after using others to complete optimal recipes if possible
+        for player in players_holding_projectors:
             dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
             is_useful = int(dist < np.inf)
-            discount = gamma**(min(potential_params['pot_onion_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
-            potential += discount * potential_params['onion_value']
+            discount = gamma**(min(potential_params['pot_projector_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
+            potential += discount * potential_params['projector_value']
+
+        for player in players_holding_solar_cells:
+            dist = mp.min_cost_to_feature(player.pos_and_or, self.get_empty_pots(pot_states))
+            is_useful = int(dist < np.inf)
+            discount = gamma**(min(potential_params['pot_solar_cell_steps'], dist) + potential_params['max_pickup_steps'] + potential_params['max_delivery_steps']) * is_useful
+            potential += discount * potential_params['solar_cell_value']
 
         # At last
         return potential
@@ -2415,9 +2488,9 @@ class OvercookedGridworld(object):
     #     distance_based_shaped_reward = 0
     #
     #     pot_states = self.get_pot_states(new_state)
-    #     ready_pots = pot_states["tomato"]["ready"] + pot_states["onion"]["ready"]
-    #     cooking_pots = ready_pots + pot_states["tomato"]["cooking"] + pot_states["onion"]["cooking"]
-    #     nearly_ready_pots = cooking_pots + pot_states["tomato"]["partially_full"] + pot_states["onion"]["partially_full"]
+    #     ready_pots = pot_states["laptop"]["ready"] + pot_states["projector"]["ready"]
+    #     cooking_pots = ready_pots + pot_states["laptop"]["cooking"] + pot_states["projector"]["cooking"]
+    #     nearly_ready_pots = cooking_pots + pot_states["laptop"]["partially_full"] + pot_states["projector"]["partially_full"]
     #     dishes_in_play = len(new_state.player_objects_by_type['dish'])
     #     for player_old, player_new in zip(state.players, new_state.players):
     #         # Linearly increase reward depending on vicinity to certain features, where distance of 10 achieves 0 reward
