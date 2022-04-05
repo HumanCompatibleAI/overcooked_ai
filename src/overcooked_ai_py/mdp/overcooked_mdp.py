@@ -22,7 +22,7 @@ class Recipe:
     
     def __new__(cls, ingredients):
         if not cls._configured:
-            raise ValueError("Recipe class must be configured before recipes can be created")
+            cls.configure({})
         # Some basic argument verification
         if not ingredients or not hasattr(ingredients, '__iter__') or len(ingredients) == 0:
             raise ValueError("Invalid input recipe. Must be ingredients iterable with non-zero length")
