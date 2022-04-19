@@ -1197,6 +1197,10 @@ class OvercookedGridworld(object):
                         soup.add_ingredient(obj)
                         shaped_reward[player_idx] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
 
+                        # Start cooking without extra INTERACT action if recipe is done
+                        if self.soup_to_be_cooked_at_location(new_state, i_pos) and soup.is_full and soup.is_valid:
+                            soup.begin_cooking()
+
                         # Log potting
                         self.log_object_potting(events_infos, new_state, old_soup, soup, obj.name, player_idx)
                         if obj.name == Recipe.ONION:
