@@ -98,7 +98,7 @@ python -m unittest discover -s testing/ -p "*_test.py"
 
 ## Python Visualizations 🌠
 
-One can adapt a version of [this file](https://github.com/HumanCompatibleAI/human_aware_rl/blob/master/human_aware_rl/overcooked_interactive.py) in order to be able to play games in terminal graphics with custom-defined agents.
+One can adapt a version of [this file](https://github.com/HumanCompatibleAI/human_aware_rl/blob/neurips2019/human_aware_rl/overcooked_interactive.py) in order to be able to play games in terminal graphics with custom-defined agents.
 
 
 ## Further Issues and questions ❓
