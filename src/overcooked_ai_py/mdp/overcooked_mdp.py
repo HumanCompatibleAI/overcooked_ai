@@ -1202,6 +1202,11 @@ class OvercookedGridworld(object):
                         if obj.name == Recipe.ONION:
                             events_infos['potting_onion'][player_idx] = True
 
+                    ### ADDED BY STEPHAO ###
+                    if soup.is_full:
+                        soup.begin_cooking()
+                    ########################
+
             elif terrain_type == 'S' and player.has_object():
                 obj = player.get_object()
                 if obj.name == 'soup':

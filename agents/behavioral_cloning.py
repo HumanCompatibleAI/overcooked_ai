@@ -1,26 +1,30 @@
 from arguments import get_arguments
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-
+from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, OvercookedGridworld, Direction, Action
+from overcooked_dataset import OvercookedDataset
+from state_encodings import ENCODING_SCHEMES
 
 import numpy as np
+from pathlib import Path
 from tqdm import tqdm
 import torch as th
 import torch.nn as nn
+from torch.utils.data import DataLoader
+import wandb
 
 NUM_ACTIONS = 6 # UP, DOWN, LEFT, RIGHT, INTERACT, NOOP
 
 def get_output_shape(model, image_dim):
-    return model(torch.rand(*(image_dim))).data.shape[1:]
+    return model(th.rand(*(image_dim))).data.shape[1:]
 
 def weights_init_(m):
     if hasattr(m, 'weight') and m.weight is not None and len(m.weight.shape) > 2:
-        torch.nn.init.xavier_uniform_(m.weight, gain=1)
-    if hasattr(m, 'bias') and m.bias is not None and isinstance(m.bias, torch.Tensor):
-        torch.nn.init.constant_(m.bias, 0)
+        th.nn.init.xavier_uniform_(m.weight, gain=1)
+    if hasattr(m, 'bias') and m.bias is not None and isinstance(m.bias, th.Tensor):
+        th.nn.init.constant_(m.bias, 0)
 
 class BehaviouralCloning(nn.Module):
-    def __init__(self, robot_obs_size=9, visual_obs_size=(8, 8), depth=16, act=nn.ReLU, num_channels=3,
-                 hidden_dim=1024):
+    def __init__(self, visual_obs_shape, agent_obs_shape, depth=16, act=nn.ReLU, hidden_dim=1024):
         '''
         :param depth: depth of cnn (i.e. num output channels
         :param act: activation fn to use
@@ -31,69 +35,83 @@ class BehaviouralCloning(nn.Module):
         super(BehaviouralCloning, self).__init__()
         self.act = act
         self.hidden_dim = hidden_dim
-        self.kernels = (4, 4, 4, 4) if max(visual_obs_size) > 64 else (3, 3, 3, 3)
-        self.strides = (2, 2, 2, 2) if max(visual_obs_size) > 64 else (1, 1, 1, 1)
-        self.padding = (1, 1)
-        layers = []
-        current_channels = num_channels
-        for i, (k, s) in enumerate(zip(self.kernels, self.strides)):
-            layers.append(nn.Conv2d(current_channels, depth, k, stride=s, padding=self.padding))
-            layers.append(nn.GroupNorm(1, depth))
-            layers.append(self.act())
-            current_channels = depth
-            depth *= 2
+        self.use_visual_obs = np.prod(visual_obs_shape) > 0
+        assert len(agent_obs_shape) == 1
+        self.use_agent_obs = np.prod(agent_obs_shape) > 0
+        if self.use_visual_obs:
+            self.kernels = (4, 4, 4, 4) if max(visual_obs_shape) > 64 else (3, 3, 3, 3)
+            self.strides = (2, 2, 2, 2) if max(visual_obs_shape) > 64 else (1, 1, 1, 1)
+            self.padding = (1, 1)
+            layers = []
+            current_channels = visual_obs_shape[0]
+            for i, (k, s) in enumerate(zip(self.kernels, self.strides)):
+                layers.append(nn.Conv2d(current_channels, depth, k, stride=s, padding=self.padding))
+                layers.append(nn.GroupNorm(1, depth))
+                layers.append(self.act())
+                current_channels = depth
+                depth *= 2
 
-        layers.append(nn.Flatten())
-        self.cnn = nn.Sequential(*layers)
-        self.output_shape = get_output_shape(self.cnn, [1, 3, *visual_obs_size])[0]
-        self.pre_flatten_shape = get_output_shape(self.cnn[:-1], [1, 3, *visual_obs_size])
+            layers.append(nn.Flatten())
+            self.cnn = nn.Sequential(*layers)
+            self.cnn_output_shape = get_output_shape(self.cnn, [1, *visual_obs_shape])[0]
+            self.pre_flatten_shape = get_output_shape(self.cnn[:-1], [1, *visual_obs_shape])
+        else:
+            self.cnn_output_shape = 0
 
         self.mlp = nn.Sequential(
-            nn.Linear(self.output_shape + robot_obs_size, self.hidden_dim),
+            nn.Linear(self.cnn_output_shape + agent_obs_shape[0], self.hidden_dim),
             act(),
             nn.Linear(self.hidden_dim, self.hidden_dim),
             act(),
             nn.Linear(self.hidden_dim, NUM_ACTIONS),
             # nn.utils.spectral_norm(nn.Linear(self.hidden_dim, self.hidden_dim)),
-            # nn.LayerNorm(self.output_shape),
+            # nn.LayerNorm(self.cnn_output_shape),
         )
         self.apply(weights_init_)
 
     def forward(self, obs):
-        visual_obs, robot_obs = obs
-        latent_state = [self.cnn(visual_obs), robot_obs]
-        logits = self.mlp(torch.cat(latent_state, dim=-1))
+        visual_obs, agent_obs = obs
+        latent_state = []
+        visual_obs, agent_obs = visual_obs, agent_obs
+        if self.use_visual_obs:
+            latent_state.append(self.cnn(visual_obs))
+        if self.use_agent_obs:
+            latent_state.append(agent_obs)
+        logits = self.mlp(th.cat(latent_state, dim=-1))
         return logits
 
     def get_action(self, obs):
         logits = self.forward(obs)
-        values, action_idx = torch.max(logits, dim=-1)[1]
+        values, action_idx = th.max(logits, dim=-1)
         return action_idx
 
 
 class BC_trainer():
-    def __init__(self, env, dataset, args):
+    def __init__(self, env, encoding_fn, dataset, args):
         self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
         self.num_players = 2
         self.env = env
-        obs = self.featurize_state(self.env.state)
-        visual_obs_size = obs['visual_obs'].shape
-        robot_obs_size = obs['robot_obs'].shape
+        self.encode_state_fn = encoding_fn
+        self.dataset = dataset
+        self.args = args
+        visual_obs, agent_obss = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
+        visual_obs_shape = visual_obs[0].shape
+        agent_obs_shape = agent_obss[0].shape
         self.players = (
-            BehaviouralCloning(visual_obs_size=visual_obs_size, robot_obs_size=robot_obs_size),
-            BehaviouralCloning(visual_obs_size=visual_obs_size, robot_obs_size=robot_obs_size)
+            BehaviouralCloning(visual_obs_shape, agent_obs_shape), BehaviouralCloning(visual_obs_shape, agent_obs_shape)
         )
-        self.optimizers = tuple([th.optim.Adam(player.params(), lr=args.lr) for player in self.players])
+        self.optimizers = tuple([th.optim.Adam(player.parameters(), lr=args.lr) for player in self.players])
         self.criterion = nn.CrossEntropyLoss()
 
     def train_on_batch(self, batch):
         metrics = {}
-        state, action = batch['state'].to(self.device), batch['joint_action'].to(self.device)
-        obs = self.featurize_state(state)
+        # print(batch)
+        batch = {k: v.to(self.device) for k,v in batch.items()}
+        vo, ao, action = batch['visual_obs'].float(), batch['agent_obs'].float(), batch['joint_action'].long()
         for i in range(self.num_players):
             self.optimizers[i].zero_grad()
-            pred_action = self.players[i].forward(obs[i])
-            loss = self.criterion(pred_action, action[i])
+            pred_action = self.players[i].forward( (vo[:,i], ao[:,i]) )
+            loss = self.criterion(pred_action, action[:,i])
             loss.backward()
             self.optimizers[i].step()
             metrics[f'player{i}_loss'] = loss.item()
@@ -101,45 +119,45 @@ class BC_trainer():
         wandb.log(metrics)
         return metrics
 
-    def featurize_state(self, state):
-        # TODO Remember to include agent idx
-        pass
-
     def evaluate(self, num_trials=10):
         average_reward = []
         for trial in range(num_trials):
             self.env.reset()
-            obs_p1, obs_p2 = self.featurize_state(self.env.state)
+            obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
+            visual_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
             trial_reward = 0
             done = False
             while not done:
-                joint_action = self.players[0].get_action(obs_p1), self.players[1].get_action(obs_p2)
+                joint_action = (self.players[0].get_action( (visual_obs[0].unsqueeze(dim=0), agent_obs[0].unsqueeze(dim=0)) ),
+                                self.players[1].get_action( (visual_obs[1].unsqueeze(dim=0), agent_obs[1].unsqueeze(dim=0)) ) )
+                joint_action = tuple(Action.INDEX_TO_ACTION[action] for action in joint_action)
                 next_state, reward, done, info = self.env.step(joint_action)
                 trial_reward += reward
-                obs_p1, obs_p2 = self.featurize_state(next_state)
+                obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
+                visual_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
             average_reward.append(trial)
         return np.mean(average_reward)
 
-    def train_epoch(self, dataset):
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=3)
+    def train_epoch(self):
+        dataloader = DataLoader(self.dataset, batch_size=args.batch_size, shuffle=True, num_workers=3)
         for batch in tqdm(dataloader):
             self.train_on_batch(batch)
 
     def training(self, num_epochs=100):
         base_path = '.'
-        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path)
-        dataset = None # TODO
+        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path, mode='disabled')
         for epoch in range(num_epochs):
-            self.train_epoch(dataset)
+            self.train_epoch()
             mean_reward = self.evaluate()
             wandb.log({'evaluation_reward': mean_reward})
 
 
 if __name__ == '__main__':
     args = get_arguments()
-    env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name(args.env_name), horizon=400)
-    dataset = None # TODO
-
-    bct = BC_trainer(env, dataset, args)
+    encoding_fn = ENCODING_SCHEMES[args.encoding_fn]
+    env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name(args.layout), horizon=args.horizon)
+    dataset = OvercookedDataset(env, encoding_fn, args)
+    bct = BC_trainer(env, encoding_fn, dataset, args)
+    bct.training()
 
 
