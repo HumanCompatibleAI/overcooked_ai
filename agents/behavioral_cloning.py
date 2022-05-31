@@ -24,7 +24,7 @@ def weights_init_(m):
         th.nn.init.constant_(m.bias, 0)
 
 class BehaviouralCloning(nn.Module):
-    def __init__(self, visual_obs_shape, agent_obs_shape, depth=16, act=nn.ReLU, hidden_dim=1024):
+    def __init__(self, visual_obs_shape, agent_obs_shape, depth=16, act=nn.ReLU, hidden_dim=256):
         '''
         :param depth: depth of cnn (i.e. num output channels
         :param act: activation fn to use
@@ -98,7 +98,8 @@ class BC_trainer():
         visual_obs_shape = visual_obs[0].shape
         agent_obs_shape = agent_obss[0].shape
         self.players = (
-            BehaviouralCloning(visual_obs_shape, agent_obs_shape), BehaviouralCloning(visual_obs_shape, agent_obs_shape)
+            BehaviouralCloning(visual_obs_shape, agent_obs_shape).to(self.device), 
+            BehaviouralCloning(visual_obs_shape, agent_obs_shape).to(self.device)
         )
         self.optimizers = tuple([th.optim.Adam(player.parameters(), lr=args.lr) for player in self.players])
         self.criterion = nn.CrossEntropyLoss()
@@ -139,17 +140,17 @@ class BC_trainer():
         return np.mean(average_reward)
 
     def train_epoch(self):
-        dataloader = DataLoader(self.dataset, batch_size=args.batch_size, shuffle=True, num_workers=3)
+        dataloader = DataLoader(self.dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
         for batch in tqdm(dataloader):
             self.train_on_batch(batch)
 
-    def training(self, num_epochs=100):
+    def training(self, num_epochs=250):
         base_path = '.'
-        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path, mode='disabled')
+        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path)#, mode='disabled')
         for epoch in range(num_epochs):
-            self.train_epoch()
             mean_reward = self.evaluate()
-            wandb.log({'evaluation_reward': mean_reward})
+            self.train_epoch()
+            wandb.log({'evaluation_reward': mean_reward, 'epoch': epoch})
 
 
 if __name__ == '__main__':

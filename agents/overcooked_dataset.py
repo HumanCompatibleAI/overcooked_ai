@@ -25,7 +25,11 @@ class OvercookedDataset(Dataset):
 
         def str_to_actions(joint_action):
             """Convert df cell format of a joint action to a joint action as a tuple of indices"""
-            joint_action = json.loads(joint_action)
+            try: 
+                joint_action = json.loads(joint_action)
+            except json.decoder.JSONDecodeError:
+                # Hacky fix taken from https://github.com/HumanCompatibleAI/human_aware_rl/blob/master/human_aware_rl/human/data_processing_utils.py#L29
+                joint_action = eval(joint_action)
             for i in range(2):
                 if type(joint_action[i]) is list:
                     joint_action[i] = tuple(joint_action[i])
