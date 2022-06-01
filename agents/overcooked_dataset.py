@@ -4,7 +4,7 @@ from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, OvercookedGridworld, Direction, Action
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, NO_COUNTERS_PARAMS
 
-
+from copy import deepcopy
 import json
 import numpy as np
 import os
@@ -20,12 +20,19 @@ class OvercookedDataset(Dataset):
         self.encode_state_fn = encoding_fn
         self.data_path = args.base_dir / args.data_path / args.dataset
         self.main_trials = pd.read_pickle(self.data_path)
+        print(f'Number of all trials: {len(self.main_trials)}')
         self.main_trials = self.main_trials[self.main_trials['layout_name'] == args.layout]
+        print(f'Number of {args.layout} trials: {len(self.main_trials)}')
+        # Remove all transitions where both players noop-ed
+        self.main_trials = self.main_trials[self.main_trials['joint_action'] != '[[0, 0], [0, 0]]']
+        print(f'Number of {args.layout} trials without double noops: {len(self.main_trials)}')
         # print(self.main_trials['layout_name'])
+
+        self.action_ratios = {k: 0 for k in Action.ALL_ACTIONS}
 
         def str_to_actions(joint_action):
             """Convert df cell format of a joint action to a joint action as a tuple of indices"""
-            try: 
+            try:
                 joint_action = json.loads(joint_action)
             except json.decoder.JSONDecodeError:
                 # Hacky fix taken from https://github.com/HumanCompatibleAI/human_aware_rl/blob/master/human_aware_rl/human/data_processing_utils.py#L29
@@ -36,6 +43,7 @@ class OvercookedDataset(Dataset):
                 if type(joint_action[i]) is str:
                     joint_action[i] = joint_action[i].lower()
                 assert joint_action[i] in Action.ALL_ACTIONS
+                self.action_ratios[joint_action[i]] += 1
             return np.array([Action.ACTION_TO_INDEX[a] for a in joint_action])
 
         def str_to_obss(df):
@@ -51,7 +59,17 @@ class OvercookedDataset(Dataset):
 
         self.main_trials['joint_action'] = self.main_trials['joint_action'].apply(str_to_actions)
         self.main_trials = self.main_trials.apply(str_to_obss, axis=1)
-        # print(self.main_trials)
+
+        self.class_weights = np.zeros(6)
+        for action in Action.ALL_ACTIONS:
+            self.class_weights[Action.ACTION_TO_INDEX[action]] = 0
+            self.class_weights[Action.ACTION_TO_INDEX[action]] = self.action_ratios[action]
+
+        self.class_weights = 1.0 / self.class_weights
+        self.class_weights = len(Action.ALL_ACTIONS) * self.class_weights / self.class_weights.sum()
+
+    def get_class_weights(self):
+        return self.class_weights
 
     def __len__(self):
         return len(self.main_trials)
