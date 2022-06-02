@@ -62,7 +62,6 @@ class OvercookedDataset(Dataset):
 
         self.class_weights = np.zeros(6)
         for action in Action.ALL_ACTIONS:
-            self.class_weights[Action.ACTION_TO_INDEX[action]] = 0
             self.class_weights[Action.ACTION_TO_INDEX[action]] = self.action_ratios[action]
 
         self.class_weights = 1.0 / self.class_weights

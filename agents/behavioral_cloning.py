@@ -5,6 +5,7 @@ from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
 from overcooked_dataset import OvercookedDataset
 from state_encodings import ENCODING_SCHEMES
 
+from copy import deepcopy
 import numpy as np
 from pathlib import Path
 import pygame
@@ -100,8 +101,10 @@ class BC_trainer():
             BehaviouralCloning(visual_obs_shape, agent_obs_shape).to(self.device), 
             BehaviouralCloning(visual_obs_shape, agent_obs_shape).to(self.device)
         )
-        self.optimizers = tuple([th.optim.Adam(player.parameters(), lr=args.lr) for player in self.players])
-        self.criterion = nn.CrossEntropyLoss(weight=th.tensor(dataset.get_class_weights(), dtype=th.float32, device=self.device))
+
+        if dataset is not None:
+            self.optimizers = tuple([th.optim.Adam(player.parameters(), lr=args.lr) for player in self.players])
+            self.criterion = nn.CrossEntropyLoss(weight=th.tensor(dataset.get_class_weights(), dtype=th.float32, device=self.device))
         if self.visualize_evaluation:
             pygame.init()
             surface = StateVisualizer().render_state(self.env.state, grid=self.env.mdp.terrain_mtx)
@@ -109,24 +112,9 @@ class BC_trainer():
             self.window.blit(surface, (0, 0))
             pygame.display.flip()
 
-
-    def train_on_batch(self, batch):
-        metrics = {}
-        batch = {k: v.to(self.device) for k,v in batch.items()}
-        vo, ao, action = batch['visual_obs'].float(), batch['agent_obs'].float(), batch['joint_action'].long()
-        for i in range(self.num_players):
-            self.optimizers[i].zero_grad()
-            pred_action = self.players[i].forward( (vo[:,i], ao[:,i]) )
-            loss = self.criterion(pred_action, action[:,i])
-            loss.backward()
-            self.optimizers[i].step()
-            metrics[f'player{i}_loss'] = loss.item()
-        metrics['total_loss'] = sum(metrics.values())
-        wandb.log(metrics)
-        return metrics
-
-    def evaluate(self, num_trials=1):
-        STATIC_LIMIT = 3 # number of timesteps an agent can be static before they are force to pick a different action
+    def evaluate(self, num_trials=10):
+        for i in range(2):
+            self.players[i].eval()
         average_reward = []
         shaped_reward = []
         for trial in range(num_trials):
@@ -135,39 +123,37 @@ class BC_trainer():
             vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
             trial_reward, trial_shaped_r = 0, 0
             done = False
-            prev_pos = (np.zeros( (STATIC_LIMIT, 2) ), np.zeros( (STATIC_LIMIT, 2) ))
+            prev_state, prev_actions = deepcopy(self.env.state), (Action.STAY, Action.STAY)
             timestep = 0
             while not done:
                 if self.visualize_evaluation:
                     self.render()
-                    time.sleep(0.01)
+                    time.sleep(0.1)
 
-                def select_action(idx, vo, ao, sample=False):
+                def select_action(idx, vo, ao, sample=True):
                     logits = self.players[idx].forward((vo.unsqueeze(dim=0), ao.unsqueeze(dim=0))).squeeze()
-                    if sample:
-                        return th.distributions.categorical.Categorical(logits=logits).sample()
                     action_ranking = th.argsort(logits, dim=-1)
-                    pos_hist = prev_pos[idx]
-                    if np.all(np.array([pos_hist[0] == pos_hist[i] for i in range(1, len(pos_hist))])):
-                        # Agent has not moved in 3 turns, choose 2nd best action instead of best action
-                        action = action_ranking[1]
-                    else:
-                        action = action_ranking[0]
-                    prev_pos[idx][timestep % STATIC_LIMIT] = self.env.state.players[idx].position
-                    return Action.INDEX_TO_ACTION[action]
+                    sampled_action = th.distributions.categorical.Categorical(logits=logits).sample()
+                    max_action = action_ranking[0]
+                    action = sampled_action if sample else max_action
+                    action = Action.INDEX_TO_ACTION[action]
+                    if self.env.state.time_independent_equal(prev_state) and action == prev_actions[idx]:
+                            action = np.random.choice(Action.ALL_ACTIONS)
+                    return action
 
                 joint_action = tuple(select_action(i, vis_obs[i], agent_obs[i]) for i in range(2))
+                prev_state, prev_actions = deepcopy(self.env.state), joint_action
                 next_state, reward, done, info = self.env.step(joint_action)
-                #print('-->', info['shaped_r_by_agent'])
                 trial_reward += reward
                 trial_shaped_r += np.sum(info['shaped_r_by_agent'])
                 timestep += 1
                 
                 obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
                 vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
+            if self.visualize_evaluation:
+                print(f'Reward Achieved: {trial_reward}')
             average_reward.append(trial_reward)
             shaped_reward.append(trial_shaped_r)
-        print(timestep)
         return np.mean(average_reward), np.mean(shaped_reward)
 
     def render(self):
@@ -176,20 +162,54 @@ class BC_trainer():
         self.window.blit(surface, (0, 0))
         pygame.display.flip()
 
+    def train_on_batch(self, batch):
+        batch = {k: v.to(self.device) for k,v in batch.items()}
+        vo, ao, action = batch['visual_obs'].float(), batch['agent_obs'].float(), batch['joint_action'].long()
+        for i in range(self.num_players):
+            self.optimizers[i].zero_grad()
+            pred_action = self.players[i].forward( (vo[:,i], ao[:,i]) )
+            loss = self.criterion(pred_action, action[:,i])
+            loss.backward()
+            self.optimizers[i].step()
+
+        metrics['total_loss'] = sum(metrics.values())
+        # wandb.log(metrics)
+        return metrics
+
     def train_epoch(self):
+        metrics = {}
+
+        for i in range(2):
+            self.players[i].train()
+
         dataloader = DataLoader(self.dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
         for batch in tqdm(dataloader):
-            self.train_on_batch(batch)
+            p1_loss, p2_loss = self.train_on_batch(batch)
+            metrics['p1_loss'].append(p1_loss)
+            metrics['p2_loss'].append(p2_loss)
 
-    def training(self, num_epochs=250):
+        metrics['p1_loss'] = np.mean(metrics['p1_loss'])
+        metrics['p2_loss'] = np.mean(metrics['p2_loss'])
+        metrics['tot_loss'] = np.sum( [metrics['p1_loss'], metrics['p2_loss']])
+        return metrics
+
+    def training(self, num_epochs=1000):
         base_path = '.'
         wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path)#, mode='disabled')
+        best_loss = float('inf')
+        best_reward = 0
         for epoch in range(num_epochs):
             mean_reward, shaped_reward = self.evaluate()
-            self.train_epoch()
-            wandb.log({'eval_true_reward': mean_reward, 'eval_shaped_reward': shaped_reward, 'epoch': epoch})
-            if epoch % 25 == 0:
-                self.save(tag=str(epoch))
+            metrics = self.train_epoch()
+            wandb.log({'eval_true_reward': mean_reward, 'eval_shaped_reward': shaped_reward, 'epoch': epoch, **metrics})
+            if metrics['tot_loss'] < best_loss:
+                print(f'Best loss achieved on epoch {epoch}, saving models')
+                self.save(tag='best_loss')
+                best_loss = metrics['tot_loss']
+            if mean_reward > best_reward:
+                print(f'Best reward achieved on epoch {epoch}, saving models')
+                self.save(tag='best_reward')
+                best_reward = mean_reward
 
     def save(self, tag=''):
         save_path = self.args.base_dir / 'saved_models' / f'{args.exp_name}_{tag}'
@@ -197,11 +217,10 @@ class BC_trainer():
         for i in range(2):
             th.save(self.players[i].state_dict(), save_path / f'player{i}')
 
-    def load(self, load_name):
-        load_path = self.args.base_dir / 'saved_models' / args.load_name
+    def load(self, load_name='default_exp_225'):
+        load_path = self.args.base_dir / 'saved_models' / load_name
         for i in range(2):
-            self.players[i].load_state_dict(torch.load(load_path / f'player{i}'))
-        model.eval()
+            self.players[i].load_state_dict(th.load(load_path / f'player{i}', map_location=self.device))
 
 
 if __name__ == '__main__':
@@ -209,7 +228,9 @@ if __name__ == '__main__':
     encoding_fn = ENCODING_SCHEMES[args.encoding_fn]
     env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name(args.layout), horizon=args.horizon)
     dataset = OvercookedDataset(env, encoding_fn, args)
-    bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=False)
+    bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=True)
+    # bct.load()
+    # bct.evaluate(10)
     bct.training()
 
 

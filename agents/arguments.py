@@ -8,8 +8,8 @@ def get_arguments():
     parser.add_argument('--horizon', type=int, default=400, help='Max timesteps in a rollout')
     parser.add_argument('--encoding-fn', type=str, default='dense_lossless',
                         help='Encoding scheme to use. Options: "dense_lossless", "OAI_lossless", "OAI_feats"')
-    parser.add_argument('--lr', type=float, default=0.0005, help='learning rate')
-    parser.add_argument('--batch-size', type=int, default=64, help='learning rate')
+    parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--batch-size', type=int, default=256, help='learning rate')
     parser.add_argument('--exp-name', type=str, default='default_exp',
                         help='Name of experiment. Used to name save files.')
     parser.add_argument('--base-dir', type=str, default=Path.cwd(),
