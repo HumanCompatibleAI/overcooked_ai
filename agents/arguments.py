@@ -10,7 +10,7 @@ def get_arguments():
                         help='Encoding scheme to use. Options: "dense_lossless", "OAI_lossless", "OAI_feats"')
     parser.add_argument('--lr', type=float, default=0.0005, help='learning rate')
     parser.add_argument('--batch-size', type=int, default=64, help='learning rate')
-    parser.add_argument('--exp-name', type=str, default=None,
+    parser.add_argument('--exp-name', type=str, default='default_exp',
                         help='Name of experiment. Used to name save files.')
     parser.add_argument('--base-dir', type=str, default=Path.cwd(),
                         help='Base directory to save all models, data, tensorboard metrics.')

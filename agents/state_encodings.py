@@ -123,6 +123,9 @@ def encode_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int,
             raise ValueError(f"Unrecognized object: {item.name}")
 
     visual_obs = np.tile(visual_obs, (2,1,1,1))
+
+    # print(state)
+    # print(visual_obs, agent_obs)
     return visual_obs, agent_obs
 
 def OAI_BC_featurize_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int, num_pots: int = 2):

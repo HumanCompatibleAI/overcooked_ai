@@ -84,12 +84,6 @@ class BehaviouralCloning(nn.Module):
         logits = self.mlp(th.cat(latent_state, dim=-1))
         return logits
 
-    def get_action(self, obs):
-        logits = self.forward(obs)
-        action_indices = th.argsort(logits, dim=-1)
-        return action_indices
-
-
 class BC_trainer():
     def __init__(self, env, encoding_fn, dataset, args, vis_eval=False):
         self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
@@ -132,9 +126,10 @@ class BC_trainer():
         wandb.log(metrics)
         return metrics
 
-    def evaluate(self, num_trials=10):
+    def evaluate(self, num_trials=1):
         STATIC_LIMIT = 3 # number of timesteps an agent can be static before they are force to pick a different action
         average_reward = []
+        metrics = {'onions_pickedup': 0, 'soups_made': 0, 'dishes_pickedup': 0}
         for trial in range(num_trials):
             self.env.reset()
             obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
@@ -148,8 +143,11 @@ class BC_trainer():
                     self.render()
                     time.sleep(0.01)
 
-                def select_action(idx, vo, ao):
-                    action_ranking = self.players[idx].get_action((vo.unsqueeze(dim=0), ao.unsqueeze(dim=0))).squeeze()
+                def select_action(idx, vo, ao, sample=False):
+                    logits = self.players[idx].forward((vo.unsqueeze(dim=0), ao.unsqueeze(dim=0))).squeeze()
+                    if sample:
+                        return th.distributions.categorical.Categorical(logits=logits).sample()
+                    action_ranking = th.argsort(logits, dim=-1)
                     pos_hist = prev_pos[idx]
                     if np.all(np.array([pos_hist[0] == pos_hist[i] for i in range(1, len(pos_hist))])):
                         # Agent has not moved in 3 turns, choose 2nd best action instead of best action
@@ -161,8 +159,10 @@ class BC_trainer():
 
                 joint_action = tuple(select_action(i, vis_obs[i], agent_obs[i]) for i in range(2))
                 next_state, reward, done, info = self.env.step(joint_action)
+                print('-->', info['shaped_r_by_agent'])
                 trial_reward += reward
                 timestep += 1
+                
                 obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
                 vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
             average_reward.append(trial_reward)
@@ -186,6 +186,18 @@ class BC_trainer():
             mean_reward = self.evaluate()
             self.train_epoch()
             wandb.log({'evaluation_reward': mean_reward, 'epoch': epoch})
+
+    def save(self):
+        save_path = self.args.base_path / 'saved_models' / args.exp_name
+        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+        for i in range(2):
+            torch.save(self.players[i].state_dict(), save_path / f'player{i}')
+
+    def load(self, load_name):
+        load_path = self.args.base_path / 'saved_models' / args.load_name
+        for i in range(2):
+            self.players[i].load_state_dict(torch.load(load_path / f'player{i}'))
+        model.eval()
 
 
 if __name__ == '__main__':
