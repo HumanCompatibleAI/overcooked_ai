@@ -101,8 +101,7 @@ class BC_trainer():
             BehaviouralCloning(visual_obs_shape, agent_obs_shape).to(self.device)
         )
         self.optimizers = tuple([th.optim.Adam(player.parameters(), lr=args.lr) for player in self.players])
-        a = th.tensor(dataset.get_class_weights(), dtype=th.float32)
-        self.criterion = nn.CrossEntropyLoss(weight=th.tensor(dataset.get_class_weights(), dtype=th.float32))
+        self.criterion = nn.CrossEntropyLoss(weight=th.tensor(dataset.get_class_weights(), dtype=th.float32, device=self.device))
         if self.visualize_evaluation:
             pygame.init()
             surface = StateVisualizer().render_state(self.env.state, grid=self.env.mdp.terrain_mtx)
@@ -129,12 +128,12 @@ class BC_trainer():
     def evaluate(self, num_trials=1):
         STATIC_LIMIT = 3 # number of timesteps an agent can be static before they are force to pick a different action
         average_reward = []
-        metrics = {'onions_pickedup': 0, 'soups_made': 0, 'dishes_pickedup': 0}
+        shaped_reward = []
         for trial in range(num_trials):
             self.env.reset()
             obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
             vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
-            trial_reward = 0
+            trial_reward, trial_shaped_r = 0, 0
             done = False
             prev_pos = (np.zeros( (STATIC_LIMIT, 2) ), np.zeros( (STATIC_LIMIT, 2) ))
             timestep = 0
@@ -159,14 +158,17 @@ class BC_trainer():
 
                 joint_action = tuple(select_action(i, vis_obs[i], agent_obs[i]) for i in range(2))
                 next_state, reward, done, info = self.env.step(joint_action)
-                print('-->', info['shaped_r_by_agent'])
+                #print('-->', info['shaped_r_by_agent'])
                 trial_reward += reward
+                trial_shaped_r += np.sum(info['shaped_r_by_agent'])
                 timestep += 1
                 
                 obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
                 vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
             average_reward.append(trial_reward)
-        return np.mean(average_reward)
+            shaped_reward.append(trial_shaped_r)
+        print(timestep)
+        return np.mean(average_reward), np.mean(shaped_reward)
 
     def render(self):
         surface = StateVisualizer().render_state(self.env.state, grid=self.env.mdp.terrain_mtx)
@@ -181,20 +183,22 @@ class BC_trainer():
 
     def training(self, num_epochs=250):
         base_path = '.'
-        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path, mode='disabled')
+        wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path)#, mode='disabled')
         for epoch in range(num_epochs):
-            mean_reward = self.evaluate()
+            mean_reward, shaped_reward = self.evaluate()
             self.train_epoch()
-            wandb.log({'evaluation_reward': mean_reward, 'epoch': epoch})
+            wandb.log({'eval_true_reward': mean_reward, 'eval_shaped_reward': shaped_reward, 'epoch': epoch})
+            if epoch % 25 == 0:
+                self.save(tag=str(epoch))
 
-    def save(self):
-        save_path = self.args.base_path / 'saved_models' / args.exp_name
-        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+    def save(self, tag=''):
+        save_path = self.args.base_dir / 'saved_models' / f'{args.exp_name}_{tag}'
+        Path(save_path).mkdir(parents=True, exist_ok=True)
         for i in range(2):
-            torch.save(self.players[i].state_dict(), save_path / f'player{i}')
+            th.save(self.players[i].state_dict(), save_path / f'player{i}')
 
     def load(self, load_name):
-        load_path = self.args.base_path / 'saved_models' / args.load_name
+        load_path = self.args.base_dir / 'saved_models' / args.load_name
         for i in range(2):
             self.players[i].load_state_dict(torch.load(load_path / f'player{i}'))
         model.eval()
