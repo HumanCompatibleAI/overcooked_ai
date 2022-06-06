@@ -79,7 +79,7 @@ class Action(object):
 
     @staticmethod
     def sample(action_probs):
-        return np.random.choice(Action.ALL_ACTIONS, p=action_probs)
+        return np.random.choice(np.array(Action.ALL_ACTIONS, dtype=object), p=action_probs)
     
     @staticmethod
     def argmax(action_probs):
