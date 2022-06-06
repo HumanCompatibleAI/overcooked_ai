@@ -3,6 +3,10 @@ from pathlib import Path
 
 
 def get_arguments():
+    """
+    Arguments for training agents
+    :return:
+    """
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
     parser.add_argument('--layout', default='asymmetric_advantages',  help='Overcooked map to use')
     parser.add_argument('--horizon', type=int, default=400, help='Max timesteps in a rollout')

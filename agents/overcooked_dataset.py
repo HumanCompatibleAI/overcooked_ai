@@ -31,7 +31,10 @@ class OvercookedDataset(Dataset):
         self.action_ratios = {k: 0 for k in Action.ALL_ACTIONS}
 
         def str_to_actions(joint_action):
-            """Convert df cell format of a joint action to a joint action as a tuple of indices"""
+            """
+            Convert df cell format of a joint action to a joint action as a tuple of indices.
+            Used to convert pickle files which are stored as strings into np.arrays
+            """
             try:
                 joint_action = json.loads(joint_action)
             except json.decoder.JSONDecodeError:
@@ -47,7 +50,10 @@ class OvercookedDataset(Dataset):
             return np.array([Action.ACTION_TO_INDEX[a] for a in joint_action])
 
         def str_to_obss(df):
-            """Convert from a df cell format of a state to an Overcooked State"""
+            """
+            Convert from a df cell format of a state to an Overcooked State
+            Used to convert pickle files which are stored as strings into overcooked states
+            """
             state = df['state']
             if type(state) is str:
                 state = json.loads(state)
@@ -60,10 +66,10 @@ class OvercookedDataset(Dataset):
         self.main_trials['joint_action'] = self.main_trials['joint_action'].apply(str_to_actions)
         self.main_trials = self.main_trials.apply(str_to_obss, axis=1)
 
+        # Calculate class weights for cross entropy
         self.class_weights = np.zeros(6)
         for action in Action.ALL_ACTIONS:
             self.class_weights[Action.ACTION_TO_INDEX[action]] = self.action_ratios[action]
-
         self.class_weights = 1.0 / self.class_weights
         self.class_weights = len(Action.ALL_ACTIONS) * self.class_weights / self.class_weights.sum()
 

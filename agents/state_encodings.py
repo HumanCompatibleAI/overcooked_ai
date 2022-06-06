@@ -27,7 +27,7 @@ def encode_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int,
         # - Facing empty counter
         - Time remaining
         - (Optional) Urgency (if horizon - overcooked_state.timestep < 40)
-        Maybe's
+        TODOs (Maybe)
         - relative location to the other player
         - relative location to the closest onion
         - relative location to the closest dish
@@ -123,9 +123,6 @@ def encode_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int,
             raise ValueError(f"Unrecognized object: {item.name}")
 
     visual_obs = np.tile(visual_obs, (2,1,1,1))
-
-    # print(state)
-    # print(visual_obs, agent_obs)
     return visual_obs, agent_obs
 
 def OAI_BC_featurize_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int, num_pots: int = 2):
@@ -143,6 +140,8 @@ def OAI_RL_encode_state(mdp: OvercookedGridworld, state: OvercookedState, horizo
     """
     visual_obs = mdp.lossless_state_encoding(state, horizon=horizon)
     visual_obs = np.stack(visual_obs, axis=0)
+    # Reorder to channels first
+    visual_obs = np.transpose(visual_obs, (0, 3, 1, 2))
     return visual_obs, np.array([[], []])
 
 ENCODING_SCHEMES = {
@@ -150,3 +149,16 @@ ENCODING_SCHEMES = {
     'OAI_lossless': OAI_RL_encode_state,
     'dense_lossless': encode_state
 }
+
+if __name__ == '__main__':
+    import timeit
+    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedState, OvercookedGridworld, Direction, Action
+    env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name('asymmetric_advantages'), horizon=400)
+    env.reset()
+    for name, encoding_fn in ENCODING_SCHEMES.items():
+        vis_obs, agents_obs = encoding_fn(env.mdp, env.state, 400)
+        time_taken = timeit.timeit(lambda: encoding_fn(env.mdp, env.state, 400), number=10)
+        print(f'{name} function returns tuple with shapes({vis_obs.shape}, {agents_obs.shape}) and takes {time_taken} to complete')
+        # print(vis_obs.shape, agents_obs.shape)
+

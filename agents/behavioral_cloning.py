@@ -30,13 +30,14 @@ def weights_init_(m):
 
 class BehaviouralCloning(nn.Module):
     def __init__(self, visual_obs_shape, agent_obs_shape, depth=16, act=nn.ReLU, hidden_dim=256):
-        '''
-        :param depth: depth of cnn (i.e. num output channels
-        :param act: activation fn to use
-        :param kernels: kernel sizes for cnn
-        :param stride: stride of kernels - should be >= 2 for larger images, 1 for small images
-        :param image_dims: dimensions of images
-        '''
+        """
+        NN network for a behavioral cloning agent
+        :param visual_obs_shape: Shape of any grid-like input to be passed into a CNN
+        :param agent_obs_shape: Shape of any vector input to passed only into an MLP
+        :param depth: Depth of CNN
+        :param act: activation function
+        :param hidden_dim: hidden dimension to use in NNs
+        """
         super(BehaviouralCloning, self).__init__()
         self.act = act
         self.hidden_dim = hidden_dim
@@ -69,15 +70,12 @@ class BehaviouralCloning(nn.Module):
             nn.Linear(self.hidden_dim, self.hidden_dim),
             act(),
             nn.Linear(self.hidden_dim, NUM_ACTIONS),
-            # nn.utils.spectral_norm(nn.Linear(self.hidden_dim, self.hidden_dim)),
-            # nn.LayerNorm(self.cnn_output_shape),
         )
         self.apply(weights_init_)
 
     def forward(self, obs):
         visual_obs, agent_obs = obs
         latent_state = []
-        visual_obs, agent_obs = visual_obs, agent_obs
         if self.use_visual_obs:
             latent_state.append(self.cnn(visual_obs))
         if self.use_agent_obs:
@@ -85,8 +83,23 @@ class BehaviouralCloning(nn.Module):
         logits = self.mlp(th.cat(latent_state, dim=-1))
         return logits
 
+    def select_action(idx, vo, ao, sample=True):
+        logits = self.players[idx].forward((vo.unsqueeze(dim=0), ao.unsqueeze(dim=0))).squeeze()
+        return th.distributions.categorical.Categorical(logits=logits).sample() \
+               if sample else \
+               th.argmax(logits, dim=-1)
+
 class BC_trainer():
     def __init__(self, env, encoding_fn, dataset, args, vis_eval=False):
+        """
+        Class to train BC agent
+        :param env: Overcooked environment to use
+        :param encoding_fn: A callable function to encode an Overcooked state into a combination of visual and agent obs
+                            that can be fed into a NN
+        :param dataset: That dataset to train on - can be None if the only visualizing agetns
+        :param args: arguments to use
+        :param vis_eval: If true, the evaluate function will visualize the agents
+        """
         self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
         self.num_players = 2
         self.env = env
@@ -112,57 +125,67 @@ class BC_trainer():
             self.window.blit(surface, (0, 0))
             pygame.display.flip()
 
-    def evaluate(self, num_trials=10):
+    def evaluate(self, num_trials=10, sample=True):
+        """
+        Evaluate agent on <num_trials> trials. Returns average true reward and average shaped reward trials.
+        :param num_trials: Number of trials to run
+        :param sample: Boolean. If true sample from action distribution. If false, always take 'best' action.
+                       NOTE: if sample is false, there is no point in running more than a single trial since the system
+                             becomes deterministic
+        :return: average true reward and average shaped reward
+        """
         for i in range(2):
             self.players[i].eval()
         average_reward = []
         shaped_reward = []
         for trial in range(num_trials):
             self.env.reset()
-            obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
-            vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
+            prev_state, prev_actions = deepcopy(self.env.state), (Action.STAY, Action.STAY)
             trial_reward, trial_shaped_r = 0, 0
             done = False
-            prev_state, prev_actions = deepcopy(self.env.state), (Action.STAY, Action.STAY)
             timestep = 0
             while not done:
                 if self.visualize_evaluation:
                     self.render()
                     time.sleep(0.1)
+                # Encode Overcooked state into observations for agents
+                obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
+                vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
 
-                def select_action(idx, vo, ao, sample=True):
-                    logits = self.players[idx].forward((vo.unsqueeze(dim=0), ao.unsqueeze(dim=0))).squeeze()
-                    action_ranking = th.argsort(logits, dim=-1)
-                    sampled_action = th.distributions.categorical.Categorical(logits=logits).sample()
-                    max_action = action_ranking[0]
-                    action = sampled_action if sample else max_action
-                    action = Action.INDEX_TO_ACTION[action]
+                # Get next actions
+                joint_action = []
+                for i in range(2):
+                    action = Action.INDEX_TO_ACTION[self.players[i].select_action(vis_obs[i], agent_obs[i], sample)]
+                    # If the state didn't change from the previous timestep and the agent is choosing the same action
+                    # then play a random action instead. Prevents agents from getting stuck
                     if self.env.state.time_independent_equal(prev_state) and action == prev_actions[idx]:
-                            action = np.random.choice(Action.ALL_ACTIONS)
-                    return action
+                        action = np.random.choice(Action.ALL_ACTIONS)
+                    joint_action.append(action)
+                joint_action = tuple(joint_action)
 
-                joint_action = tuple(select_action(i, vis_obs[i], agent_obs[i]) for i in range(2))
                 prev_state, prev_actions = deepcopy(self.env.state), joint_action
+                # Environment step
                 next_state, reward, done, info = self.env.step(joint_action)
+                # Update metrics
                 trial_reward += reward
                 trial_shaped_r += np.sum(info['shaped_r_by_agent'])
                 timestep += 1
-                
-                obs = self.encode_state_fn(self.env.mdp, self.env.state, self.args.horizon)
-                vis_obs, agent_obs = (th.tensor(o, device=self.device, dtype=th.float32) for o in obs)
+
             if self.visualize_evaluation:
-                print(f'Reward Achieved: {trial_reward}')
+                print(f'Reward received for trial {trial}: {trial_reward}')
             average_reward.append(trial_reward)
             shaped_reward.append(trial_shaped_r)
         return np.mean(average_reward), np.mean(shaped_reward)
 
     def render(self):
+        """ Render game env """
         surface = StateVisualizer().render_state(self.env.state, grid=self.env.mdp.terrain_mtx)
         self.window = pygame.display.set_mode(surface.get_size(), HWSURFACE | DOUBLEBUF | RESIZABLE)
         self.window.blit(surface, (0, 0))
         pygame.display.flip()
 
     def train_on_batch(self, batch):
+        """Train BC agent on a batch of data"""
         batch = {k: v.to(self.device) for k,v in batch.items()}
         vo, ao, action = batch['visual_obs'].float(), batch['agent_obs'].float(), batch['joint_action'].long()
         for i in range(self.num_players):
@@ -171,14 +194,12 @@ class BC_trainer():
             loss = self.criterion(pred_action, action[:,i])
             loss.backward()
             self.optimizers[i].step()
-
         metrics['total_loss'] = sum(metrics.values())
-        # wandb.log(metrics)
         return metrics
 
     def train_epoch(self):
+        """ Train BC agent on a batch of data"""
         metrics = {}
-
         for i in range(2):
             self.players[i].train()
 
@@ -194,6 +215,7 @@ class BC_trainer():
         return metrics
 
     def training(self, num_epochs=1000):
+        """ Training routine """
         base_path = '.'
         wandb.init(project="overcooked_ai_test", entity="stephaneao", dir=base_path)#, mode='disabled')
         best_loss = float('inf')
@@ -229,8 +251,6 @@ if __name__ == '__main__':
     env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name(args.layout), horizon=args.horizon)
     dataset = OvercookedDataset(env, encoding_fn, args)
     bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=True)
-    # bct.load()
-    # bct.evaluate(10)
     bct.training()
 
 
