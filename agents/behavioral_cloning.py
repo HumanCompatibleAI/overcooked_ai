@@ -165,19 +165,18 @@ class BC_trainer():
     def train_on_batch(self, batch):
         batch = {k: v.to(self.device) for k,v in batch.items()}
         vo, ao, action = batch['visual_obs'].float(), batch['agent_obs'].float(), batch['joint_action'].long()
+        losses = [0, 0]
         for i in range(self.num_players):
             self.optimizers[i].zero_grad()
             pred_action = self.players[i].forward( (vo[:,i], ao[:,i]) )
             loss = self.criterion(pred_action, action[:,i])
             loss.backward()
             self.optimizers[i].step()
-
-        metrics['total_loss'] = sum(metrics.values())
-        # wandb.log(metrics)
-        return metrics
+            losses[i] = loss.item()
+        return losses
 
     def train_epoch(self):
-        metrics = {}
+        metrics = {'p1_loss': [], 'p2_loss': []}
 
         for i in range(2):
             self.players[i].train()
@@ -228,7 +227,7 @@ if __name__ == '__main__':
     encoding_fn = ENCODING_SCHEMES[args.encoding_fn]
     env = OvercookedEnv.from_mdp(OvercookedGridworld.from_layout_name(args.layout), horizon=args.horizon)
     dataset = OvercookedDataset(env, encoding_fn, args)
-    bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=True)
+    bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=False)
     # bct.load()
     # bct.evaluate(10)
     bct.training()
