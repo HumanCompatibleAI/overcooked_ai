@@ -103,5 +103,5 @@ See [this Google Colab](https://colab.research.google.com/drive/1AAVP2P-QQhbx6WT
 
 ## Further Issues and questions ❓
 
-If you have issues or questions, don't hesitate to contact either [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu or [Nathan Miller](https://github.com/nathan-miller23) at nathan_miller23@berkeley.edu
+If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
 
