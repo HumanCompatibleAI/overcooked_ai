@@ -47,7 +47,7 @@ class OvercookedEnv(object):
                                             "If trying to instantiate directly from a OvercookedGridworld " \
                                             "instance, use the OvercookedEnv.from_mdp method"
         self.num_mdp = num_mdp
-        self.variable_mdp = num_mdp == 1
+        self.variable_mdp = num_mdp > 1
         self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
         self._mlam = None
@@ -82,12 +82,14 @@ class OvercookedEnv(object):
         return self._mp
 
     @staticmethod
-    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1):
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=None):
         """
         Create an OvercookedEnv directly from a OvercookedGridworld mdp
         rather than a mdp generating function.
         """
         assert isinstance(mdp, OvercookedGridworld)
+        if num_mdp is not None:
+            assert num_mdp == 1
         mdp_generator_fn = lambda _ignored: mdp
         return OvercookedEnv(
             mdp_generator_fn=mdp_generator_fn,
@@ -106,7 +108,7 @@ class OvercookedEnv(object):
     @property
     def env_params(self):
         """
-        Env params should be though of as all of the params of an env WITHOUT the mdp.
+        Env params should be thought of as all of the params of an env WITHOUT the mdp.
         Alone, env_params is not sufficent to recreate a copy of the Env instance, but it is
         together with mdp_params (which is sufficient to build a copy of the Mdp instance).
         """
@@ -114,7 +116,7 @@ class OvercookedEnv(object):
             "start_state_fn": self.start_state_fn,
             "horizon": self.horizon,
             "info_level": self.info_level,
-            "_variable_mdp": self.variable_mdp
+            "num_mdp": self.num_mdp
         }
 
     def copy(self):

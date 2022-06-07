@@ -183,7 +183,7 @@ class AgentEvaluator(object):
 
     @staticmethod
     def _check_trajectories_dynamics(trajectories, verbose=True):
-        if any(env_params["_variable_mdp"] for env_params in trajectories["env_params"]):
+        if any(env_params["num_mdp"] > 1 for env_params in trajectories["env_params"]):
             if verbose:
                 print("Skipping trajectory consistency checking because MDP was recognized as variable. "
                     "Trajectory consistency checking is not yet supported for variable MDPs.")
