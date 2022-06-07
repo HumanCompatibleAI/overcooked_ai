@@ -505,14 +505,16 @@ class OvercookedEnv(object):
 class Overcooked(gym.Env):
     """
     Wrapper for the Env class above that is SOMEWHAT compatible with the standard gym API.
+    Why only somewhat? Because we need to flatten a multi-agent env to be a single-agent env (as gym requires).
 
     NOTE: Observations returned are in a dictionary format with various information that is
-    necessary to be able to handle the multi-agent nature of the environment. There are probably
-    better ways to handle this, but we found this to work with minor modifications to OpenAI Baselines.
+     necessary to be able to handle the multi-agent nature of the environment. There are probably
+     better ways to handle this, but we found this to work with minor modifications to OpenAI Baselines.
     
-    NOTE: The index of the main agent in the mdp is randomized at each reset of the environment, and 
-    is kept track of by the self.agent_idx attribute. This means that it is necessary to pass on this 
-    information in the output to know for which agent index featurizations should be made for other agents.
+    NOTE: The index of the main agent (as gym envs are 'single-agent') in the mdp is randomized at each reset
+     of the environment, and is kept track of by the self.agent_idx attribute. This means that it is necessary
+     to pass on this information in the output to know for which agent index featurizations should be made for
+     other agents.
     
     For example, say one is training A0 paired with A1, and A1 takes a custom state featurization.
     Then in the runner.py loop in OpenAI Baselines, we will get the lossless encodings of the state,
@@ -551,7 +553,6 @@ class Overcooked(gym.Env):
         high = np.ones(obs_shape) * float("inf")
         low = np.zeros(obs_shape)
         return gym.spaces.Box(low, high, dtype=np.float32)
-
 
     def step(self, action):
         """
