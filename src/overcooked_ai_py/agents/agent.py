@@ -172,6 +172,7 @@ class AgentFromPolicy(Agent):
         super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
 
+
 class RandomAgent(Agent):
     """
     An agent that randomly picks motion actions.

@@ -98,7 +98,7 @@ python -m unittest discover -s testing/ -p "*_test.py"
 
 ## Python Visualizations 🌠
 
-One can adapt a version of [this file](https://github.com/HumanCompatibleAI/human_aware_rl/blob/neurips2019/human_aware_rl/overcooked_interactive.py) in order to be able to play games in terminal graphics with custom-defined agents.
+See [this Google Colab](https://colab.research.google.com/drive/1AAVP2P-QQhbx6WTOnIG54NXLXFbO7y6n#scrollTo=Z1RBlqADnTDw) for some sample code for visualizing trajectories in python.
 
 
 ## Further Issues and questions ❓
