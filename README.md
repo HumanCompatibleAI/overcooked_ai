@@ -41,7 +41,7 @@ You can install the pre-compiled wheel file using pip.
 ```
 pip install overcooked-ai
 ```
-Note that PyPI releases are stable but infrequent. For the most up-to-date development features, build from source
+Note that PyPI releases are stable but infrequent. For the most up-to-date development features, build from source with `pip install -e .`.
 
 
 ### Building from source 🔧
