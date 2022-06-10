@@ -747,6 +747,7 @@ class OvercookedState(object):
         return self.time_independent_equal(other) and self.timestep == other.timestep
 
     def __hash__(self):
+        # NOTE: hash doesn't take into account timestep
         order_list_hash = hash(tuple(self.bonus_orders)) + hash(tuple(self.all_orders))
         return hash(
             (self.players, tuple(self.objects.values()), order_list_hash)
@@ -838,6 +839,10 @@ POTENTIAL_CONSTANTS = {
 class OvercookedGridworld(object):
     """
     An MDP grid world based off of the Overcooked game.
+
+    Importantly, an OvercookedGridworld object has no state. Once initialized,
+    all instance attributes will stay fixed.
+
     TODO: clean the organization of this class further.
     """
 
