@@ -14,6 +14,7 @@ class Direction(object):
     ALL_DIRECTIONS = INDEX_TO_DIRECTION = [NORTH, SOUTH, EAST, WEST]
     DIRECTION_TO_INDEX = { a:i for i, a in enumerate(INDEX_TO_DIRECTION) }
     OPPOSITE_DIRECTIONS = { NORTH: SOUTH, SOUTH: NORTH, EAST: WEST, WEST: EAST }
+    DIRECTION_TO_NAME = { d:name for d, name in zip([NORTH, SOUTH, EAST, WEST], ["NORTH", "SOUTH", "EAST", "WEST"])}
 
     @staticmethod
     def get_adjacent_directions(direction):
@@ -78,7 +79,7 @@ class Action(object):
 
     @staticmethod
     def sample(action_probs):
-        return np.random.choice(Action.ALL_ACTIONS, p=action_probs)
+        return np.random.choice(np.array(Action.ALL_ACTIONS, dtype=object), p=action_probs)
     
     @staticmethod
     def argmax(action_probs):

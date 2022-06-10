@@ -1,10 +1,14 @@
-import itertools, math
+import itertools, math, os, dill
 import numpy as np
 from collections import defaultdict
 from overcooked_ai_py.mdp.actions import Action
+from overcooked_ai_py.mdp.overcooked_mdp import Recipe
+from overcooked_ai_py.utils import OvercookedException
 
 
 class Agent(object):
+
+    agent_file_name = 'agent.pickle'
 
     def __init__(self):
         self.reset()
@@ -58,6 +62,30 @@ class Agent(object):
         """
         self.agent_index = None
         self.mdp = None
+
+    def save(self, path):
+        if os.path.isfile(path):
+            raise IOError("Must specify a path to directory! Got: {}".format(path))
+        if not os.path.exists(path):
+            os.makedirs(path)
+        pickle_path = os.path.join(path, self.agent_file_name)
+        with open(pickle_path, 'wb') as f:
+            dill.dump(self, f)
+        return path
+
+    @classmethod
+    def load(cls, path):
+        if os.path.isdir(path):
+            path = os.path.join(path, cls.agent_file_name)
+        try:
+            with open(path, 'rb') as f:
+                obj = dill.load(f)
+            return obj
+        except OvercookedException:
+            Recipe.configure({})
+            with open(path, 'rb') as f:
+                obj = dill.load(f)
+            return obj
 
 
 class AgentGroup(object):
@@ -171,6 +199,7 @@ class AgentFromPolicy(Agent):
     def reset(self):
         super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
+
 
 class RandomAgent(Agent):
     """
@@ -449,6 +478,20 @@ class GreedyHumanModel(Agent):
             assert len(motion_goals) != 0
 
         return motion_goals
+
+
+class SampleAgent(Agent):
+    """ Agent that samples action using the average action_probs across multiple agents
+    """
+    def __init__(self, agents):
+        self.agents = agents
+
+    def action(self, state):
+        action_probs = np.zeros(Action.NUM_ACTIONS)
+        for agent in self.agents:
+            action_probs += agent.action(state)[1]["action_probs"]
+        action_probs = action_probs/len(self.agents)
+        return Action.sample(action_probs), {"action_probs": action_probs}
 
 
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning

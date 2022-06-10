@@ -4,6 +4,7 @@ import numpy as np
 from overcooked_ai_py.utils import mean_and_std_err, append_dictionaries
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, EVENT_TYPES
+from overcooked_ai_py.mdp.overcooked_trajectory import TIMESTEP_TRAJ_KEYS, EPISODE_TRAJ_KEYS, DEFAULT_TRAJ_KEYS
 from overcooked_ai_py.planning.planners import MediumLevelActionManager, MotionPlanner, NO_COUNTERS_PARAMS
 
 DEFAULT_ENV_PARAMS = {
@@ -22,37 +23,14 @@ class OvercookedEnv(object):
     E.g. of how to instantiate OvercookedEnv:
     > mdp = OvercookedGridworld(...)
     > env = OvercookedEnv.from_mdp(mdp, horizon=400)
-
-    The standard format for Overcooked trajectories is:
-    trajs = {
-        # With shape (n_episodes, game_len), where game_len might vary across games:
-        "ep_states":    [ [traj_1_states], [traj_2_states], ... ],                          # Individual trajectory states
-        "ep_actions":   [ [traj_1_joint_actions], [traj_2_joint_actions], ... ],            # Trajectory joint actions, by agent
-        "ep_rewards":   [ [traj_1_timestep_rewards], [traj_2_timestep_rewards], ... ],      # (Sparse) reward values by timestep
-        "ep_dones":     [ [traj_1_timestep_dones], [traj_2_timestep_dones], ... ],          # Done values (should be all 0s except last one for each traj) TODO: add this to traj checks
-        "ep_infos":     [ [traj_1_timestep_infos], [traj_2_traj_1_timestep_infos], ... ],   # Info dictionaries
-
-        # With shape (n_episodes, ):
-        "ep_returns":   [ cumulative_traj1_reward, cumulative_traj2_reward, ... ],          # Sum of sparse rewards across each episode
-        "ep_lengths":   [ traj1_length, traj2_length, ... ],                                # Lengths (in env timesteps) of each episode
-        "mdp_params":   [ traj1_mdp_params, traj2_mdp_params, ... ],                        # Custom Mdp params to for each episode
-        "env_params":   [ traj1_env_params, traj2_env_params, ... ],                        # Custom Env params for each episode
-
-        # Custom metadata key value pairs
-        "metadatas":    [{custom metadata key:value pairs for traj 1}, {...}, ...]          # Each metadata dictionary is of similar format to the trajectories dictionary
-    }
     """
-
-    TIMESTEP_TRAJ_KEYS = ["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"]
-    EPISODE_TRAJ_KEYS = ["ep_returns", "ep_lengths", "mdp_params", "env_params", "metadatas"]
-    DEFAULT_TRAJ_KEYS = TIMESTEP_TRAJ_KEYS + EPISODE_TRAJ_KEYS + ["metadatas"]
 
 
     #########################
     # INSTANTIATION METHODS #
     #########################
 
-    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=1, initial_info={}):
+    def __init__(self, mdp_generator_fn, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=0, num_mdp=1, initial_info={}):
         """
         mdp_generator_fn (callable):    A no-argument function that returns a OvercookedGridworld instance
         start_state_fn (callable):      Function that returns start state for the MDP, called at each environment reset
@@ -69,7 +47,7 @@ class OvercookedEnv(object):
                                             "If trying to instantiate directly from a OvercookedGridworld " \
                                             "instance, use the OvercookedEnv.from_mdp method"
         self.num_mdp = num_mdp
-        self.variable_mdp = num_mdp == 1
+        self.variable_mdp = num_mdp > 1
         self.mdp_generator_fn = mdp_generator_fn
         self.horizon = horizon
         self._mlam = None
@@ -86,7 +64,8 @@ class OvercookedEnv(object):
     @property
     def mlam(self):
         if self._mlam is None:
-            print("Computing MediumLevelActionManager")
+            if self.info_level > 0:
+                print("Computing MediumLevelActionManager")
             self._mlam = MediumLevelActionManager.from_pickle_or_compute(self.mdp, self.mlam_params,
                                                                   force_compute=False)
         return self._mlam
@@ -97,17 +76,21 @@ class OvercookedEnv(object):
             if self._mlam is not None:
                 self._mp = self.mlam.motion_planner
             else:
+                if self.info_level > 0:
+                    print("Computing MotionPlanner")
                 self._mp = MotionPlanner.from_pickle_or_compute(self.mdp, self.mlam_params["counter_goals"],
                                                                 force_compute=False)
         return self._mp
 
     @staticmethod
-    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1):
+    def from_mdp(mdp, start_state_fn=None, horizon=MAX_HORIZON, mlam_params=NO_COUNTERS_PARAMS, info_level=1, num_mdp=None):
         """
         Create an OvercookedEnv directly from a OvercookedGridworld mdp
         rather than a mdp generating function.
         """
         assert isinstance(mdp, OvercookedGridworld)
+        if num_mdp is not None:
+            assert num_mdp == 1
         mdp_generator_fn = lambda _ignored: mdp
         return OvercookedEnv(
             mdp_generator_fn=mdp_generator_fn,
@@ -126,7 +109,7 @@ class OvercookedEnv(object):
     @property
     def env_params(self):
         """
-        Env params should be though of as all of the params of an env WITHOUT the mdp.
+        Env params should be thought of as all of the params of an env WITHOUT the mdp.
         Alone, env_params is not sufficent to recreate a copy of the Env instance, but it is
         together with mdp_params (which is sufficient to build a copy of the Mdp instance).
         """
@@ -134,7 +117,7 @@ class OvercookedEnv(object):
             "start_state_fn": self.start_state_fn,
             "horizon": self.horizon,
             "info_level": self.info_level,
-            "_variable_mdp": self.variable_mdp
+            "num_mdp": self.num_mdp
         }
 
     def copy(self):
@@ -239,11 +222,11 @@ class OvercookedEnv(object):
         """
         return self.mdp.lossless_state_encoding(state, self.horizon)
 
-    def featurize_state_mdp(self, state):
+    def featurize_state_mdp(self, state, num_pots=2):
         """
         Wrapper of the mdp's featurize_state
         """
-        return self.mdp.featurize_state(state, self.mlam, self.horizon)
+        return self.mdp.featurize_state(state, self.mlam, num_pots=num_pots)
 
     def reset(self, regen_mdp=True, outside_info={}):
         """
@@ -390,7 +373,7 @@ class OvercookedEnv(object):
 
         total_sparse = sum(self.game_stats["cumulative_sparse_rewards_by_agent"])
         total_shaped = sum(self.game_stats["cumulative_shaped_rewards_by_agent"])
-        return np.array(trajectory), self.state.timestep, total_sparse, total_shaped
+        return np.array(trajectory, dtype=object), self.state.timestep, total_sparse, total_shaped
 
     def get_rollouts(self, agent_pair, num_games, display=False, dir=None, final_state=False, display_phi=False,
                      display_until=np.Inf, metadata_fn=None, metadata_info_fn=None, info=True):
@@ -406,7 +389,7 @@ class OvercookedEnv(object):
 
         NOTE: this is the standard trajectories format used throughout the codebase
         """
-        trajectories = { k:[] for k in self.DEFAULT_TRAJ_KEYS }
+        trajectories = { k:[] for k in DEFAULT_TRAJ_KEYS }
         metadata_fn = (lambda x: {}) if metadata_fn is None else metadata_fn
         metadata_info_fn = (lambda x: "") if metadata_info_fn is None else metadata_info_fn
         range_iterator = tqdm.trange(num_games, desc="", leave=True) if info else range(num_games)
@@ -450,7 +433,7 @@ class OvercookedEnv(object):
 
         # TODO: should probably transfer check methods over to Env class
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-        AgentEvaluator.check_trajectories(trajectories)
+        AgentEvaluator.check_trajectories(trajectories, verbose=info)
         return trajectories
 
 
@@ -529,14 +512,16 @@ class OvercookedEnv(object):
 class Overcooked(gym.Env):
     """
     Wrapper for the Env class above that is SOMEWHAT compatible with the standard gym API.
+    Why only somewhat? Because we need to flatten a multi-agent env to be a single-agent env (as gym requires).
 
     NOTE: Observations returned are in a dictionary format with various information that is
-    necessary to be able to handle the multi-agent nature of the environment. There are probably
-    better ways to handle this, but we found this to work with minor modifications to OpenAI Baselines.
+     necessary to be able to handle the multi-agent nature of the environment. There are probably
+     better ways to handle this, but we found this to work with minor modifications to OpenAI Baselines.
     
-    NOTE: The index of the main agent in the mdp is randomized at each reset of the environment, and 
-    is kept track of by the self.agent_idx attribute. This means that it is necessary to pass on this 
-    information in the output to know for which agent index featurizations should be made for other agents.
+    NOTE: The index of the main agent (as gym envs are 'single-agent') in the mdp is randomized at each reset
+     of the environment, and is kept track of by the self.agent_idx attribute. This means that it is necessary
+     to pass on this information in the output to know for which agent index featurizations should be made for
+     other agents.
     
     For example, say one is training A0 paired with A1, and A1 takes a custom state featurization.
     Then in the runner.py loop in OpenAI Baselines, we will get the lossless encodings of the state,
@@ -572,8 +557,9 @@ class Overcooked(gym.Env):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         obs_shape = self.featurize_fn(dummy_mdp, dummy_state)[0].shape
-        high = np.ones(obs_shape) * max(dummy_mdp.soup_cooking_time, dummy_mdp.num_items_for_soup, 5)
-        return gym.spaces.Box(high * 0, high, dtype=np.float32)
+        high = np.ones(obs_shape) * float("inf")
+        low = np.zeros(obs_shape)
+        return gym.spaces.Box(low, high, dtype=np.float32)
 
     def step(self, action):
         """
