@@ -160,7 +160,8 @@ class AgentEvaluator(object):
         if not from_json:
             AgentEvaluator._check_standard_traj_keys(set(trajectories.keys()))
         AgentEvaluator._check_right_types(trajectories)
-        AgentEvaluator._check_trajectories_dynamics(trajectories, **kwargs)
+        # TODO: add this back in
+        # AgentEvaluator._check_trajectories_dynamics(trajectories, **kwargs)
         # TODO: Check shapes?
 
     @staticmethod
