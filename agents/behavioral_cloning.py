@@ -258,5 +258,3 @@ if __name__ == '__main__':
     else:
         bct = BC_trainer(env, encoding_fn, dataset, args, vis_eval=False)
         bct.training()
-
-

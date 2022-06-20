@@ -124,7 +124,7 @@ class App:
     def on_render(self):
         print(self.env)
         # print("AT R :", self.env.state)
-        # print(self.env.mdp.terrain_mtx)
+        print(self.env.mdp.terrain_mtx)
         surface = StateVisualizer().render_state(self.env.state, grid=self.env.mdp.terrain_mtx)
         self.window = pygame.display.set_mode(surface.get_size(), HWSURFACE | DOUBLEBUF | RESIZABLE)
         self.window.blit(surface, (0, 0))

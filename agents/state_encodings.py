@@ -36,8 +36,6 @@ def encode_state(mdp: OvercookedGridworld, state: OvercookedState, horizon: int,
         - relative location to the closest dish dispenser
         - relative location to the closest serving location
         - relative location to the closest pot (one for each pot state: empty, 1 onion, 2 onions, cooking, and ready).
-
-
     """
     AGENTS = ['player_1', 'player_2']
     UNMOVABLE_TERRAIN = ['floor', 'counter', 'pot', 'onion_dispenser', 'tomato_dispenser', 'dish_dispenser', 'serving_location']

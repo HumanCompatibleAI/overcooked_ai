@@ -18,7 +18,7 @@ def get_arguments():
                         help='Name of experiment. Used to name save files.')
     parser.add_argument('--base-dir', type=str, default=Path.cwd(),
                         help='Base directory to save all models, data, tensorboard metrics.')
-    parser.add_argument('--data_path', type=str, default='data',
+    parser.add_argument('--data-path', type=str, default='data',
                         help='Path from base_dir to where the expert data is stored')
     parser.add_argument('--dataset', type=str, default='2019_hh_trials_all.pickle',
                         help='Which set of expert data to use. '
