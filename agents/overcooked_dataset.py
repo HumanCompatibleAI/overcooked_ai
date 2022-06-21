@@ -67,6 +67,11 @@ class OvercookedDataset(Dataset):
         self.main_trials = self.main_trials.apply(str_to_obss, axis=1)
 
         if add_subtask_info:
+            self.subtasks = ['get_onion_from_dispenser', 'get_onion_from_counter', 'put_onion_in_pot',
+                             'put_onion_closer',
+                             'get_plate_from_dish_rack', 'get_plate_from_counter', 'put_plate_closer', 'get_soup',
+                             'get_soup_from_counter', 'put_soup_closer', 'serve_soup', 'unknown']
+            self.num_subtasks = len(self.subtasks)
             self.add_subtasks()
 
         # Remove all transitions where both players noop-ed
@@ -74,14 +79,17 @@ class OvercookedDataset(Dataset):
         print(f'Number of {args.layout} trials without double noops: {len(self.main_trials)}')
 
         # Calculate class weights for cross entropy
-        self.class_weights = np.zeros(6)
+        self.action_weights = np.zeros(6)
         for action in Action.ALL_ACTIONS:
-            self.class_weights[Action.ACTION_TO_INDEX[action]] = self.action_ratios[action]
-        self.class_weights = 1.0 / self.class_weights
-        self.class_weights = len(Action.ALL_ACTIONS) * self.class_weights / self.class_weights.sum()
+            self.action_weights[Action.ACTION_TO_INDEX[action]] = self.action_ratios[action]
+        self.action_weights = 1.0 / self.action_weights
+        self.action_weights = len(Action.ALL_ACTIONS) * self.action_weights / self.action_weights.sum()
 
-    def get_class_weights(self):
-        return self.class_weights
+    def get_action_weights(self):
+        return self.action_weights
+
+    def get_subtask_weights(self):
+        return self.subtask_weights
 
     def __len__(self):
         return len(self.main_trials)
@@ -91,7 +99,8 @@ class OvercookedDataset(Dataset):
         a = {
             'visual_obs': data_point['visual_obs'],
             'agent_obs': data_point['agent_obs'],
-            'joint_action': data_point['joint_action']
+            'joint_action': data_point['joint_action'],
+            'subtasks': np.array( [data_point['p1_subtask'], data_point['p2_subtask']] )
         }
         return a
 
@@ -101,12 +110,8 @@ class OvercookedDataset(Dataset):
         curr_objs = None
         subtask_start_idx = [0, 0]
         interact_id = Action.ACTION_TO_INDEX[Action.INTERACT]
-
-        subtasks = ['get_onion_from_dispenser', 'get_onion_from_counter', 'put_onion_in_pot', 'put_onion_closer',
-                    'get_plate_from_dish_rack', 'get_plate_from_counter', 'put_plate_closer', 'get_soup',
-                    'get_soup_from_counter', 'put_soup_closer', 'serve_soup', 'unknown']
-        subtasks_to_id = {s: i for i, s in enumerate(subtasks)}
-        onehot_to_subtasks = {v: k for k, v in subtasks_to_id.items()}
+        subtasks_to_id = {s: i for i, s in enumerate(self.subtasks)}
+        id_to_subtasks = {v: k for k, v in subtasks_to_id.items()}
 
         def facing(layout, player):
             '''Returns what object the player is facing'''
@@ -225,11 +230,15 @@ class OvercookedDataset(Dataset):
         assert not (self.main_trials['p1_subtask'].isna().any())
         assert not (self.main_trials['p2_subtask'].isna().any())
 
+        self.subtask_weights = np.zeros(len(self.subtasks))
         for i in range(2):
             counts = self.main_trials[f'p{i+1}_subtask'].value_counts().to_dict()
             print(f'Player {i+1} subtask splits')
             for k, v in counts.items():
-                print(f'{onehot_to_subtasks[k]}: {v}')
+                self.subtask_weights[k] += v
+                print(f'{id_to_subtasks[k]}: {v}')
+        self.subtask_weights = 1.0 / self.subtask_weights
+        self.subtask_weights = len(self.subtasks) * self.subtask_weights / self.subtask_weights.sum()
 
 
 
