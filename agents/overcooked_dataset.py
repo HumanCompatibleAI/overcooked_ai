@@ -14,6 +14,14 @@ import pickle
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
+class Subtasks:
+    SUBTASKS = ['get_onion_from_dispenser', 'get_onion_from_counter', 'put_onion_in_pot', 'put_onion_closer',
+                'get_plate_from_dish_rack', 'get_plate_from_counter', 'put_plate_closer', 'get_soup',
+                'get_soup_from_counter', 'put_soup_closer', 'serve_soup', 'unknown']
+    NUM_SUBTASKS = len(SUBTASKS)
+    SUBTASKS_TO_IDS = {s: i for i, s in enumerate(SUBTASKS)}
+    IDS_TO_SUBTASKS = {v: k for k, v in SUBTASKS_TO_IDS.items()}
+
 
 class OvercookedDataset(Dataset):
     def __init__(self, env, encoding_fn, args, add_subtask_info=True):
@@ -66,13 +74,7 @@ class OvercookedDataset(Dataset):
         self.main_trials['joint_action'] = self.main_trials['joint_action'].apply(str_to_actions)
         self.main_trials = self.main_trials.apply(str_to_obss, axis=1)
 
-        if add_subtask_info:
-            self.subtasks = ['get_onion_from_dispenser', 'get_onion_from_counter', 'put_onion_in_pot',
-                             'put_onion_closer',
-                             'get_plate_from_dish_rack', 'get_plate_from_counter', 'put_plate_closer', 'get_soup',
-                             'get_soup_from_counter', 'put_soup_closer', 'serve_soup', 'unknown']
-            self.num_subtasks = len(self.subtasks)
-            self.add_subtasks()
+        self.add_subtasks()
 
         # Remove all transitions where both players noop-ed
         self.main_trials = self.main_trials[self.main_trials['joint_action'] != '[[0, 0], [0, 0]]']
@@ -100,7 +102,8 @@ class OvercookedDataset(Dataset):
             'visual_obs': data_point['visual_obs'],
             'agent_obs': data_point['agent_obs'],
             'joint_action': data_point['joint_action'],
-            'subtasks': np.array( [data_point['p1_subtask'], data_point['p2_subtask']] )
+            'subtasks': np.array( [[data_point['p1_curr_subtask'], data_point['p2_curr_subtask']],
+                                   [data_point['p1_next_subtask'], data_point['p2_next_subtask']]])
         }
         return a
 
@@ -110,8 +113,6 @@ class OvercookedDataset(Dataset):
         curr_objs = None
         subtask_start_idx = [0, 0]
         interact_id = Action.ACTION_TO_INDEX[Action.INTERACT]
-        subtasks_to_id = {s: i for i, s in enumerate(self.subtasks)}
-        id_to_subtasks = {v: k for k, v in subtasks_to_id.items()}
 
         def facing(layout, player):
             '''Returns what object the player is facing'''
@@ -119,8 +120,10 @@ class OvercookedDataset(Dataset):
             layout = [[t for t in row.strip("[]'")] for row in layout.split("', '")]
             return layout[y][x]
 
-        self.main_trials['p1_subtask'] = None
-        self.main_trials['p2_subtask'] = None
+        self.main_trials['p1_curr_subtask'] = None
+        self.main_trials['p2_curr_subtask'] = None
+        self.main_trials['p1_next_subtask'] = None
+        self.main_trials['p2_next_subtask'] = None
         for index, row in tqdm(self.main_trials.iterrows()):
             if row['trial_id'] != curr_trial:
                 # Start of a new trial
@@ -138,7 +141,8 @@ class OvercookedDataset(Dataset):
                     next_row = self.main_trials.loc[index + 1]
                 except KeyError:
                     subtask = 'unknown'
-                    self.main_trials.loc[subtask_start_idx[i]:index, f'p{i + 1}_subtask'] = subtasks_to_id[subtask]
+                    self.main_trials.loc[subtask_start_idx[i]:index, f'p{i + 1}_curr_subtask'] = Subtasks.SUBTASKS_TO_IDS[subtask]
+                    self.main_trials.loc[subtask_start_idx[i]-1:index, f'p{i + 1}_next_subtask'] = Subtasks.SUBTASKS_TO_IDS[subtask]
                     continue
 
                 # All subtasks will start and end with an INTERACT action
@@ -224,21 +228,27 @@ class OvercookedDataset(Dataset):
                         raise ValueError(
                             f'Unexpected transition. {curr_objs[i]} -> {next_objs[i]}.')
 
-                    self.main_trials.loc[subtask_start_idx[i]:index, f'p{i+1}_subtask'] = subtasks_to_id[subtask]
+                    self.main_trials.loc[subtask_start_idx[i]:index, f'p{i + 1}_curr_subtask'] = \
+                        Subtasks.SUBTASKS_TO_IDS[subtask]
+                    self.main_trials.loc[max(0, subtask_start_idx[i]-1):max(0, index-1), f'p{i + 1}_next_subtask'] = \
+                        Subtasks.SUBTASKS_TO_IDS[subtask]
                     subtask_start_idx[i] = index + 1
 
-        assert not (self.main_trials['p1_subtask'].isna().any())
-        assert not (self.main_trials['p2_subtask'].isna().any())
+        # print()
+        assert not (self.main_trials['p1_curr_subtask'].isna().any())
+        assert not (self.main_trials['p2_curr_subtask'].isna().any())
+        assert not (self.main_trials['p1_next_subtask'].isna().any())
+        assert not (self.main_trials['p2_next_subtask'].isna().any())
 
-        self.subtask_weights = np.zeros(len(self.subtasks))
+        self.subtask_weights = np.zeros(Subtasks.NUM_SUBTASKS)
         for i in range(2):
-            counts = self.main_trials[f'p{i+1}_subtask'].value_counts().to_dict()
+            counts = self.main_trials[f'p{i+1}_next_subtask'].value_counts().to_dict()
             print(f'Player {i+1} subtask splits')
             for k, v in counts.items():
                 self.subtask_weights[k] += v
-                print(f'{id_to_subtasks[k]}: {v}')
+                print(f'{Subtasks.IDS_TO_SUBTASKS[k]}: {v}')
         self.subtask_weights = 1.0 / self.subtask_weights
-        self.subtask_weights = len(self.subtasks) * self.subtask_weights / self.subtask_weights.sum()
+        self.subtask_weights = Subtasks.NUM_SUBTASKS * self.subtask_weights / self.subtask_weights.sum()
 
 
 
