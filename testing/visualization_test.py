@@ -21,6 +21,7 @@ def test_render_state_from_dict(test_dict):
     test_dict = copy.deepcopy(test_dict)
     test_dict["kwargs"]["state"] = OvercookedState.from_dict(test_dict["kwargs"]["state"])
     # check only if it raise error or not, for image fidelity render_state check is used
+    print("!!!", test_dict)
     StateVisualizer(**test_dict["config"]).display_rendered_state(img_path=example_img_path, **test_dict["kwargs"])
 
     actual_result = pygame.surfarray.array3d(StateVisualizer(**test_dict["config"]).render_state(**test_dict["kwargs"]))
