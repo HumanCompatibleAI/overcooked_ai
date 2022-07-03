@@ -24,12 +24,13 @@ class Subtasks:
 
 
 class OvercookedDataset(Dataset):
-    def __init__(self, env, encoding_fn, args, add_subtask_info=True):
+    def __init__(self, env, encoding_fn, args, add_subtask_info=True, filter_transitions=True):
         self.env = env
         self.add_subtask_info = add_subtask_info
         self.encode_state_fn = encoding_fn
         self.data_path = args.base_dir / args.data_path / args.dataset
         self.main_trials = pd.read_pickle(self.data_path)
+        self.filter_transitions = filter_transitions
         print(f'Number of all trials: {len(self.main_trials)}')
         self.main_trials = self.main_trials[self.main_trials['layout_name'] == args.layout]
         print(f'Number of {args.layout} trials: {len(self.main_trials)}')
@@ -239,6 +240,16 @@ class OvercookedDataset(Dataset):
         assert not (self.main_trials['p2_curr_subtask'].isna().any())
         assert not (self.main_trials['p1_next_subtask'].isna().any())
         assert not (self.main_trials['p2_next_subtask'].isna().any())
+        
+        if self.filter_transitions:
+            print(len(self.main_trials))
+            remove_list= []
+            for id,samples in tqdm(self.main_trials.iterrows()):
+                if samples['p1_curr_subtask'] == samples['p1_next_subtask'] and samples['p2_curr_subtask'] == samples['p2_next_subtask']:
+                    remove_list.append(id)
+            self.main_trials = self.main_trials.drop(remove_list)
+            # self.main_trials = self.main_trials[ ]
+            print(len(self.main_trials))
 
         self.subtask_weights = np.zeros(Subtasks.NUM_SUBTASKS)
         for i in range(2):
