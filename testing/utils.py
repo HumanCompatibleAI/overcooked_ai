@@ -1,8 +1,10 @@
 import numpy as np
+
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 
 # The point of this function is to generate serialized trajectories for MDP dynamics consistency testing
 # NOTE: If intentionally updating MDP dynamics, this function should be used
+
 
 def generate_serialized_trajectory(mdp, save_path):
     # Saving trajectory for dynamics consistency test

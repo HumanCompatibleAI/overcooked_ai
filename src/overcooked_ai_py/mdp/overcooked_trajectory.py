@@ -31,12 +31,20 @@ The standard format for Overcooked trajectories is:
     }
 """
 
-TIMESTEP_TRAJ_KEYS = set(["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"])
-EPISODE_TRAJ_KEYS = set(["ep_returns", "ep_lengths", "mdp_params", "env_params"])
-DEFAULT_TRAJ_KEYS = set(list(TIMESTEP_TRAJ_KEYS) + list(EPISODE_TRAJ_KEYS) + ["metadatas"])
+TIMESTEP_TRAJ_KEYS = set(
+    ["ep_states", "ep_actions", "ep_rewards", "ep_dones", "ep_infos"]
+)
+EPISODE_TRAJ_KEYS = set(
+    ["ep_returns", "ep_lengths", "mdp_params", "env_params"]
+)
+DEFAULT_TRAJ_KEYS = set(
+    list(TIMESTEP_TRAJ_KEYS) + list(EPISODE_TRAJ_KEYS) + ["metadatas"]
+)
+
 
 def get_empty_trajectory():
-    return { k : [] if k != 'metadatas' else {} for k in DEFAULT_TRAJ_KEYS }
+    return {k: [] if k != "metadatas" else {} for k in DEFAULT_TRAJ_KEYS}
+
 
 def append_trajectories(traj_one, traj_two):
     # Note: Drops metadatas for now
@@ -46,20 +54,27 @@ def append_trajectories(traj_one, traj_two):
         traj_one = get_empty_trajectory()
     if not traj_two:
         traj_two = get_empty_trajectory()
-    
-    if set(traj_one.keys()) != DEFAULT_TRAJ_KEYS or set(traj_two.keys()) != DEFAULT_TRAJ_KEYS:
+
+    if (
+        set(traj_one.keys()) != DEFAULT_TRAJ_KEYS
+        or set(traj_two.keys()) != DEFAULT_TRAJ_KEYS
+    ):
         raise ValueError("Trajectory key mismatch!")
-    
-    appended_traj = { "metadatas" : {} }
+
+    appended_traj = {"metadatas": {}}
     for k in traj_one:
-        if k != 'metadatas':
+        if k != "metadatas":
             traj_one_value = traj_one[k]
             traj_two_value = traj_two[k]
-            assert type(traj_one_value) == type(traj_two_value), "mismatched trajectory types!"
-            
+            assert type(traj_one_value) == type(
+                traj_two_value
+            ), "mismatched trajectory types!"
+
             if type(traj_one_value) == list:
                 appended_traj[k] = traj_one_value + traj_two_value
             else:
-                appended_traj[k] = np.concatenate([traj_one_value, traj_two_value], axis=0)
+                appended_traj[k] = np.concatenate(
+                    [traj_one_value, traj_two_value], axis=0
+                )
 
     return appended_traj

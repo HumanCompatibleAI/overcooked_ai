@@ -1,6 +1,11 @@
-import itertools, math, os, dill
-import numpy as np
+import itertools
+import math
+import os
 from collections import defaultdict
+
+import dill
+import numpy as np
+
 from overcooked_ai_py.mdp.actions import Action
 from overcooked_ai_py.mdp.overcooked_mdp import Recipe
 from overcooked_ai_py.utils import OvercookedException
@@ -8,7 +13,7 @@ from overcooked_ai_py.utils import OvercookedException
 
 class Agent(object):
 
-    agent_file_name = 'agent.pickle'
+    agent_file_name = "agent.pickle"
 
     def __init__(self):
         self.reset()
@@ -27,7 +32,7 @@ class Agent(object):
     def actions(self, states, agent_indices):
         """
         A multi-state version of the action method. This enables for parallized
-        implementations that can potentially give speedups in action prediction. 
+        implementations that can potentially give speedups in action prediction.
 
         Args:
             states (list): list of OvercookedStates for which we want actions for
@@ -47,7 +52,11 @@ class Agent(object):
     def check_action_probs(action_probs, tolerance=1e-4):
         """Check that action probabilities sum to ≈ 1.0"""
         probs_sum = sum(action_probs)
-        assert math.isclose(probs_sum, 1.0, rel_tol=tolerance), "Action probabilities {} should sum up to approximately 1 but sum up to {}".format(list(action_probs), probs_sum)
+        assert math.isclose(
+            probs_sum, 1.0, rel_tol=tolerance
+        ), "Action probabilities {} should sum up to approximately 1 but sum up to {}".format(
+            list(action_probs), probs_sum
+        )
 
     def set_agent_index(self, agent_index):
         self.agent_index = agent_index
@@ -65,11 +74,13 @@ class Agent(object):
 
     def save(self, path):
         if os.path.isfile(path):
-            raise IOError("Must specify a path to directory! Got: {}".format(path))
+            raise IOError(
+                "Must specify a path to directory! Got: {}".format(path)
+            )
         if not os.path.exists(path):
             os.makedirs(path)
         pickle_path = os.path.join(path, self.agent_file_name)
-        with open(pickle_path, 'wb') as f:
+        with open(pickle_path, "wb") as f:
             dill.dump(self, f)
         return path
 
@@ -78,19 +89,19 @@ class Agent(object):
         if os.path.isdir(path):
             path = os.path.join(path, cls.agent_file_name)
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 obj = dill.load(f)
             return obj
         except OvercookedException:
             Recipe.configure({})
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 obj = dill.load(f)
             return obj
 
 
 class AgentGroup(object):
     """
-    AgentGroup is a group of N agents used to sample 
+    AgentGroup is a group of N agents used to sample
     joint actions in the context of an OvercookedEnv instance.
     """
 
@@ -99,8 +110,12 @@ class AgentGroup(object):
         self.n = len(self.agents)
         self.reset()
 
-        if not all(a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)):
-            assert allow_duplicate_agents, "All agents should be separate instances, unless allow_duplicate_agents is set to true"
+        if not all(
+            a0 is not a1 for a0, a1 in itertools.combinations(agents, 2)
+        ):
+            assert (
+                allow_duplicate_agents
+            ), "All agents should be separate instances, unless allow_duplicate_agents is set to true"
 
     def joint_action(self, state):
         actions_and_probs_n = tuple(a.action(state) for a in self.agents)
@@ -129,8 +144,10 @@ class AgentPair(AgentGroup):
     for both fields can lead to problems if the agents have state / history)
     """
 
-    def __init__(self, *agents, allow_duplicate_agents=False): 
-        super().__init__(*agents, allow_duplicate_agents=allow_duplicate_agents)
+    def __init__(self, *agents, allow_duplicate_agents=False):
+        super().__init__(
+            *agents, allow_duplicate_agents=allow_duplicate_agents
+        )
         assert self.n == 2
         self.a0, self.a1 = self.agents
 
@@ -146,6 +163,7 @@ class AgentPair(AgentGroup):
             return joint_action_and_infos
         else:
             return super().joint_action(state)
+
 
 class NNPolicy(object):
     """
@@ -173,14 +191,14 @@ class AgentFromPolicy(Agent):
     """
     This is a useful Agent class backbone from which to subclass from NN-based agents.
     """
-    
+
     def __init__(self, policy):
         """
         Takes as input an NN Policy instance
         """
         self.policy = policy
         self.reset()
-        
+
     def action(self, state):
         return self.actions([state], [self.agent_index])[0]
 
@@ -189,13 +207,15 @@ class AgentFromPolicy(Agent):
         actions_and_infos_n = []
         for action_probs in action_probs_n:
             action = Action.sample(action_probs)
-            actions_and_infos_n.append((action, {"action_probs": action_probs}))
+            actions_and_infos_n.append(
+                (action, {"action_probs": action_probs})
+            )
         return actions_and_infos_n
 
     def set_mdp(self, mdp):
         super().set_mdp(mdp)
         self.policy.mdp = mdp
-    
+
     def reset(self):
         super(AgentFromPolicy, self).reset()
         self.policy.mdp = None
@@ -207,17 +227,21 @@ class RandomAgent(Agent):
     NOTE: Does not perform interact actions, unless specified
     """
 
-    def __init__(self, sim_threads=None, all_actions=False, custom_wait_prob=None):
+    def __init__(
+        self, sim_threads=None, all_actions=False, custom_wait_prob=None
+    ):
         self.sim_threads = sim_threads
         self.all_actions = all_actions
         self.custom_wait_prob = custom_wait_prob
-    
+
     def action(self, state):
         action_probs = np.zeros(Action.NUM_ACTIONS)
         legal_actions = list(Action.MOTION_ACTIONS)
         if self.all_actions:
             legal_actions = Action.ALL_ACTIONS
-        legal_actions_indices = np.array([Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions])
+        legal_actions_indices = np.array(
+            [Action.ACTION_TO_INDEX[motion_a] for motion_a in legal_actions]
+        )
         action_probs[legal_actions_indices] = 1 / len(legal_actions_indices)
 
         if self.custom_wait_prob is not None:
@@ -225,7 +249,9 @@ class RandomAgent(Agent):
             if np.random.random() < self.custom_wait_prob:
                 return stay, {"action_probs": Agent.a_probs_from_action(stay)}
             else:
-                action_probs = Action.remove_indices_and_renormalize(action_probs, [Action.ACTION_TO_INDEX[stay]])
+                action_probs = Action.remove_indices_and_renormalize(
+                    action_probs, [Action.ACTION_TO_INDEX[stay]]
+                )
 
         return Action.sample(action_probs), {"action_probs": action_probs}
 
@@ -237,10 +263,9 @@ class RandomAgent(Agent):
 
 
 class StayAgent(Agent):
-
     def __init__(self, sim_threads=None):
         self.sim_threads = sim_threads
-    
+
     def action(self, state):
         a = Action.STAY
         return a, {}
@@ -258,7 +283,7 @@ class FixedPlanAgent(Agent):
     def __init__(self, plan):
         self.plan = plan
         self.i = 0
-    
+
     def action(self, state):
         if self.i >= len(self.plan):
             return Action.STAY, {}
@@ -281,14 +306,23 @@ class GreedyHumanModel(Agent):
     Will work only in environments where the only order is 3 onion soup.
     """
 
-    def __init__(self, mlam, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1,
-                 auto_unstuck=True):
+    def __init__(
+        self,
+        mlam,
+        hl_boltzmann_rational=False,
+        ll_boltzmann_rational=False,
+        hl_temp=1,
+        ll_temp=1,
+        auto_unstuck=True,
+    ):
         self.mlam = mlam
         self.mdp = self.mlam.mdp
 
         # Bool for perfect rationality vs Boltzmann rationality for high level and low level action selection
         self.hl_boltzmann_rational = hl_boltzmann_rational  # For choices among high level goals of same type
-        self.ll_boltzmann_rational = ll_boltzmann_rational  # For choices about low level motion
+        self.ll_boltzmann_rational = (
+            ll_boltzmann_rational  # For choices about low level motion
+        )
 
         # Coefficient for Boltzmann rationality for high level action selection
         self.hl_temperature = hl_temp
@@ -318,32 +352,53 @@ class GreedyHumanModel(Agent):
         # level action we want to perform, select the one with lowest cost
         start_pos_and_or = state.players_pos_and_or[self.agent_index]
 
-        chosen_goal, chosen_action, action_probs = self.choose_motion_goal(start_pos_and_or, possible_motion_goals)
+        chosen_goal, chosen_action, action_probs = self.choose_motion_goal(
+            start_pos_and_or, possible_motion_goals
+        )
 
-        if self.ll_boltzmann_rational and chosen_goal[0] == start_pos_and_or[0]:
-            chosen_action, action_probs = self.boltzmann_rational_ll_action(start_pos_and_or, chosen_goal)
+        if (
+            self.ll_boltzmann_rational
+            and chosen_goal[0] == start_pos_and_or[0]
+        ):
+            chosen_action, action_probs = self.boltzmann_rational_ll_action(
+                start_pos_and_or, chosen_goal
+            )
 
         if self.auto_unstuck:
             # HACK: if two agents get stuck, select an action at random that would
             # change the player positions if the other player were not to move
-            if self.prev_state is not None and state.players_pos_and_or == self.prev_state.players_pos_and_or:
+            if (
+                self.prev_state is not None
+                and state.players_pos_and_or
+                == self.prev_state.players_pos_and_or
+            ):
                 if self.agent_index == 0:
-                    joint_actions = list(itertools.product(Action.ALL_ACTIONS, [Action.STAY]))
+                    joint_actions = list(
+                        itertools.product(Action.ALL_ACTIONS, [Action.STAY])
+                    )
                 elif self.agent_index == 1:
-                    joint_actions = list(itertools.product([Action.STAY], Action.ALL_ACTIONS))
+                    joint_actions = list(
+                        itertools.product([Action.STAY], Action.ALL_ACTIONS)
+                    )
                 else:
                     raise ValueError("Player index not recognized")
 
                 unblocking_joint_actions = []
                 for j_a in joint_actions:
-                    new_state, _ = self.mlam.mdp.get_state_transition(state, j_a)
-                    if new_state.player_positions != self.prev_state.player_positions:
+                    new_state, _ = self.mlam.mdp.get_state_transition(
+                        state, j_a
+                    )
+                    if (
+                        new_state.player_positions
+                        != self.prev_state.player_positions
+                    ):
                         unblocking_joint_actions.append(j_a)
                 # Getting stuck became a possiblity simply because the nature of a layout (having a dip in the middle)
                 if len(unblocking_joint_actions) == 0:
                     unblocking_joint_actions.append([Action.STAY, Action.STAY])
-                chosen_action = unblocking_joint_actions[np.random.choice(len(unblocking_joint_actions))][
-                    self.agent_index]
+                chosen_action = unblocking_joint_actions[
+                    np.random.choice(len(unblocking_joint_actions))
+                ][self.agent_index]
                 action_probs = self.a_probs_from_action(chosen_action)
 
             # NOTE: Assumes that calls to the action method are sequential
@@ -357,20 +412,32 @@ class GreedyHumanModel(Agent):
         or rationally), and returns the plan and the corresponding first action on that plan.
         """
         if self.hl_boltzmann_rational:
-            possible_plans = [self.mlam.motion_planner.get_plan(start_pos_and_or, goal) for goal in motion_goals]
+            possible_plans = [
+                self.mlam.motion_planner.get_plan(start_pos_and_or, goal)
+                for goal in motion_goals
+            ]
             plan_costs = [plan[2] for plan in possible_plans]
-            goal_idx, action_probs = self.get_boltzmann_rational_action_idx(plan_costs, self.hl_temperature)
+            goal_idx, action_probs = self.get_boltzmann_rational_action_idx(
+                plan_costs, self.hl_temperature
+            )
             chosen_goal = motion_goals[goal_idx]
             chosen_goal_action = possible_plans[goal_idx][0][0]
         else:
-            chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
+            (
+                chosen_goal,
+                chosen_goal_action,
+            ) = self.get_lowest_cost_action_and_goal(
+                start_pos_and_or, motion_goals
+            )
             action_probs = self.a_probs_from_action(chosen_goal_action)
         return chosen_goal, chosen_goal_action, action_probs
 
     def get_boltzmann_rational_action_idx(self, costs, temperature):
         """Chooses index based on softmax probabilities obtained from cost array"""
         costs = np.array(costs)
-        softmax_probs = np.exp(-costs * temperature) / np.sum(np.exp(-costs * temperature))
+        softmax_probs = np.exp(-costs * temperature) / np.sum(
+            np.exp(-costs * temperature)
+        )
         action_idx = np.random.choice(len(costs), p=softmax_probs)
         return action_idx, softmax_probs
 
@@ -382,14 +449,18 @@ class GreedyHumanModel(Agent):
         min_cost = np.Inf
         best_action, best_goal = None, None
         for goal in motion_goals:
-            action_plan, _, plan_cost = self.mlam.motion_planner.get_plan(start_pos_and_or, goal)
+            action_plan, _, plan_cost = self.mlam.motion_planner.get_plan(
+                start_pos_and_or, goal
+            )
             if plan_cost < min_cost:
                 best_action = action_plan[0]
                 min_cost = plan_cost
                 best_goal = goal
         return best_goal, best_action
 
-    def boltzmann_rational_ll_action(self, start_pos_and_or, goal, inverted_costs=False):
+    def boltzmann_rational_ll_action(
+        self, start_pos_and_or, goal, inverted_costs=False
+    ):
         """
         Computes the plan cost to reach the goal after taking each possible low level action.
         Selects a low level action boltzmann rationally based on the one-step-ahead plan costs.
@@ -401,11 +472,15 @@ class GreedyHumanModel(Agent):
         for action in Action.ALL_ACTIONS:
             pos, orient = start_pos_and_or
             new_pos_and_or = self.mdp._move_if_direction(pos, orient, action)
-            _, _, plan_cost = self.mlam.motion_planner.get_plan(new_pos_and_or, goal)
+            _, _, plan_cost = self.mlam.motion_planner.get_plan(
+                new_pos_and_or, goal
+            )
             sign = (-1) ** int(inverted_costs)
             future_costs.append(sign * plan_cost)
 
-        action_idx, action_probs = self.get_boltzmann_rational_action_idx(future_costs, self.ll_temperature)
+        action_idx, action_probs = self.get_boltzmann_rational_action_idx(
+            future_costs, self.ll_temperature
+        )
         return Action.ALL_ACTIONS[action_idx], action_probs
 
     def ml_action(self, state):
@@ -424,31 +499,44 @@ class GreedyHumanModel(Agent):
         other_player = state.players[1 - self.agent_index]
         am = self.mlam
 
-        counter_objects = self.mlam.mdp.get_counter_objects_dict(state, list(self.mlam.mdp.terrain_pos_dict['X']))
+        counter_objects = self.mlam.mdp.get_counter_objects_dict(
+            state, list(self.mlam.mdp.terrain_pos_dict["X"])
+        )
         pot_states_dict = self.mlam.mdp.get_pot_states(state)
 
-
         if not player.has_object():
-            ready_soups = pot_states_dict['ready']
-            cooking_soups = pot_states_dict['cooking']
+            ready_soups = pot_states_dict["ready"]
+            cooking_soups = pot_states_dict["cooking"]
 
             soup_nearly_ready = len(ready_soups) > 0 or len(cooking_soups) > 0
-            other_has_dish = other_player.has_object() and other_player.get_object().name == 'dish'
+            other_has_dish = (
+                other_player.has_object()
+                and other_player.get_object().name == "dish"
+            )
 
             if soup_nearly_ready and not other_has_dish:
                 motion_goals = am.pickup_dish_actions(counter_objects)
             else:
-                assert len(state.all_orders) == 1 and list(state.all_orders[0].ingredients) == ["onion", "onion", "onion"], \
-                    "The current mid level action manager only support 3-onion-soup order, but got orders" \
+                assert len(state.all_orders) == 1 and list(
+                    state.all_orders[0].ingredients
+                ) == ["onion", "onion", "onion"], (
+                    "The current mid level action manager only support 3-onion-soup order, but got orders"
                     + str(state.all_orders)
+                )
                 next_order = list(state.all_orders)[0]
-                soups_ready_to_cook_key = '{}_items'.format(len(next_order.ingredients))
+                soups_ready_to_cook_key = "{}_items".format(
+                    len(next_order.ingredients)
+                )
                 soups_ready_to_cook = pot_states_dict[soups_ready_to_cook_key]
                 if soups_ready_to_cook:
                     only_pot_states_ready_to_cook = defaultdict(list)
-                    only_pot_states_ready_to_cook[soups_ready_to_cook_key] = soups_ready_to_cook
+                    only_pot_states_ready_to_cook[
+                        soups_ready_to_cook_key
+                    ] = soups_ready_to_cook
                     # we want to cook only soups that has same len as order
-                    motion_goals = am.start_cooking_actions(only_pot_states_ready_to_cook)
+                    motion_goals = am.start_cooking_actions(
+                        only_pot_states_ready_to_cook
+                    )
                 else:
                     motion_goals = am.pickup_onion_actions(counter_objects)
                 # it does not make sense to have tomato logic when the only possible order is 3 onion soup (see assertion above)
@@ -459,38 +547,51 @@ class GreedyHumanModel(Agent):
                 # else:
                 #     motion_goals = am.pickup_onion_actions(counter_objects) + am.pickup_tomato_actions(counter_objects)
 
-
         else:
             player_obj = player.get_object()
 
-            if player_obj.name == 'onion':
+            if player_obj.name == "onion":
                 motion_goals = am.put_onion_in_pot_actions(pot_states_dict)
 
-            elif player_obj.name == 'tomato':
+            elif player_obj.name == "tomato":
                 motion_goals = am.put_tomato_in_pot_actions(pot_states_dict)
 
-            elif player_obj.name == 'dish':
-                motion_goals = am.pickup_soup_with_dish_actions(pot_states_dict, only_nearly_ready=True)
+            elif player_obj.name == "dish":
+                motion_goals = am.pickup_soup_with_dish_actions(
+                    pot_states_dict, only_nearly_ready=True
+                )
 
-            elif player_obj.name == 'soup':
+            elif player_obj.name == "soup":
                 motion_goals = am.deliver_soup_actions()
 
             else:
                 raise ValueError()
 
-        motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+        motion_goals = [
+            mg
+            for mg in motion_goals
+            if self.mlam.motion_planner.is_valid_motion_start_goal_pair(
+                player.pos_and_or, mg
+            )
+        ]
 
         if len(motion_goals) == 0:
             motion_goals = am.go_to_closest_feature_actions(player)
-            motion_goals = [mg for mg in motion_goals if self.mlam.motion_planner.is_valid_motion_start_goal_pair(player.pos_and_or, mg)]
+            motion_goals = [
+                mg
+                for mg in motion_goals
+                if self.mlam.motion_planner.is_valid_motion_start_goal_pair(
+                    player.pos_and_or, mg
+                )
+            ]
             assert len(motion_goals) != 0
 
         return motion_goals
 
 
 class SampleAgent(Agent):
-    """ Agent that samples action using the average action_probs across multiple agents
-    """
+    """Agent that samples action using the average action_probs across multiple agents"""
+
     def __init__(self, agents):
         self.agents = agents
 
@@ -498,7 +599,7 @@ class SampleAgent(Agent):
         action_probs = np.zeros(Action.NUM_ACTIONS)
         for agent in self.agents:
             action_probs += agent.action(state)[1]["action_probs"]
-        action_probs = action_probs/len(self.agents)
+        action_probs = action_probs / len(self.agents)
         return Action.sample(action_probs), {"action_probs": action_probs}
 
 
