@@ -1429,9 +1429,10 @@ class OvercookedGridworld(object):
         """
         pot_states = self.get_pot_states(new_state)
         # We divide reward by agent to keep track of who contributed
-        sparse_reward, shaped_reward = [0] * self.num_players, [
-            0
-        ] * self.num_players
+        sparse_reward, shaped_reward = (
+            [0] * self.num_players,
+            [0] * self.num_players,
+        )
 
         for player_idx, (player, action) in enumerate(
             zip(new_state.players, joint_action)
