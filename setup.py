@@ -28,8 +28,8 @@ setup(
             "data/fonts/*.ttf",
         ],
         "human_aware_rl": [
-            "static/*/*.pickle",
-            "static/*/*.csv",
+            "static/**/*.pickle",
+            "static/**/*.csv",
             "ppo/trained_example/*.pkl",
             "ppo/trained_example/*.json",
             "ppo/trained_example/*/.is_checkpoint",
@@ -49,7 +49,7 @@ setup(
     ],
     # removed overlapping dependencies
     extras_require={
-        "human_aware_rl": [
+        "harl": [
             "GitPython",
             "memory_profiler",
             "sacred",
@@ -57,7 +57,7 @@ setup(
             "matplotlib",
             "requests",
             "seaborn==0.9.0",
-            "ray[rllib]>=2.0.0",
+            "ray[rllib]==2.0.0",
             "protobuf",
             "tensorflow==2.10",
         ]

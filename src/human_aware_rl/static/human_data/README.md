@@ -2,7 +2,7 @@
 
 This subdirectory is the home of all human experiment data for the Overcooked game. All data was collected through Mturk and is fully anonymized. While the data collection code is proprietary, it relies heavily on the open source [Overcooked-demo](https://github.com/HumanCompatibleAI/overcooked-demo) project. 
 
-Data was collected on behalf of the Center for Human-Compatible AI (CHAI) at UC Berkeley. Do not distribute in any manner without the express consent of CHAI or its affiliates. If you have questions regarding data rights, privacy, or distrubion please contact either Nathan Miller at nathan_miller23@berkeley.edu or Micah Carroll at mdc@berkeley.edu. 
+Data was collected on behalf of the Center for Human-Compatible AI (CHAI) at UC Berkeley. Do not distribute in any manner without the express consent of CHAI or its affiliates. If you have questions regarding data rights, privacy, or distrubion please contact either Jackson Yan at yanzeyi1999@berkeley.edu or Micah Carroll at mdc@berkeley.edu. 
 
 # Overview 
 

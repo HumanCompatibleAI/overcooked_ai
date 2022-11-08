@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: 3.7
       - name: Installing dependencies
-        run: pip install -e .[human_aware_rl]
+        run: pip install .[harl]
       - name: Test human_aware_rl with unittest
         run: |
           cd src/human_aware_rl

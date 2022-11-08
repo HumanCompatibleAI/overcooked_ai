@@ -12,7 +12,7 @@ from overcooked_ai_py.mdp.overcooked_mdp import (
     PlayerState,
 )
 
-AI_ID = "I am robot, bite my shiny metal ass!"
+AI_ID = "I am robot!"
 
 
 ####################
