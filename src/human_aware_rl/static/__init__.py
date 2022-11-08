@@ -26,11 +26,6 @@ CLEAN_2019_HUMAN_DATA_TEST = os.path.join(
     CLEAN_HUMAN_DATA_DIR, "2019_hh_trials_test.pickle"
 )
 
-# Paths to raw data
-RAW_HUMAN_DATA_DIR = os.path.join(HUMAN_DATA_DIR, "raw")
-RAW_2020_HUMAN_DATA = os.path.join(RAW_HUMAN_DATA_DIR, "2020_hh_trials.csv")
-RAW_2019_HUMAN_DATA = os.path.join(RAW_HUMAN_DATA_DIR, "2019_hh_trials.csv")
-
 # Human data tests (smaller datasets for more efficient sanity checks)
 DUMMY_HUMAN_DATA_DIR = os.path.join(HUMAN_DATA_DIR, "dummy")
 DUMMY_2020_CLEAN_HUMAN_DATA_PATH = os.path.join(
