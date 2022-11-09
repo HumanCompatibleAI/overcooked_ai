@@ -134,3 +134,29 @@ dmypy.json
 # IDES
 **/.vscode/
 .idea/
+
+#.gitignore from harl 
+hpsearch.py
+temp.npz
+src/human_aware_rl/data/bc_runs/bc_testing/
+*~
+*.swp
+*.key
+*.png
+# sacred config files
+**/slack.json
+# Models and run data
+.temp_best_model
+checkpoint/
+data/ppo_runs/
+data/ftw_runs/
+data/pbt_runs/
+data/agent_runs/
+data/bc_runs/
+data/chosen_layouts/
+data/expert_agent/
+data/ftw_exp/
+data/pbt_exp/
+data/gail_runs/
+data/joint_ppo_runs/
+data/ppo_exp/

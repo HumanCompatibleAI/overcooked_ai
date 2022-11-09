@@ -27,6 +27,15 @@ setup(
             "data/graphics/*.json",
             "data/fonts/*.ttf",
         ],
+        "human_aware_rl": [
+            "static/**/*.pickle",
+            "static/**/*.csv",
+            "ppo/trained_example/*.pkl",
+            "ppo/trained_example/*.json",
+            "ppo/trained_example/*/.is_checkpoint",
+            "ppo/trained_example/*/.tune_metadata",
+            "ppo/trained_example/*/checkpoint-500",
+        ],
     },
     install_requires=[
         "dill",
@@ -38,4 +47,19 @@ setup(
         "pygame",
         "ipywidgets",
     ],
+    # removed overlapping dependencies
+    extras_require={
+        "harl": [
+            "GitPython",
+            "memory_profiler",
+            "sacred",
+            "pymongo",
+            "matplotlib",
+            "requests",
+            "seaborn==0.9.0",
+            "ray[rllib]==2.0.0",
+            "protobuf",
+            "tensorflow==2.10",
+        ]
+    },
 )
