@@ -50,6 +50,7 @@ setup(
     # removed overlapping dependencies
     extras_require={
         "harl": [
+            "wandb",
             "GitPython",
             "memory_profiler",
             "sacred",

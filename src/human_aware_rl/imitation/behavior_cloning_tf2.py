@@ -648,7 +648,7 @@ class BehaviorCloningPolicy(RllibPolicy):
             logits = logits.reshape((logits.shape[0], -1))
             return logits, states
         else:
-            return self.model.predict(obs_batch), []
+            return self.model.predict(obs_batch, verbose=0), []
 
     def _create_execution_context(self):
         """

@@ -341,11 +341,17 @@ def my_config():
 
 
 def run(params):
+    layout = params["environment_params"]["mdp_params"]["layout_name"]
+    conf = params["experiment_name"]
+    if params["verbose"]:
+        import wandb
+
+        wandb.init(project=layout, sync_tensorboard=True)
+        wandb.run.name = conf
     # Retrieve the tune.Trainable object that is used for the experiment
     trainer = gen_trainer_from_params(params)
     # Object to store training results in
     result = {}
-
     # Training loop
     for i in range(params["num_training_iters"]):
         if params["verbose"]:
@@ -363,6 +369,7 @@ def run(params):
 
     if params["verbose"]:
         print("saved trainer at", save_path)
+        wandb.finish(quiet=True)
 
     return result
 

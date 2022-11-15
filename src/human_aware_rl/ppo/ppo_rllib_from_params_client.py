@@ -391,7 +391,13 @@ def _env_creater(env_config):
 
 
 def run(params):
+    layout = "MyPPOModel"
+    conf = params["experiment_name"]
+    if params["verbose"]:
+        import wandb
 
+        wandb.init(project=layout, sync_tensorboard=True)
+        wandb.run.name = conf
     # Check if any resume checkpoint given
     saved_path = params["resume_checkpoint_path"]
 
@@ -419,6 +425,7 @@ def run(params):
     save_path = save_trainer(trainer, params)
     if params["verbose"]:
         print("saved trainer at", save_path)
+        wandb.finish(quiet=True)
 
     return result
 
