@@ -395,6 +395,7 @@ def run(params):
     run_name = params["experiment_name"]
     if params["verbose"]:
         import wandb
+
         wandb.init(project=WANDB_PROJECT, sync_tensorboard=True)
         wandb.run.name = run_name
     # Check if any resume checkpoint given
@@ -424,7 +425,7 @@ def run(params):
     save_path = save_trainer(trainer, params)
     if params["verbose"]:
         print("saved trainer at", save_path)
-        #quiet = True so wandb doesn't log to console 
+        # quiet = True so wandb doesn't log to console
         wandb.finish(quiet=True)
 
     return result
