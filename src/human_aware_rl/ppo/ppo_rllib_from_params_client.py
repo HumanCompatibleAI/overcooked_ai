@@ -94,6 +94,7 @@ def naive_params_schedule_fn(outside_information):
         "start_all_orders": [{"ingredients": ["onion", "onion", "onion"]}],
         "display": False,
         "rew_shaping_params": rew_shaping_params,
+        "old_dynamics": False,
     }
     return mdp_default_gen_params
 

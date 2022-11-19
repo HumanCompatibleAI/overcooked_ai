@@ -293,6 +293,9 @@ def my_config():
         "mdp_params": {
             "layout_name": layout_name,
             "rew_shaping_params": rew_shaping_params,
+            # old_dynamics == True makes cooking starts automatically without INTERACT
+            # allows only 3-item recipes
+            "old_dynamics": False,
         },
         # To be passed into OvercookedEnv constructor
         "env_params": {"horizon": horizon},

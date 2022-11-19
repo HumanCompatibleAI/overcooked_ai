@@ -63,7 +63,7 @@ DEFAULT_BC_PARAMS = {
     "use_lstm": False,
     "cell_size": 256,
     "data_params": DEFAULT_DATA_PARAMS,
-    "mdp_params": {"layout_name": "cramped_room"},
+    "mdp_params": {"layout_name": "cramped_room", "old_dynamics": False},
     "env_params": DEFAULT_ENV_PARAMS,
     "mdp_fn_params": {},
     "mlp_params": DEFAULT_MLP_PARAMS,
