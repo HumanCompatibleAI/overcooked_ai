@@ -58,6 +58,8 @@ class TestPPORllib(unittest.TestCase):
         self.compute_pickle = False
         # Reproducibility test
         self.strict = False
+        # this value exists as sanity checks since random actions can still obtain at least this much dense reward
+        # some performance thresholds are hardcoded and are determined by comparing empirical performances with and with actual trainings/gradient updates
         self.min_performance = 5
         assert not (
             self.compute_pickle and self.strict
@@ -214,13 +216,13 @@ class TestPPORllib(unittest.TestCase):
                 "use_phi": True,
                 "evaluation_display": False,
                 "verbose": False,
+                "lr": 5e-3,
             },
             options={"--loglevel": "ERROR"},
         ).result
         # Sanity check (make sure it begins to learn to receive dense reward)
-        self.assertGreaterEqual(
-            results["average_total_reward"], self.min_performance
-        )
+        # This value is determined by comparing emperical performances with and without actual training updates
+        self.assertGreaterEqual(results["average_total_reward"], 15)
 
         if self.compute_pickle:
             self.expected["test_ppo_sp_yes_phi"] = results
@@ -242,7 +244,7 @@ class TestPPORllib(unittest.TestCase):
                 "use_phi": False,
                 "entropy_coeff_start": 0.0002,
                 "entropy_coeff_end": 0.00005,
-                "lr": 7e-4,
+                "lr": 5e-3,
                 "seeds": [0],
                 "outer_shape": (5, 4),
                 "evaluation_display": False,
@@ -251,9 +253,7 @@ class TestPPORllib(unittest.TestCase):
             options={"--loglevel": "ERROR"},
         ).result
         # Sanity check (make sure it begins to learn to receive dense reward)
-        self.assertGreaterEqual(
-            results["average_total_reward"], self.min_performance
-        )
+        self.assertGreaterEqual(results["average_total_reward"], 7)
 
         if self.compute_pickle:
             self.expected["test_ppo_fp_sp_no_phi"] = results
@@ -285,7 +285,6 @@ class TestPPORllib(unittest.TestCase):
             },
             options={"--loglevel": "ERROR"},
         ).result
-        print(results["average_total_reward"])
 
         # Sanity check (make sure it begins to learn to receive dense reward)
         self.assertGreaterEqual(
@@ -305,7 +304,7 @@ class TestPPORllib(unittest.TestCase):
         # Train bc model
         model_dir = self.temp_model_dir
         params_to_override = {
-            "layouts": ["inverse_marshmallow_experiment"],
+            "layouts": ["asymmetric_advantages_tomato"],
             "data_path": None,
             "epochs": 10,
         }
@@ -320,14 +319,14 @@ class TestPPORllib(unittest.TestCase):
             "bc_model_dir": model_dir,
             "evaluation_interval": 5,
             "verbose": False,
+            "layout_name": "asymmetric_advantages_tomato",
         }
         results = ex.run(
             config_updates=config_updates, options={"--loglevel": "ERROR"}
         ).result
         # Sanity check
-        self.assertGreaterEqual(
-            results["average_total_reward"], self.min_performance
-        )
+        # This value is determined by comparing emperical performances with and without actual training updates
+        self.assertGreaterEqual(results["average_total_reward"], 30)
 
         if self.compute_pickle:
             self.expected["test_ppo_bc"] = results

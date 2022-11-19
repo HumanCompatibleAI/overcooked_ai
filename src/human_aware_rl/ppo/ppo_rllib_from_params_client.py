@@ -51,6 +51,7 @@ from human_aware_rl.rllib.rllib import (
     load_trainer,
     save_trainer,
 )
+from human_aware_rl.utils import WANDB_PROJECT
 
 ###################### Temp Documentation #######################
 #   run the following command in order to train a PPO self-play #
@@ -391,7 +392,12 @@ def _env_creater(env_config):
 
 
 def run(params):
+    run_name = params["experiment_name"]
+    if params["verbose"]:
+        import wandb
 
+        wandb.init(project=WANDB_PROJECT, sync_tensorboard=True)
+        wandb.run.name = run_name
     # Check if any resume checkpoint given
     saved_path = params["resume_checkpoint_path"]
 
@@ -419,6 +425,8 @@ def run(params):
     save_path = save_trainer(trainer, params)
     if params["verbose"]:
         print("saved trainer at", save_path)
+        # quiet = True so wandb doesn't log to console
+        wandb.finish(quiet=True)
 
     return result
 

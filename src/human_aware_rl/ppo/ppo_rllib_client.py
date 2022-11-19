@@ -52,6 +52,7 @@ from human_aware_rl.rllib.rllib import (
     gen_trainer_from_params,
     save_trainer,
 )
+from human_aware_rl.utils import WANDB_PROJECT
 
 ###################### Temp Documentation #######################
 #   run the following command in order to train a PPO self-play #
@@ -341,11 +342,16 @@ def my_config():
 
 
 def run(params):
+    run_name = params["experiment_name"]
+    if params["verbose"]:
+        import wandb
+
+        wandb.init(project=WANDB_PROJECT, sync_tensorboard=True)
+        wandb.run.name = run_name
     # Retrieve the tune.Trainable object that is used for the experiment
     trainer = gen_trainer_from_params(params)
     # Object to store training results in
     result = {}
-
     # Training loop
     for i in range(params["num_training_iters"]):
         if params["verbose"]:
@@ -363,6 +369,8 @@ def run(params):
 
     if params["verbose"]:
         print("saved trainer at", save_path)
+        # quiet = True so wandb doesn't log to console
+        wandb.finish(quiet=True)
 
     return result
 
