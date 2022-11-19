@@ -1144,7 +1144,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
-        # determines whether to start cooking automatically
+        # determines whether to start cooking automatically once 3 items are in the pot
         self.old_dynamics = old_dynamics
 
     @staticmethod
