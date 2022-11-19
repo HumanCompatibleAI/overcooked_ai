@@ -9,6 +9,7 @@ import git
 import numpy as np
 import tensorflow as tf
 
+WANDB_PROJECT = "Overcooked AI"
 
 def delete_dir_if_exists(dir_path, verbose=False):
     if os.path.exists(dir_path):

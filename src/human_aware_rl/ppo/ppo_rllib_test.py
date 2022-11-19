@@ -58,6 +58,8 @@ class TestPPORllib(unittest.TestCase):
         self.compute_pickle = False
         # Reproducibility test
         self.strict = False
+        # this value exists as sanity checks since random actions can still obtain at least this much dense reward 
+        # some performance thresholds are hardcoded and are determined by comparing empirical performances with and with actual trainings/gradient updates
         self.min_performance = 5
         assert not (
             self.compute_pickle and self.strict
@@ -219,6 +221,7 @@ class TestPPORllib(unittest.TestCase):
             options={"--loglevel": "ERROR"},
         ).result
         # Sanity check (make sure it begins to learn to receive dense reward)
+        # This value is determined by comparing emperical performances with and without actual training updates 
         self.assertGreaterEqual(results["average_total_reward"], 15)
 
         if self.compute_pickle:
@@ -322,6 +325,7 @@ class TestPPORllib(unittest.TestCase):
             config_updates=config_updates, options={"--loglevel": "ERROR"}
         ).result
         # Sanity check
+        # This value is determined by comparing emperical performances with and without actual training updates 
         self.assertGreaterEqual(results["average_total_reward"], 30)
 
         if self.compute_pickle:
