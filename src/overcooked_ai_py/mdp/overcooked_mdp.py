@@ -1390,6 +1390,7 @@ class OvercookedGridworld(object):
         assert not self.is_terminal(
             state
         ), "Trying to find successor of a terminal state: {}".format(state)
+
         for action, action_set in zip(joint_action, self.get_actions(state)):
             if action not in action_set:
                 raise ValueError(
@@ -1397,13 +1398,11 @@ class OvercookedGridworld(object):
                 )
 
         new_state = state.deepcopy()
-
         # Resolve interacts first
         (
             sparse_reward_by_agent,
             shaped_reward_by_agent,
         ) = self.resolve_interacts(new_state, joint_action, events_infos)
-
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
 
@@ -1458,7 +1457,6 @@ class OvercookedGridworld(object):
             # NOTE: we always log pickup/drop before performing it, as that's
             # what the logic of determining whether the pickup/drop is useful assumes
             if terrain_type == "X":
-
                 if player.has_object() and not new_state.has_object(i_pos):
                     obj_name = player.get_object().name
                     self.log_object_drop(

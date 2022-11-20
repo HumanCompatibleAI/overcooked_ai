@@ -227,6 +227,8 @@ def my_config():
         "POT_DISTANCE_REW": 0,
         "SOUP_DISTANCE_REW": 0,
     }
+    # whether to start cooking automatically when pot has 3 items in it
+    old_dynamics = False
 
     # Max episode length
     horizon = 400
@@ -295,7 +297,7 @@ def my_config():
             "rew_shaping_params": rew_shaping_params,
             # old_dynamics == True makes cooking starts automatically without INTERACT
             # allows only 3-item recipes
-            "old_dynamics": False,
+            "old_dynamics": old_dynamics,
         },
         # To be passed into OvercookedEnv constructor
         "env_params": {"horizon": horizon},
