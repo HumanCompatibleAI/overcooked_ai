@@ -1144,7 +1144,7 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
-        # determines whether to start cooking automatically
+        # determines whether to start cooking automatically once 3 items are in the pot
         self.old_dynamics = old_dynamics
 
     @staticmethod
@@ -1514,7 +1514,7 @@ class OvercookedGridworld(object):
                 player.set_object(obj)
 
             elif terrain_type == "P" and not player.has_object():
-                # Cooking soup only if we are using the new dynamics
+                # An interact action will only start cooking the soup if we are using the new dynamics
                 if (
                     not self.old_dynamics
                     and self.soup_to_be_cooked_at_location(new_state, i_pos)
