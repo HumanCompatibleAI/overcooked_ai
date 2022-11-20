@@ -1098,6 +1098,7 @@ class OvercookedGridworld(object):
         num_items_for_soup=3,
         order_bonus=2,
         start_state=None,
+        old_dynamics=False,
         **kwargs
     ):
         """
@@ -1117,6 +1118,13 @@ class OvercookedGridworld(object):
             if not start_all_orders
             else start_all_orders
         )
+        if old_dynamics:
+            assert all(
+                [
+                    len(order["ingredients"]) == 3
+                    for order in self.start_all_orders
+                ]
+            ), "Only accept orders with 3 items when using the old_dynamics"
         self.height = len(terrain)
         self.width = len(terrain[0])
         self.shape = (self.width, self.height)
@@ -1136,6 +1144,8 @@ class OvercookedGridworld(object):
         self._opt_recipe_discount_cache = {}
         self._opt_recipe_cache = {}
         self._prev_potential_params = {}
+        # determines whether to start cooking automatically once 3 items are in the pot
+        self.old_dynamics = old_dynamics
 
     @staticmethod
     def from_layout_name(layout_name, **params_to_overwrite):
@@ -1380,6 +1390,7 @@ class OvercookedGridworld(object):
         assert not self.is_terminal(
             state
         ), "Trying to find successor of a terminal state: {}".format(state)
+
         for action, action_set in zip(joint_action, self.get_actions(state)):
             if action not in action_set:
                 raise ValueError(
@@ -1387,13 +1398,11 @@ class OvercookedGridworld(object):
                 )
 
         new_state = state.deepcopy()
-
         # Resolve interacts first
         (
             sparse_reward_by_agent,
             shaped_reward_by_agent,
         ) = self.resolve_interacts(new_state, joint_action, events_infos)
-
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
 
@@ -1448,7 +1457,6 @@ class OvercookedGridworld(object):
             # NOTE: we always log pickup/drop before performing it, as that's
             # what the logic of determining whether the pickup/drop is useful assumes
             if terrain_type == "X":
-
                 if player.has_object() and not new_state.has_object(i_pos):
                     obj_name = player.get_object().name
                     self.log_object_drop(
@@ -1506,8 +1514,11 @@ class OvercookedGridworld(object):
                 player.set_object(obj)
 
             elif terrain_type == "P" and not player.has_object():
-                # Cooking soup
-                if self.soup_to_be_cooked_at_location(new_state, i_pos):
+                # An interact action will only start cooking the soup if we are using the new dynamics
+                if (
+                    not self.old_dynamics
+                    and self.soup_to_be_cooked_at_location(new_state, i_pos)
+                ):
                     soup = new_state.get_object(i_pos)
                     soup.begin_cooking()
 
@@ -1683,8 +1694,16 @@ class OvercookedGridworld(object):
     def step_environment_effects(self, state):
         state.timestep += 1
         for obj in state.objects.values():
-            if obj.name == "soup" and obj.is_cooking:
-                obj.cook()
+            if obj.name == "soup":
+                # automatically starts cooking when the pot has 3 ingredients
+                if self.old_dynamics and (
+                    not obj.is_cooking
+                    and not obj.is_ready
+                    and len(obj.ingredients) == 3
+                ):
+                    obj.begin_cooking()
+                if obj.is_cooking:
+                    obj.cook()
 
     def _handle_collisions(self, old_positions, new_positions):
         """If agents collide, they stay at their old locations"""

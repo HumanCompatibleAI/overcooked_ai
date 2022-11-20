@@ -7,7 +7,6 @@ import unittest
 from math import factorial
 
 import numpy as np
-from utils import generate_serialized_trajectory
 
 from overcooked_ai_py.agents.agent import (
     AgentGroup,
@@ -567,6 +566,52 @@ class TestGridworld(unittest.TestCase):
         AgentEvaluator.check_trajectories(
             test_trajectory, from_json=True, verbose=False
         )
+
+    def test_mdp_old_cook_dynamics(self):
+        with self.assertRaises(AssertionError):
+            # shouldn't be able to create a game with recipes of less than 3 ingredients
+            OvercookedGridworld.from_layout_name(
+                layout_name="mdp_test", old_dynamics=True
+            )
+
+        old_mdp = OvercookedGridworld.from_layout_name(
+            layout_name="old_dynamics_cook_test", old_dynamics=True
+        )
+        new_mdp = OvercookedGridworld.from_layout_name(
+            layout_name="old_dynamics_cook_test", old_dynamics=False
+        )
+        # test interacting with a 1-ingredient soup starts cooking in the new dynamics
+        new_state_n, _ = new_mdp.get_state_transition(
+            new_mdp.start_state, [interact]
+        )
+        soup_new = new_state_n.get_object((2, 0))
+        self.assertTrue(soup_new.is_cooking)
+        # this should have no effects
+        new_state_o, _ = old_mdp.get_state_transition(
+            old_mdp.start_state, [interact]
+        )
+        soup_old = new_state_o.get_object((2, 0))
+        self.assertFalse(soup_old.is_cooking)
+
+    def test_mdp_old_put_dynamics(self):
+        old_mdp = OvercookedGridworld.from_layout_name(
+            layout_name="old_dynamics_put_test", old_dynamics=True
+        )
+        new_mdp = OvercookedGridworld.from_layout_name(
+            layout_name="old_dynamics_put_test", old_dynamics=False
+        )
+        # putting in the third ingredient will not start cooking in the new dynamics
+        new_state_n, _ = new_mdp.get_state_transition(
+            new_mdp.start_state, [interact]
+        )
+        soup_new = new_state_n.get_object((2, 0))
+        self.assertFalse(soup_new.is_cooking)
+        # cooking should start automatically in the old dynamics
+        new_state_o, _ = old_mdp.get_state_transition(
+            old_mdp.start_state, [interact]
+        )
+        soup_old = new_state_o.get_object((2, 0))
+        self.assertTrue(soup_old.is_cooking)
 
     def test_mdp_serialization(self):
         # Where to store serialized states -- will be overwritten each timestep
