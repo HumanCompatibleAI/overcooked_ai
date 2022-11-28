@@ -17,7 +17,9 @@ The goal of the game is to deliver soups as fast as possible. Each soup requires
 
 You can **try out the game [here](https://humancompatibleai.github.io/overcooked-demo/)** (playing with some previously trained DRL agents). To play with your own trained agents using this interface, you can use [this repo](https://github.com/HumanCompatibleAI/overcooked-demo). To run human-AI experiments, check out [this repo](https://github.com/HumanCompatibleAI/overcooked-hAI-exp). You can find some human-human and human-AI gameplay data already collected [here](https://github.com/HumanCompatibleAI/human_aware_rl/tree/master/human_aware_rl/static/human_data).
 
-Check out [this repo](https://github.com/HumanCompatibleAI/human_aware_rl) for the DRL implementations compatible with the environment and reproducible results to our paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* (also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)).
+DRL implementations compatible with the environment are included in the repo as a submodule under src/human_aware_rl. 
+
+The old [human_aware_rl](https://github.com/HumanCompatibleAI/human_aware_rl) is being deprecated and should only used to reproduce the results in the 2019 paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* (also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)).
 
 For simple usage of the environment, it's worthwhile considering using [this environment wrapper](https://github.com/Stanford-ILIAD/PantheonRL).
 
@@ -60,8 +62,16 @@ git clone https://github.com/HumanCompatibleAI/overcooked_ai.git
 ```
 Finally, use python setup-tools to locally install
 
+If you just want to use the environment:
+
 ```
 pip install -e overcooked_ai/
+```
+
+If you also need the DRL implementations:
+
+```
+pip install -e overcooked_ai[harl]
 ```
 
 
@@ -72,6 +82,16 @@ When building from source, you can verify the installation by running the Overco
 ```
 python testing/overcooked_test.py
 ```
+
+To check whether the humam_aware_rl is installed correctly, you can run the following script from the src/human_aware_rl directory
+
+```
+$ ./run_tests.sh
+```
+
+⚠️**Be sure to change your CWD to the human_aware_rl directory before running the script, as the test script uses the CWD to dynamically generate a path to save temporary training runs/checkpoints. The testing script will fail if not being run from the correct directory.**
+
+This will run all tests belonging to the human_aware_rl module. You can checkout the README in the submodule for instructions of running target-specific tests. This can be initiated from any directory.
 
 If you're thinking of using the planning code extensively, you should run the full testing suite that verifies all of the Overcooked accessory tools (this can take 5-10 mins): 
 ```
@@ -96,6 +116,30 @@ python -m unittest discover -s testing/ -p "*_test.py"
 - `planners.py`: near-optimal agent planning logic
 - `search.py`: A* search and shortest path logic
 
+`human_aware_rl` contains:
+
+`ppo/`:
+- `ppo_rllib.py`: Primary module where code for training a PPO agent resides. This includes an rllib compatible wrapper on `OvercookedEnv`, utilities for converting rllib `Policy` classes to Overcooked `Agent`s, as well as utility functions and callbacks
+- `ppo_rllib_client.py` Driver code for configuing and launching the training of an agent. More details about usage below
+- `ppo_rllib_from_params_client.py`: train one agent with PPO in Overcooked with variable-MDPs 
+- `ppo_rllib_test.py` Reproducibility tests for local sanity checks
+- `run_experiments.sh` Script for training agents on 5 classical layouts
+- `trained_example/` Pretrained model for testing purposes
+
+`rllib/`:
+- `rllib.py`: rllib agent and training utils that utilize Overcooked APIs
+- `utils.py`: utils for the above
+- `tests.py`: preliminary tests for the above
+
+`imitation/`:
+- `behavior_cloning_tf2.py`:  Module for training, saving, and loading a BC model
+- `behavior_cloning_tf2_test.py`: Contains basic reproducibility tests as well as unit tests for the various components of the bc module.
+
+`human/`:
+- `process_data.py` script to process human data in specific formats to be used by DRL algorithms
+- `data_processing_utils.py` utils for the above
+
+`utils.py`: utils for the repo
 
 ## Python Visualizations 🌠
 
