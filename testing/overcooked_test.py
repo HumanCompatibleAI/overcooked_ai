@@ -1,5 +1,6 @@
 import copy
 import glob
+import gym
 import json
 import os
 import shutil
@@ -1702,6 +1703,11 @@ class TestGymEnvironment(unittest.TestCase):
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)
+    
+    def test_creation(self):
+        env = gym.make('Overcooked-v0')
+        env.custom_init(self.env, self.env.featurize_state_mdp)
+        self.assertEqual(env.action_space, gym.spaces.Discrete(6))
 
     # TODO: write more tests here
 
