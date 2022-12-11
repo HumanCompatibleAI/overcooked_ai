@@ -686,12 +686,19 @@ class Overcooked(gym.Env):
 
     env_name = "Overcooked-v0"
 
-    def custom_init(
-        self, base_env, featurize_fn, baselines_reproducible=False
-    ):
+    # gym checks for the action space and obs space while initializing the env and throws an error if none exists
+    # custom_init after __init__ no longer works
+    # might as well move all the initilization into the actual __init__
+    def __init__(self, base_env, featurize_fn, baselines_reproducible=False):
         """
         base_env: OvercookedEnv
         featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
+
+        Example creating a gym env:
+
+        mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages")
+        base_env = OvercookedEnv.from_mdp(mdp, horizon=500)
+        env = gym.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
         """
         if baselines_reproducible:
             # NOTE:
@@ -704,7 +711,6 @@ class Overcooked(gym.Env):
             # The effect of this should be negligible, as all other randomness is
             # controlled by the actual run seeds
             np.random.seed(0)
-
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()

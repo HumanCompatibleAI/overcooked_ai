@@ -1705,10 +1705,17 @@ class TestGymEnvironment(unittest.TestCase):
         np.random.seed(0)
 
     def test_creation(self):
-        env = gym.make("Overcooked-v0")
-        env.custom_init(self.env, self.env.featurize_state_mdp)
-        # verify that the action_space is initialized correctly
+        env = gym.make(
+            "Overcooked-v0",
+            base_env=self.env,
+            featurize_fn=self.env.featurize_state_mdp,
+        )
+        # verify that the action_space * obs_space are initialized correctly
         self.assertEqual(env.action_space, gym.spaces.Discrete(6))
+        self.assertEqual(
+            env.observation_space.shape,
+            self.base_mdp.get_featurize_state_shape(),
+        )
 
     # TODO: write more tests here
 
