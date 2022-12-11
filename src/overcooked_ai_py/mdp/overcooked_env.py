@@ -714,7 +714,7 @@ class Overcooked(gym.Env):
     def _setup_observation_space(self):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
-        obs_shape = self.featurize_fn(dummy_mdp, dummy_state)[0].shape
+        obs_shape = self.featurize_fn(dummy_state)[0].shape
         high = np.ones(obs_shape) * float("inf")
         low = np.zeros(obs_shape)
         return gym.spaces.Box(low, high, dtype=np.float32)
@@ -774,7 +774,7 @@ class Overcooked(gym.Env):
         self.base_env.reset()
         self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
-        ob_p0, ob_p1 = self.featurize_fn(self.mdp, self.base_env.state)
+        ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
 
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
