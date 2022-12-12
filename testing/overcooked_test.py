@@ -6,6 +6,7 @@ import shutil
 import unittest
 from math import factorial
 
+import gym
 import numpy as np
 
 from overcooked_ai_py.agents.agent import (
@@ -1702,6 +1703,19 @@ class TestGymEnvironment(unittest.TestCase):
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)
+
+    def test_creation(self):
+        env = gym.make(
+            "Overcooked-v0",
+            base_env=self.env,
+            featurize_fn=self.env.featurize_state_mdp,
+        )
+        # verify that the action_space * obs_space are initialized correctly
+        self.assertEqual(env.action_space, gym.spaces.Discrete(6))
+        self.assertEqual(
+            env.observation_space.shape,
+            self.base_mdp.get_featurize_state_shape(),
+        )
 
     # TODO: write more tests here
 

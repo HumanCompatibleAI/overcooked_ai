@@ -686,12 +686,19 @@ class Overcooked(gym.Env):
 
     env_name = "Overcooked-v0"
 
-    def custom_init(
-        self, base_env, featurize_fn, baselines_reproducible=False
-    ):
+    # gym checks for the action space and obs space while initializing the env and throws an error if none exists
+    # custom_init after __init__ no longer works
+    # might as well move all the initilization into the actual __init__
+    def __init__(self, base_env, featurize_fn, baselines_reproducible=False):
         """
         base_env: OvercookedEnv
         featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
+
+        Example creating a gym env:
+
+        mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages")
+        base_env = OvercookedEnv.from_mdp(mdp, horizon=500)
+        env = gym.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
         """
         if baselines_reproducible:
             # NOTE:
@@ -704,7 +711,6 @@ class Overcooked(gym.Env):
             # The effect of this should be negligible, as all other randomness is
             # controlled by the actual run seeds
             np.random.seed(0)
-
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
@@ -714,7 +720,7 @@ class Overcooked(gym.Env):
     def _setup_observation_space(self):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
-        obs_shape = self.featurize_fn(dummy_mdp, dummy_state)[0].shape
+        obs_shape = self.featurize_fn(dummy_state)[0].shape
         high = np.ones(obs_shape) * float("inf")
         low = np.zeros(obs_shape)
         return gym.spaces.Box(low, high, dtype=np.float32)
@@ -774,7 +780,7 @@ class Overcooked(gym.Env):
         self.base_env.reset()
         self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
-        ob_p0, ob_p1 = self.featurize_fn(self.mdp, self.base_env.state)
+        ob_p0, ob_p1 = self.featurize_fn(self.base_env.state)
 
         if self.agent_idx == 0:
             both_agents_ob = (ob_p0, ob_p1)
