@@ -7,6 +7,7 @@ from datetime import datetime
 import dill
 import gym
 import numpy as np
+import random
 import ray
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
@@ -93,14 +94,22 @@ class RlLibAgent(Agent):
         my_obs = obs[self.agent_index]
 
         # Use Rllib.Policy class to compute action argmax and action probabilities
-        [action_idx], rnn_state, info = self.policy.compute_actions(
+        # The first value is action_idx, which we will recompute below so the results are stochastic
+        _, rnn_state, info = self.policy.compute_actions(
             np.array([my_obs]), self.rnn_state
         )
-        agent_action = Action.INDEX_TO_ACTION[action_idx]
 
         # Softmax in numpy to convert logits to normalized probabilities
         logits = info["action_dist_inputs"]
         action_probabilities = softmax(logits)
+
+        #reseed to make sure the outputs are stochastic
+        random.seed()
+        #The original design is stochastic across different games, 
+        #Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
+        [action_idx] = random.choices([0,1,2,3,4,5],action_probabilities[0])
+        agent_action = Action.INDEX_TO_ACTION[action_idx]
+
 
         agent_action_info = {"action_probs": action_probabilities}
         self.rnn_state = rnn_state
