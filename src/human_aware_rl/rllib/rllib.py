@@ -1,13 +1,13 @@
 import copy
 import logging
 import os
+import random
 import tempfile
 from datetime import datetime
 
 import dill
 import gym
 import numpy as np
-import random
 import ray
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
@@ -103,13 +103,14 @@ class RlLibAgent(Agent):
         logits = info["action_dist_inputs"]
         action_probabilities = softmax(logits)
 
-        #reseed to make sure the outputs are stochastic
+        # reseed to make sure the outputs are stochastic
         random.seed()
-        #The original design is stochastic across different games, 
-        #Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
-        [action_idx] = random.choices([0,1,2,3,4,5],action_probabilities[0])
+        # The original design is stochastic across different games,
+        # Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
+        [action_idx] = random.choices(
+            [0, 1, 2, 3, 4, 5], action_probabilities[0]
+        )
         agent_action = Action.INDEX_TO_ACTION[action_idx]
-
 
         agent_action_info = {"action_probs": action_probabilities}
         self.rnn_state = rnn_state
