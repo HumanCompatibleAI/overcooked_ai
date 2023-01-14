@@ -103,8 +103,6 @@ class RlLibAgent(Agent):
         logits = info["action_dist_inputs"]
         action_probabilities = softmax(logits)
 
-        # reseed to make sure the outputs are stochastic
-        random.seed()
         # The original design is stochastic across different games,
         # Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
         [action_idx] = random.choices(
