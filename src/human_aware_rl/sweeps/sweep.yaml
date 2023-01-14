@@ -1,0 +1,62 @@
+program: ../ppo/ppo_rllib_client.py
+method: random
+name: Overcooked
+project: overcooked_sweeps
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - "with"
+  - ${args_no_hyphens}
+metric:
+  name: performance
+  goal: maximize
+parameters:
+# Searching over
+  layout_name:
+    distribution: categorical
+    values: ["cramped_room","forced_coordination","counter_circuit_o_1order","asymmetric_advantages","coordination_ring"]
+  lr:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 5e-2
+  vf_loss_coeff:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 5e-2
+  grad_clip:
+    distribution: uniform
+    min: 0.1
+    max: 0.5
+  gamma:
+    distribution: uniform
+    min: 0.9
+    max: 0.99
+  lmbda:
+    distribution: uniform
+    min: 0.9
+    max: 0.99
+  kl_coeff:
+    distribution: uniform
+    min: 0.1
+    max: 0.3
+  clip_param:
+    distribution: log_uniform_values
+    min: 0.01
+    max: 0.3
+  num_sgd_iter:
+    values: [8]
+  old_dynamics:
+    values: [True]
+  num_training_iters:
+    values: [500,550,600,650,700]
+  train_batch_size:
+    values: [12000]
+  sgd_minibatch_size:
+    values: [2000]
+  num_workers:
+    values: [30]
+  reward_shaping_horizon:
+    values: [3e6,4e6,5e6,6e6]
+  verbose:
+    values: [True]

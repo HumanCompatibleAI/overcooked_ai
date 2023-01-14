@@ -372,6 +372,9 @@ def run(params):
     # Save the state of the experiment at end
     save_path = save_trainer(trainer, params)
 
+    avg_sparse_reward = result["custom_metrics"]["sparse_reward_mean"]
+    wandb.log({"performance":avg_sparse_reward})
+
     if params["verbose"]:
         print("saved trainer at", save_path)
         # quiet = True so wandb doesn't log to console
@@ -402,6 +405,7 @@ def main(params):
     average_sparse_reward = np.mean(
         [res["custom_metrics"]["sparse_reward_mean"] for res in results]
     )
+
     average_episode_reward = np.mean(
         [res["episode_reward_mean"] for res in results]
     )
