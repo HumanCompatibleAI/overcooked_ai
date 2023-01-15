@@ -106,7 +106,7 @@ class RlLibAgent(Agent):
         # The original design is stochastic across different games,
         # Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
         [action_idx] = random.choices(
-            [0, 1, 2, 3, 4, 5], action_probabilities[0]
+            list(range(Action.NUM_ACTIONS)), action_probabilities[0]
         )
         agent_action = Action.INDEX_TO_ACTION[action_idx]
 
