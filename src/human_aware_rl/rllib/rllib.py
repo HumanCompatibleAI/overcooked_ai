@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import random
 import tempfile
 from datetime import datetime
 
@@ -93,14 +94,21 @@ class RlLibAgent(Agent):
         my_obs = obs[self.agent_index]
 
         # Use Rllib.Policy class to compute action argmax and action probabilities
-        [action_idx], rnn_state, info = self.policy.compute_actions(
+        # The first value is action_idx, which we will recompute below so the results are stochastic
+        _, rnn_state, info = self.policy.compute_actions(
             np.array([my_obs]), self.rnn_state
         )
-        agent_action = Action.INDEX_TO_ACTION[action_idx]
 
         # Softmax in numpy to convert logits to normalized probabilities
         logits = info["action_dist_inputs"]
         action_probabilities = softmax(logits)
+
+        # The original design is stochastic across different games,
+        # Though if we are reloading from a checkpoint it would inherit the seed at that point, producing deterministic results
+        [action_idx] = random.choices(
+            list(range(Action.NUM_ACTIONS)), action_probabilities[0]
+        )
+        agent_action = Action.INDEX_TO_ACTION[action_idx]
 
         agent_action_info = {"action_probs": action_probabilities}
         self.rnn_state = rnn_state
