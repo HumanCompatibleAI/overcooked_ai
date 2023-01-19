@@ -4,12 +4,12 @@ import os
 import shutil
 import sys
 
-with open("config.json", "r") as f:
-    config = json.load(f)
-# the agents dir
-agent_dir = config["AGENT_DIR"]
 
-if __name__ == "__main__":
+def main():
+    with open("config.json", "r") as f:
+        config = json.load(f)
+    # the agents dir
+    agent_dir = config["AGENT_DIR"]
     parser = argparse.ArgumentParser(
         prog="move_agent",
         description="Create a directory for agent to be loaded into the game",
@@ -72,3 +72,7 @@ if __name__ == "__main__":
         shutil.copytree(bc_model, bc_params)
 
     sys.exit("Copy succeeded")
+
+
+if __name__ == "__main__":
+    main()
