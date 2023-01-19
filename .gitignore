@@ -160,3 +160,13 @@ data/pbt_exp/
 data/gail_runs/
 data/joint_ppo_runs/
 data/ppo_exp/
+
+#demo gitignore
+*~
+package-lock.json
+node_modules/
+**/.DS_Store
+**/.vscode/
+**/old/
+**/master_agents/
+**/__pycache__/
