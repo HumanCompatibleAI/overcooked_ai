@@ -53,6 +53,13 @@ python move_agents.py ~/ray_results/MyAgent_0_2020-09-24_01-24-43m6jg7brh/checkp
 
 It also takes in optional arguments to overwrite existing agent and to copy bc_model 
 
+You can also directly call the function via CLI by typing
+
+```
+overcooked-demo-move path/to/checkpoint RllibAgentX
+```
+
+The same optional arguments apply
 
 Relaunching the Overcooked-Demo server, you should now see `RllibMyAgent` in the dropdown of available agents
 

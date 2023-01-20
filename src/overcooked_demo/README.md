@@ -36,13 +36,23 @@ In order to kill the production server, run
 ./down.sh
 ```
 
+You can also start the server via the command line. After installing the `overcooked_ai` via pip, you can start the server by typing
+
+```
+overcooked-demo-up
+```
+
+in the terminal. The same arguments still apply
+
 ## Dependencies
 
-The Overcooked-Demo server relies on the [overcooked-ai](https://github.com/HumanCompatibleAI/overcooked_ai) repo, specifically the submodules overcooked_ai_py and human_aware_rl. Changes made in these modules will be reflected in the overcooked_demo server
+The Overcooked-Demo server relies on the [overcooked-ai](https://github.com/HumanCompatibleAI/overcooked_ai) repo, specifically the submodules overcooked_ai_py and human_aware_rl. Changes made in these modules will be reflected in the overcooked_demo server.
+
+One thing to note is that the main logic depends on submodules in the repo on Github, not the one installed locally. Only changes made in the overcooked_demo locally will be reflected in game
 
 ## Using Pre-trained Agents
 
-Overcooked-Demo can dynamically load pre-trained agents provided by the user. In order to use a pre-trained agent, a pickle file should be added to the `agents` directory. The final structure will look like `static/assets/agents/<agent_name>/agent.pickle`. Note, to use the pre-defined rllib loading routine, the agent directory name must start with 'rllib', and contain the appropriate rllib checkpoint, config, and metadata files. Details can be found in the [README](server/static/assets/agents/README.md) under the agent directory. We also provide a [move_agents.py](server/move_agents.py) file that can help copy over checkpoint files. Note that currently it only supports copying over SP agents.
+Overcooked-Demo can dynamically load pre-trained agents provided by the user. In order to use a pre-trained agent, a pickle file should be added to the `agents` directory. The final structure will look like `static/assets/agents/<agent_name>/agent.pickle`. Note, to use the pre-defined rllib loading routine, the agent directory name must start with 'rllib', and contain the appropriate rllib checkpoint, config, and metadata files. Details can be found in the [README](server/static/assets/agents/README.md) under the agent directory. We also provide a [move_agents.py](server/move_agents.py) file that can help copy over checkpoint files.
 
 If a more complex or custom loading routing is necessary, one can subclass the `OvercookedGame` class and override the `get_policy` method, as done in [DummyOvercookedGame](server/game.py#L420). Make sure the subclass is properly imported [here](server/app.py#L5)
 
