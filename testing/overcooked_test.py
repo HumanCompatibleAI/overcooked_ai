@@ -93,7 +93,6 @@ class TestRecipe(unittest.TestCase):
             shutil.rmtree(self.pickle_temp_dir)
 
     def test_eq(self):
-
         self.assertEqual(self.r1, self.r2, "Failed basic equality check")
         self.assertNotEqual(self.r1, self.r3, "Failed Basic inequality check")
         self.assertNotEqual(
@@ -103,7 +102,6 @@ class TestRecipe(unittest.TestCase):
         self.assertEqual(self.r4, self.r5, "Failed ordered equality check")
 
     def test_caching(self):
-
         self.assertIs(self.r1, self.r2)
         self.assertIs(self.r3, self.r4)
         self.assertIs(self.r4, self.r5)
@@ -156,7 +154,6 @@ class TestRecipe(unittest.TestCase):
         )
 
     def test_invalid_input(self):
-
         self.assertRaises(
             ValueError, Recipe, [Recipe.ONION, Recipe.TOMATO, "carrot"]
         )
@@ -337,7 +334,6 @@ class TestSoupState(unittest.TestCase):
         )
 
     def test_invalid_ops(self):
-
         # Cannot cook an empty soup
         self.assertRaises(ValueError, self.s1.begin_cooking)
 
@@ -393,7 +389,6 @@ class TestDirection(unittest.TestCase):
 
 
 class TestGridworld(unittest.TestCase):
-
     # TODO: write more smaller targeted tests to be loaded from jsons
 
     verbose = False
@@ -1310,7 +1305,6 @@ class TestFeaturizations(unittest.TestCase):
 
 
 class TestOvercookedEnvironment(unittest.TestCase):
-
     dummy_dir = "overcooked_test_temp"
 
     def setUp(self):

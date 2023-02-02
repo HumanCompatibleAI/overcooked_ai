@@ -1446,7 +1446,6 @@ class OvercookedGridworld(object):
         for player_idx, (player, action) in enumerate(
             zip(new_state.players, joint_action)
         ):
-
             if action != Action.INTERACT:
                 continue
 
@@ -1523,7 +1522,6 @@ class OvercookedGridworld(object):
                     soup.begin_cooking()
 
             elif terrain_type == "P" and player.has_object():
-
                 if (
                     player.get_object().name == "dish"
                     and self.soup_ready_at_location(new_state, i_pos)
@@ -1572,7 +1570,6 @@ class OvercookedGridworld(object):
             elif terrain_type == "S" and player.has_object():
                 obj = player.get_object()
                 if obj.name == "soup":
-
                     delivery_rew = self.deliver_soup(new_state, player, obj)
                     sparse_reward[player_idx] += delivery_rew
 

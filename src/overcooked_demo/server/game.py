@@ -889,7 +889,6 @@ class StayAI:
 
 
 class TutorialAI:
-
     COOK_SOUP_LOOP = [
         # Grab first onion
         Direction.WEST,

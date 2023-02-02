@@ -491,7 +491,6 @@ def on_join(data):
         else:
             # Game was found so join it
             with game.lock:
-
                 join_room(game.id)
                 set_curr_room(user_id, game.id)
                 game.add_player(user_id)

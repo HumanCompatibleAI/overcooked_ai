@@ -450,14 +450,12 @@ def add_means_and_stds_from_df(data, main_trials, algo_name):
         idx_1_workers = []
         idx_0_workers = []
         for worker_id in layout_trials["player_0_id"].unique():
-
             if layout_trials[layout_trials["player_0_id"] == worker_id][
                 "player_0_is_human"
             ][0]:
                 idx_0_workers.append(worker_id)
 
         for worker_id in layout_trials["player_1_id"].unique():
-
             if layout_trials[layout_trials["player_1_id"] == worker_id][
                 "player_1_is_human"
             ][0]:
