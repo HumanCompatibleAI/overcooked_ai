@@ -58,12 +58,17 @@
   <div class="form-group col-lg-2">
     <label for="gameTime">Game Length (sec)</label>
     <input type="number" id="gameTime" value="30" min="1" max="1800" name="gameTime">
+    <label for="ticks_per_ai_action">Ticks per AI action</label>
+    <input type="number" id="ticks" value="4" min="1" max="10" name="ticks_per_ai_action">
+    <label for="fps">FPS rate of the game</label>
+    <input type="number" id="fps" value="30" min="1" max="100" name="fps">
   </div>
   <div class="form-group col-lg-2">
     <label for="showPotential">Show Potential?</label>
     <input type="checkbox" id="showPotential" name="showPotential">
+    <label for="Use Old Dynamics">Old dynamics?</label>
+    <input type="checkbox" id="oldDynamics" name="oldDynamics">
   </div>
-  
       </div>
       </div>
     </form>
