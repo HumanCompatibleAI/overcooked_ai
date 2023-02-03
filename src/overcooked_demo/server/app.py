@@ -288,7 +288,9 @@ def _create_game(user_id, game_name, params={}):
                 {"spectating": spectating, "start_info": game.to_json()},
                 room=game.id,
             )
-            socketio.start_background_task(play_game, game, fps=MAX_FPS)
+            socketio.start_background_task(
+                play_game, game, fps=int(params["fps"])
+            )
         else:
             WAITING_GAMES.put(game.id)
             emit("waiting", {"in_game": True}, room=game.id)
@@ -442,6 +444,9 @@ def debug():
 
 @socketio.on("create")
 def on_create(data):
+    import sys
+
+    print(data, file=sys.stderr)
     user_id = request.sid
     with USERS[user_id]:
         # Retrieve current game if one exists
@@ -451,9 +456,9 @@ def on_create(data):
             return
 
         params = data.get("params", {})
-        # hardcoded since there is no input for toggling this flag
-        # defnitely want to change this in the future
-        params["mdp_params"] = {"old_dynamics": True}
+        if "oldDynamics" in params and params["oldDynamics"] == "on":
+            params["mdp_params"] = {"old_dynamics": True}
+        params["ticks_per_ai_action"] = int(params["ticks_per_ai_action"])
         game_name = data.get("game_name", "overcooked")
         _create_game(user_id, game_name, params)
 
@@ -486,7 +491,6 @@ def on_join(data):
         else:
             # Game was found so join it
             with game.lock:
-
                 join_room(game.id)
                 set_curr_room(user_id, game.id)
                 game.add_player(user_id)

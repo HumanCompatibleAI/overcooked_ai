@@ -136,7 +136,6 @@ class TestBasicAgents(unittest.TestCase):
 
 
 class TestAgentEvaluatorStatic(unittest.TestCase):
-
     layout_name_lst = [
         "asymmetric_advantages",
         "asymmetric_advantages_tomato",

@@ -12,7 +12,6 @@ from overcooked_ai_py.utils import OvercookedException
 
 
 class Agent(object):
-
     agent_file_name = "agent.pickle"
 
     def __init__(self):
