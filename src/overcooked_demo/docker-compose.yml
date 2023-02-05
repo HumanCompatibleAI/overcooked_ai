@@ -7,8 +7,9 @@ services:
             args:
                 BUILD_ENV: "${BUILD_ENV:-production}"
                 OVERCOOKED_BRANCH: "${OVERCOOKED_BRANCH:-master}"
-                HARL_BRANCH: "${HARL_BRANCH:-master}"
                 GRAPHICS: "${GRAPHICS:-overcooked_graphics_v2.2.js}"
+            shm_size: "5gb"
+        shm_size: "5gb"
         environment: 
             FLASK_ENV: "${BUILD_ENV:-production}"
         ports:

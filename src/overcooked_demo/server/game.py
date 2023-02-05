@@ -463,6 +463,10 @@ class OvercookedGame(Game):
                 playerOne, idx=1
             )
             self.npc_state_queues[player_one_id] = LifoQueue()
+        # Always kill ray after loading agent, otherwise, ray will crash once process exits
+        # Only kill ray after loading both agents to avoid having to restart ray during loading
+        if ray.is_initialized():
+            ray.shutdown()       
 
     def _curr_game_over(self):
         return time() - self.start_time >= self.max_time
@@ -651,10 +655,6 @@ class OvercookedGame(Game):
                 raise IOError(
                     "Error loading Rllib Agent\n{}".format(e.__repr__())
                 )
-            finally:
-                # Always kill ray after loading agent, otherwise, ray will crash once process exits
-                if ray.is_initialized():
-                    ray.shutdown()
         else:
             try:
                 fpath = os.path.join(AGENT_DIR, npc_id, "agent.pickle")
