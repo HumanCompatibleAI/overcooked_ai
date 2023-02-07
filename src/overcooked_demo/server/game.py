@@ -466,7 +466,7 @@ class OvercookedGame(Game):
         # Always kill ray after loading agent, otherwise, ray will crash once process exits
         # Only kill ray after loading both agents to avoid having to restart ray during loading
         if ray.is_initialized():
-            ray.shutdown()       
+            ray.shutdown()
 
     def _curr_game_over(self):
         return time() - self.start_time >= self.max_time

@@ -170,3 +170,6 @@ node_modules/
 **/old/
 **/master_agents/
 **/__pycache__/
+#manually correcting for demo 
+!**/static/**/*.png
+!src/overcooked_demo/server/static/lib
