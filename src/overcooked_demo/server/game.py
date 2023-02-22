@@ -417,7 +417,7 @@ class OvercookedGame(Game):
         playerOne="human",
         showPotential=False,
         randomized=False,
-        ticks_per_ai_action=4,
+        ticks_per_ai_action=1,
         **kwargs
     ):
         super(OvercookedGame, self).__init__(**kwargs)

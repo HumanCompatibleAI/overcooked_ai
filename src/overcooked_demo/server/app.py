@@ -288,9 +288,7 @@ def _create_game(user_id, game_name, params={}):
                 {"spectating": spectating, "start_info": game.to_json()},
                 room=game.id,
             )
-            socketio.start_background_task(
-                play_game, game, fps=int(params["fps"])
-            )
+            socketio.start_background_task(play_game, game, fps=6)
         else:
             WAITING_GAMES.put(game.id)
             emit("waiting", {"in_game": True}, room=game.id)
@@ -444,9 +442,6 @@ def debug():
 
 @socketio.on("create")
 def on_create(data):
-    import sys
-
-    print(data, file=sys.stderr)
     user_id = request.sid
     with USERS[user_id]:
         # Retrieve current game if one exists
@@ -458,7 +453,6 @@ def on_create(data):
         params = data.get("params", {})
         if "oldDynamics" in params and params["oldDynamics"] == "on":
             params["mdp_params"] = {"old_dynamics": True}
-        params["ticks_per_ai_action"] = int(params["ticks_per_ai_action"])
         game_name = data.get("game_name", "overcooked")
         _create_game(user_id, game_name, params)
 

@@ -1,6 +1,6 @@
 {
     "logfile" : "app.log",
-    "layouts" : ["cramped_room", "cramped_room_tomato", "asymmetric_advantages", "coordination_ring", "forced_coordination", "counter_circuit", "cramped_corridor", "marshmallow_experiment", "long_cook_time", "forced_coordination_tomato", "asymmetric_advantages_tomato", "marshmallow_experiment_coordination", "pipeline", "you_shall_not_pass", "tutorial_3"],
+    "layouts" : ["cramped_room","counter_circuit_o_1order", "cramped_room_tomato", "asymmetric_advantages", "coordination_ring", "forced_coordination", "counter_circuit", "cramped_corridor", "marshmallow_experiment", "long_cook_time", "forced_coordination_tomato", "asymmetric_advantages_tomato", "marshmallow_experiment_coordination", "pipeline", "you_shall_not_pass", "tutorial_3"],
     "MAX_GAMES" : 10,
     "MAX_GAME_LENGTH" : 120,
     "AGENT_DIR" : "./static/assets/agents",
