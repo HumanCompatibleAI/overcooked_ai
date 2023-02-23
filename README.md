@@ -146,10 +146,7 @@ python -m unittest discover -s testing/ -p "*_test.py"
 `server/`:
 - `app.py`: The Flask app 
 - `game.py`: The main logic of the game. State transitions are handled by overcooked.Gridworld object embedded in the game environment
-- `move_agents.py`: A script that simplifies copying checkpoints to [agents](src/overcooked_demo/server/static/assets/agents/) directory. Instruction of how to use can be found inside the file or by running 
-```
-python move_agents.py -h
-```
+- `move_agents.py`: A script that simplifies copying checkpoints to [agents](src/overcooked_demo/server/static/assets/agents/) directory. Instruction of how to use can be found inside the file or by running `python move_agents.py -h`
 
 `up.sh`: Shell script to spin up the Docker server that hosts the game 
 
