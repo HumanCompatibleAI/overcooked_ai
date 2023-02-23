@@ -15,7 +15,7 @@ Data was collected on behalf of the Center for Human-Compatible AI (CHAI) at UC 
 This directory is subdivided into three subdirectories as follows 
 
 `human_data/`
-* `raw/`
+* `raw/` (this folder has been removed from this repo, but you can find the same CSV files [here](https://github.com/HumanCompatibleAI/human_aware_rl/tree/master/human_aware_rl/data/human/anonymized))
   * Contains all unprocessed, unfiltered data in CSV form
   * Data is divided into 2019 experiments, collected for [this](https://arxiv.org/abs/1910.05789) paper, and 2020 experiments, collected on more complex layouts with updated dynamics
 * `cleaned/`
