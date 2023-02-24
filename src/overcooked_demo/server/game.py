@@ -767,7 +767,7 @@ class OvercookedTutorial(OvercookedGame):
         self.phase_two_finished = False
         self.max_time = 0
         self.max_players = 2
-        self.ticks_per_ai_action = 8
+        self.ticks_per_ai_action = 1
         self.curr_phase = 0
 
     @property

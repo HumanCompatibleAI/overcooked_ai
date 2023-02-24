@@ -48,7 +48,7 @@ in the terminal. The same arguments still apply
 
 The Overcooked-Demo server relies on the [overcooked-ai](https://github.com/HumanCompatibleAI/overcooked_ai) repo, specifically the submodules overcooked_ai_py and human_aware_rl. Changes made in these modules will be reflected in the overcooked_demo server.
 
-One thing to note is that the main logic depends on submodules in the repo on Github, not the one installed locally. Only changes made in the overcooked_demo locally will be reflected in game
+One thing to note is that local changes to the game logic will not be present by default in the demo (it is pulled directly from the GitHub version). Only changes made in the overcooked_demo folder locally will be reflected in the demo.
 
 ## Using Pre-trained Agents
 
