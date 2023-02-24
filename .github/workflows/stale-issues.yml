@@ -17,5 +17,4 @@ jobs:
           stale-issue-label: "stale"
           stale-issue-message: "This issue is stale because it has been open for 30 days with no activity. It will be closed in 14 days unless there is some new activity"
           close-issue-message: "This issue was closed because it has been inactive for 14 days since being marked as stale."
-          start-date: 2023-02-20T00:00:01.000Z
           repo-token: ${{ secrets.GITHUB_TOKEN }}
