@@ -141,9 +141,21 @@ python -m unittest discover -s testing/ -p "*_test.py"
 
 `utils.py`: utils for the repo
 
+`overcooked_demo` contains:
+
+`server/`:
+- `app.py`: The Flask app 
+- `game.py`: The main logic of the game. State transitions are handled by overcooked.Gridworld object embedded in the game environment
+- `move_agents.py`: A script that simplifies copying checkpoints to [agents](src/overcooked_demo/server/static/assets/agents/) directory. Instruction of how to use can be found inside the file or by running `python move_agents.py -h`
+
+`up.sh`: Shell script to spin up the Docker server that hosts the game 
+
+
 ## Python Visualizations 🌠
 
 See [this Google Colab](https://colab.research.google.com/drive/1AAVP2P-QQhbx6WTOnIG54NXLXFbO7y6n#scrollTo=Z1RBlqADnTDw) for some sample code for visualizing trajectories in python.
+
+Overcooked_demo can also start an interactive game in the browser for visualizations. Details can be found in its [README](src/overcooked_demo/README.md)
 
 ## Raw Data :ledger:
 

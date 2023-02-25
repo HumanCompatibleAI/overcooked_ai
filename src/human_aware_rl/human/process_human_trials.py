@@ -158,7 +158,7 @@ def process_state(state_json, forward_port=False, fix_json=False):
         insertion_needed (bool): Whether a soup began cooking at this timestep
     """
     if fix_json:
-        for (old, new) in JSON_FIXES:
+        for old, new in JSON_FIXES:
             state_json = state_json.replace(old, new)
 
     if forward_port:

@@ -247,7 +247,6 @@ def joint_state_trajectory_to_single(
 
     # Getting trajectory for each agent
     for agent_idx in player_indices_to_convert:
-
         ep_obs, ep_acts, ep_dones = [], [], []
         for i in range(len(states)):
             state, action = states[i], joint_actions[i][agent_idx]

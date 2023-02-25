@@ -63,4 +63,10 @@ setup(
             "tensorflow==2.10",
         ]
     },
+    entry_points={
+        "console_scripts": [
+            "overcooked-demo-up = overcooked_demo:start_server",
+            "overcooked-demo-move = overcooked_demo:move_agent",
+        ]
+    },
 )

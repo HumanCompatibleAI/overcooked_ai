@@ -1045,7 +1045,8 @@ class JointMotionPlanner(object):
 
     def _get_valid_successor_joint_positions(self, starting_positions):
         """Get all joint positions that can be reached by a joint action.
-        NOTE: this DOES NOT include joint positions with superimposed agents."""
+        NOTE: this DOES NOT include joint positions with superimposed agents.
+        """
         successor_joint_positions = {}
         joint_motion_actions = itertools.product(
             Action.MOTION_ACTIONS, Action.MOTION_ACTIONS

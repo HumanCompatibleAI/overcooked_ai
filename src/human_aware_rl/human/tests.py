@@ -30,7 +30,6 @@ from overcooked_ai_py.planning.planners import (
 
 
 class TestProcessDataFrames(unittest.TestCase):
-
     temp_data_dir = "this_is_a_temp"
     data_len_2019 = 3546
     data_len_2020 = 1189
@@ -146,7 +145,6 @@ class TestProcessDataFrames(unittest.TestCase):
 
 
 class TestHumanDataConversion(unittest.TestCase):
-
     temp_dir = "this_is_also_a_temp"
     infile = DUMMY_2019_CLEAN_HUMAN_DATA_PATH
     horizon = 400
