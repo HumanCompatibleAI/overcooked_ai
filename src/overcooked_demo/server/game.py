@@ -8,7 +8,6 @@ from threading import Lock, Thread
 from time import time
 
 import ray
-
 from human_aware_rl.rllib.rllib import load_agent
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -37,18 +36,18 @@ def fix_bc_path(path):
     For now the solution is to include the saved BC model and fix the relative path to the model in the config.pkl file
     """
 
-    import pickle
+    import dill
 
     # the path is the agents/Rllib.*/agent directory
     agent_path = os.path.dirname(path)
     with open(os.path.join(agent_path, "config.pkl"), "rb") as f:
-        data = pickle.load(f)
+        data = dill.load(f)
     bc_model_dir = data["bc_params"]["bc_config"]["model_dir"]
     last_dir = os.path.basename(bc_model_dir)
     bc_model_dir = os.path.join(agent_path, "bc_params", last_dir)
     data["bc_params"]["bc_config"]["model_dir"] = bc_model_dir
     with open(os.path.join(agent_path, "config.pkl"), "wb") as f:
-        pickle.dump(data, f)
+        dill.dump(data, f)
 
 
 class Game(ABC):
