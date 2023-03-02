@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 # Import and patch the production eventlet server if necessary
 if os.getenv("FLASK_ENV", "production") == "production":
@@ -442,6 +442,7 @@ def debug():
 
 @socketio.on("create")
 def on_create(data):
+    print(data, file=sys.stderr)
     user_id = request.sid
     with USERS[user_id]:
         # Retrieve current game if one exists
@@ -586,6 +587,8 @@ def play_game(game, fps=30):
         if status == Game.Status.RESET:
             with game.lock:
                 data = game.get_data()
+                import sys
+                print(data,file=sys.stderr)
             socketio.emit(
                 "reset_game",
                 {
@@ -604,6 +607,8 @@ def play_game(game, fps=30):
 
     with game.lock:
         data = game.get_data()
+        import sys
+        print(data,file=sys.stderr)
         socketio.emit(
             "end_game", {"status": status, "data": data}, room=game.id
         )
@@ -616,7 +621,7 @@ def play_game(game, fps=30):
 if __name__ == "__main__":
     # Dynamically parse host and port from environment variables (set by docker build)
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 80))
+    port = int(os.getenv("PORT", 5000))
 
     # Attach exit handler to ensure graceful shutdown
     atexit.register(on_exit)
