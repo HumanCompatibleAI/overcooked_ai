@@ -1,0 +1,111 @@
+{
+  "callbacks": "<class 'human_aware_rl.rllib.rllib.TrainingCallbacks'>",
+  "clip_param": 0.229,
+  "custom_eval_function": "<function get_rllib_eval_function.<locals>._evaluate at 0x7f12bc174e60>",
+  "eager_tracing": false,
+  "entropy_coeff_schedule": [
+    [
+      0,
+      0.2
+    ],
+    [
+      300000.0,
+      0.1
+    ]
+  ],
+  "env_config": {
+    "env_params": {
+      "horizon": 400,
+      "mlam_params": {
+        "counter_drop": [],
+        "counter_goals": [],
+        "counter_pickup": [],
+        "same_motion_goals": true,
+        "start_orientations": false,
+        "wait_allowed": false
+      }
+    },
+    "eval_mdp_params": {
+      "layout_name": "asymmetric_advantages",
+      "old_dynamics": true,
+      "rew_shaping_params": {
+        "DISH_DISP_DISTANCE_REW": 0,
+        "DISH_PICKUP_REWARD": 3,
+        "PLACEMENT_IN_POT_REW": 3,
+        "POT_DISTANCE_REW": 0,
+        "SOUP_DISTANCE_REW": 0,
+        "SOUP_PICKUP_REWARD": 5
+      }
+    },
+    "mdp_params": {
+      "layout_name": "asymmetric_advantages",
+      "old_dynamics": true,
+      "rew_shaping_params": {
+        "DISH_DISP_DISTANCE_REW": 0,
+        "DISH_PICKUP_REWARD": 3,
+        "PLACEMENT_IN_POT_REW": 3,
+        "POT_DISTANCE_REW": 0,
+        "SOUP_DISTANCE_REW": 0,
+        "SOUP_PICKUP_REWARD": 5
+      }
+    },
+    "multi_agent_params": {
+      "bc_schedule": [
+        [
+          0,
+          0
+        ],
+        [
+          Infinity,
+          0
+        ]
+      ],
+      "reward_shaping_factor": 1.0,
+      "reward_shaping_horizon": 5000000,
+      "use_phi": false
+    },
+    "outer_shape": null
+  },
+  "evaluation_interval": 50,
+  "gamma": 0.964,
+  "grad_clip": 0.256,
+  "kl_coeff": 0.185,
+  "lambda": 0.5,
+  "log_level": "WARN",
+  "lr": 0.00021,
+  "lr_schedule": null,
+  "multiagent": {
+    "policies": {
+      "ppo": [
+        null,
+        "Box(0.0, inf, (9, 5, 26), float32)",
+        "Discrete(6)",
+        {
+          "model": {
+            "custom_model": "MyPPOModel",
+            "custom_model_config": {
+              "CELL_SIZE": 256,
+              "D2RL": false,
+              "NUM_CONV_LAYERS": 3,
+              "NUM_FILTERS": 25,
+              "NUM_HIDDEN_LAYERS": 3,
+              "SIZE_HIDDEN_LAYERS": 64,
+              "use_lstm": false
+            }
+          }
+        }
+      ]
+    },
+    "policies_to_train": "{'ppo'}",
+    "policy_mapping_fn": "<function gen_trainer_from_params.<locals>.select_policy at 0x7f12bc174f80>"
+  },
+  "num_gpus": 1,
+  "num_sgd_iter": 8,
+  "num_workers": 30,
+  "rollout_fragment_length": 400,
+  "seed": 30,
+  "sgd_minibatch_size": 2000,
+  "train_batch_size": 12000,
+  "vf_loss_coeff": 0.022,
+  "vf_share_layers": true
+}
