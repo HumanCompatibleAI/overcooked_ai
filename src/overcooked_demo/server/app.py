@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 
 # Import and patch the production eventlet server if necessary
 if os.getenv("FLASK_ENV", "production") == "production":
@@ -587,8 +588,6 @@ def play_game(game, fps=30):
         if status == Game.Status.RESET:
             with game.lock:
                 data = game.get_data()
-                import sys
-                print(data,file=sys.stderr)
             socketio.emit(
                 "reset_game",
                 {
@@ -607,8 +606,6 @@ def play_game(game, fps=30):
 
     with game.lock:
         data = game.get_data()
-        import sys
-        print(data,file=sys.stderr)
         socketio.emit(
             "end_game", {"status": status, "data": data}, room=game.id
         )

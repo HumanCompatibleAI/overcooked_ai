@@ -8,6 +8,7 @@ from threading import Lock, Thread
 from time import time
 
 import ray
+
 from human_aware_rl.rllib.rllib import load_agent
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
