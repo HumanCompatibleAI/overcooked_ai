@@ -150,7 +150,7 @@ def try_create_game(game_name, **kwargs):
         return game, None
 
 
-def cleanup_game(game):
+def cleanup_game(game: OvercookedGame):
     if FREE_MAP[game.id]:
         raise ValueError("Double free on a game")
 
@@ -460,14 +460,10 @@ def on_create(data):
         # oldDynamics: on/off
         # dataCollection: on/off
         # layouts: [layout in the config file], I don't think this is used
-        import sys
-
-        print(params, file=sys.stderr)
         enable_data_collection = (
             "dataCollection" in params and params["dataCollection"] == "on"
         )
         if enable_data_collection:
-            print("got here", file=sys.stderr)
             # config the necessary setting to properly save data
             params["dataCollection"] = True
             mapping = {"human": "H"}
