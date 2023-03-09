@@ -13,6 +13,7 @@ import logging
 # All other imports must come after patch to ensure eventlet compatibility
 import pickle
 import queue
+from datetime import datetime
 from threading import Lock
 
 import game
@@ -451,6 +452,37 @@ def on_create(data):
             return
 
         params = data.get("params", {})
+        # this params file should be a dictionary that can have these keys:
+        # playerZero: human/Rllib*agent
+        # playerOne: human/Rllib*agent
+        # layout: one of the layouts in the config file
+        # gameTime: time in seconds
+        # oldDynamics: on/off
+        # dataCollection: on/off
+        # layouts: [layout in the config file], I don't think this is used
+        import sys
+
+        print(params, file=sys.stderr)
+        enable_data_collection = (
+            "dataCollection" in params and params["dataCollection"] == "on"
+        )
+        if enable_data_collection:
+            print("got here", file=sys.stderr)
+            # config the necessary setting to properly save data
+            params["dataCollection"] = True
+            mapping = {"human": "H"}
+            # gameType is either HH, HA, AH, AA depending on the config
+            gameType = "{}{}".format(
+                mapping.get(params["playerZero"], "A"),
+                mapping.get(params["playerOne"], "A"),
+            )
+            params["collection_config"] = {
+                "time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
+                "type": gameType,
+                "layout": params["layout"],
+            }
+        else:
+            params["dataCollection"] = False
         if "oldDynamics" in params and params["oldDynamics"] == "on":
             params["mdp_params"] = {"old_dynamics": True}
         game_name = data.get("game_name", "overcooked")
@@ -570,7 +602,7 @@ def on_exit():
 #############
 
 
-def play_game(game, fps=30):
+def play_game(game: OvercookedGame, fps=30):
     """
     Asynchronously apply real-time game updates and broadcast state to all clients currently active
     in the game. Note that this loop must be initiated by a parallel thread for each active game

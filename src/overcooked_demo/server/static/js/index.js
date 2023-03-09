@@ -11,7 +11,8 @@ $(function() {
         params.layouts = [params.layout]
         data = {
             "params" : params,
-            "game_name" : "overcooked",
+            //changed to psiturk to always enable data collection
+            "game_name" : "psiturk",
             "create_if_not_found" : false
         };
         socket.emit("create", data);

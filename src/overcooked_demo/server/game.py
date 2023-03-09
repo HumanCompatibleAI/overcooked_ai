@@ -8,6 +8,7 @@ from threading import Lock, Thread
 from time import time
 
 import ray
+from utils import DOCKER_VOLUME, create_dirs
 
 from human_aware_rl.rllib.rllib import load_agent
 from overcooked_ai_py.mdp.actions import Action, Direction
@@ -467,6 +468,9 @@ class OvercookedGame(Game):
         # Only kill ray after loading both agents to avoid having to restart ray during loading
         if ray.is_initialized():
             ray.shutdown()
+        if kwargs["dataCollection"]:
+            self.write_data = True
+            self.write_config = kwargs["collection_config"]
 
     def _curr_game_over(self):
         return time() - self.start_time >= self.max_time
@@ -733,6 +737,14 @@ class OvercookedPsiturk(OvercookedGame):
             "trajectory": self.trajectory,
         }
         self.trajectory = []
+        # if we want to store the data and there is data to store
+        if self.write_data and len(data["trajectory"]) > 0:
+            configs = self.write_config
+            # create necessary dirs
+            data_path = create_dirs(configs)
+            # the 3-layer-directory structure should be able to uniquely define any experiment
+            with open(os.path.join(data_path, "result.pkl"), "wb") as f:
+                pickle.dump(data, f)
         return data
 
 
