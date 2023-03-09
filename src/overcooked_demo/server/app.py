@@ -443,7 +443,6 @@ def debug():
 
 @socketio.on("create")
 def on_create(data):
-    print(data, file=sys.stderr)
     user_id = request.sid
     with USERS[user_id]:
         # Retrieve current game if one exists
@@ -618,7 +617,7 @@ def play_game(game, fps=30):
 if __name__ == "__main__":
     # Dynamically parse host and port from environment variables (set by docker build)
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 5000))
+    port = int(os.getenv("PORT", 80))
 
     # Attach exit handler to ensure graceful shutdown
     atexit.register(on_exit)

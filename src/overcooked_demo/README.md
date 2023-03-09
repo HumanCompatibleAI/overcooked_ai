@@ -72,7 +72,7 @@ One also has the option to setup the repo again on a cloud server. This allows m
 
 2: Sign in to the management console to start an EC2 instance. Choose your instance type according to your expected load. 
 
-3: Install git on the server by running (example taken from linux instance)
+3: Install git on the server by running (example here is for linux instance)
 
 ```bash
 sudo yum update
