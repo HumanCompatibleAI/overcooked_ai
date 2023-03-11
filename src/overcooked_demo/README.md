@@ -54,12 +54,16 @@ One thing to note is that local changes to the game logic will not be present by
 
 Overcooked-Demo can dynamically load pre-trained agents provided by the user. In order to use a pre-trained agent, a pickle file should be added to the `agents` directory. The final structure will look like `static/assets/agents/<agent_name>/agent.pickle`. Note, to use the pre-defined rllib loading routine, the agent directory name must start with 'rllib', and contain the appropriate rllib checkpoint, config, and metadata files. Details can be found in the [README](server/static/assets/agents/README.md) under the agent directory. We also provide a [move_agents.py](server/move_agents.py) file that can help copy over checkpoint files.
 
+The existing agents that are available to play with in the overcooked_demo module are taken from [this group](https://drive.google.com/drive/folders/1CI3rLZg5wpjpoTDBi1M1qn8xvjqhk5Md?usp=share_link) of reproduced agents. To reproduce the results locally, you can run [this script](https://github.com/HumanCompatibleAI/overcooked_ai/blob/master/src/human_aware_rl/ppo/run_experiments.sh). 
+
 If a more complex or custom loading routing is necessary, one can subclass the `OvercookedGame` class and override the `get_policy` method, as done in [DummyOvercookedGame](server/game.py#L420). Make sure the subclass is properly imported [here](server/app.py#L5)
+
+
 
 ## Use the human vs. human game mode.
 
 ### 1): Using Docker Compose CLI to deploy on EC2
-With the Overcooked demo, you can test the interaction between two human players. To do this, you need to deploy this code on the server (hsttps://docs.docker.com/language/python/deploy/). 
+With the Overcooked demo, you can test the interaction between two human players. To do this, you need to deploy this code on a server (https://docs.docker.com/language/python/deploy/). 
 After successful deployment, the first user should open http://[server_ip_address]/, select the human keyboard input for both players and click on "Create game". If everything has been successful, he will receive a message: "Waiting for game to start".
 Another user should open a page at http://[server_ip_address]/psiturk to start the game.  
 
@@ -68,7 +72,7 @@ If you want to run a test on a local computer, you should use "localhost" instea
 ### 2): Setup the repo on a cloud server 
 One also has the option to setup the repo again on a cloud server. This allows more flexible customization and easier spin-up. The following steps demonstrate how one can steup the repo on an AWS EC2 instance 
 
-1: Get an [AWS account](https://aws.amazon.com/free/)
+1: Get an [AWS account](https://aws.amazon.com/free/). Note any cloud server should work and it is by no means limited to AWS, and the instruction provided here is only meant to give an example for how it can be done.
 
 2: Sign in to the management console to start an EC2 instance. Choose your instance type according to your expected load. 
 
@@ -78,7 +82,7 @@ One also has the option to setup the repo again on a cloud server. This allows m
 sudo yum update
 sudo yum install git
 ```
-4:Install pip [on the instance](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/eb-cli3-install-linux.html)
+4: Install pip [on the instance](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/eb-cli3-install-linux.html)
 
 5: Clone the repo and do a regular pip install. You can also [optionally get Anaconda on the server](https://medium.com/@GalarnykMichael/aws-ec2-part-3-installing-anaconda-on-ec2-linux-ubuntu-dbef0835818a).
 

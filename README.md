@@ -161,7 +161,6 @@ Overcooked_demo can also start an interactive game in the browser for visualizat
 
 The raw data used in training is >100 MB, which makes it inconvenient to distribute via git. The code uses pickled dataframes for training and testing, but in case one needs to original data it can be found [here](https://drive.google.com/drive/folders/1aGV8eqWeOG5BMFdUcVoP2NHU_GFPqi57?usp=share_link) 
 
-The existing agents that are available to play with in the overcooked_demo module are taken from [this group](https://drive.google.com/drive/folders/1CI3rLZg5wpjpoTDBi1M1qn8xvjqhk5Md?usp=share_link) of reproduced agents. To reproduce the results locally, you can run [this script](https://github.com/HumanCompatibleAI/overcooked_ai/blob/master/src/human_aware_rl/ppo/run_experiments.sh). 
 ## Further Issues and questions ❓
 
 If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
