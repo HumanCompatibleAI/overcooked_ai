@@ -72,7 +72,7 @@ If you want to run a test on a local computer, you should use "localhost" instea
 ### 2): Setup the repo on a cloud server 
 One also has the option to setup the repo again on a cloud server. This allows more flexible customization and easier spin-up. The following steps demonstrate how one can steup the repo on an AWS EC2 instance 
 
-1: Get an [AWS account](https://aws.amazon.com/free/). Note any cloud server should work and it is by no means limited to AWS, and the instruction provided here is only meant to give an example for how it can be done.
+1: Get an [AWS account](https://aws.amazon.com/free/). Note that any cloud provider should work – the instructions provided here for AWS are only meant as an example.
 
 2: Sign in to the management console to start an EC2 instance. Choose your instance type according to your expected load. 
 
