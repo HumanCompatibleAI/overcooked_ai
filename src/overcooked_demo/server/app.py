@@ -1,4 +1,5 @@
 import os
+import sys
 
 # Import and patch the production eventlet server if necessary
 if os.getenv("FLASK_ENV", "production") == "production":
