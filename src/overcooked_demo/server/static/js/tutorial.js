@@ -202,10 +202,10 @@ socket.on('end_game', function(data) {
     if (data.status === 'inactive') {
         // Game ended unexpectedly
         $('#error-exit').show();
-        // Propogate game stats to parent window with psiturk code
+        // Propogate game stats to parent window 
         window.top.postMessage({ name : "error" }, "*");
     } else {
-        // Propogate game stats to parent window with psiturk code
+        // Propogate game stats to parent window 
         window.top.postMessage({ name : "tutorial-done" }, "*");
     }
 

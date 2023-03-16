@@ -309,7 +309,7 @@ class Game(ABC):
 
     def get_data(self):
         """
-        Return any game metadata to server driver. Really only relevant for Psiturk code
+        Return any game metadata to server driver.  
         """
         return {}
 
@@ -468,9 +468,12 @@ class OvercookedGame(Game):
         # Only kill ray after loading both agents to avoid having to restart ray during loading
         if ray.is_initialized():
             ray.shutdown()
+        
         if kwargs["dataCollection"]:
             self.write_data = True
             self.write_config = kwargs["collection_config"]
+        
+        self.trajectory = []
 
     def _curr_game_over(self):
         return time() - self.start_time >= self.max_time
@@ -567,6 +570,25 @@ class OvercookedGame(Game):
         # Update score based on soup deliveries that might have occured
         curr_reward = sum(info["sparse_reward_by_agent"])
         self.score += curr_reward
+
+        transition = {
+            "state": json.dumps(prev_state.to_dict()),
+            "joint_action": json.dumps(joint_action),
+            "reward": curr_reward,
+            "time_left": max(self.max_time - (time() - self.start_time), 0),
+            "score": self.score,
+            "time_elapsed": time() - self.start_time,
+            "cur_gameloop": self.curr_tick,
+            "layout": json.dumps(self.mdp.terrain_mtx),
+            "layout_name": self.curr_layout,
+            "trial_id": str(self.start_time),
+            "player_0_id": self.players[0],
+            "player_1_id": self.players[1],
+            "player_0_is_human": self.players[0] in self.human_players,
+            "player_1_is_human": self.players[1] in self.human_players,
+        }
+
+        self.trajectory.append(transition)
 
         # Return about the current transition
         return prev_state, joint_action, info
@@ -666,74 +688,13 @@ class OvercookedGame(Game):
                     return pickle.load(f)
             except Exception as e:
                 raise IOError("Error loading agent\n{}".format(e.__repr__()))
-
-
-class OvercookedPsiturk(OvercookedGame):
-    """
-    Wrapper on OvercookedGame that handles additional housekeeping for Psiturk experiments
-
-    Instance Variables:
-        - trajectory (list(dict)): list of state-action pairs in current trajectory
-        - psiturk_uid (string): Unique id for each psiturk game instance (provided by Psiturk backend)
-            Note, this is not the user id -- two users in the same game will have the same psiturk_uid
-        - trial_id (string): Unique identifier for each psiturk trial, updated on each call to reset
-            Note, one OvercookedPsiturk game handles multiple layouts. This is how we differentiate
-
-    Methods:
-        get_data: Returns the accumulated trajectory data and clears the self.trajectory instance variable
-
-    """
-
-    def __init__(self, *args, psiturk_uid="-1", **kwargs):
-        super(OvercookedPsiturk, self).__init__(
-            *args, showPotential=False, **kwargs
-        )
-        self.psiturk_uid = psiturk_uid
-        self.trajectory = []
-
-    def activate(self):
-        """
-        Resets trial ID at start of new "game"
-        """
-        super(OvercookedPsiturk, self).activate()
-        self.trial_id = self.psiturk_uid + str(self.start_time)
-
-    def apply_actions(self):
-        """
-        Applies pending actions then logs transition data
-        """
-        # Apply MDP logic
-        prev_state, joint_action, info = super(
-            OvercookedPsiturk, self
-        ).apply_actions()
-
-        # Log data to send to psiturk client
-        curr_reward = sum(info["sparse_reward_by_agent"])
-        transition = {
-            "state": json.dumps(prev_state.to_dict()),
-            "joint_action": json.dumps(joint_action),
-            "reward": curr_reward,
-            "time_left": max(self.max_time - (time() - self.start_time), 0),
-            "score": self.score,
-            "time_elapsed": time() - self.start_time,
-            "cur_gameloop": self.curr_tick,
-            "layout": json.dumps(self.mdp.terrain_mtx),
-            "layout_name": self.curr_layout,
-            "trial_id": self.trial_id,
-            "player_0_id": self.players[0],
-            "player_1_id": self.players[1],
-            "player_0_is_human": self.players[0] in self.human_players,
-            "player_1_is_human": self.players[1] in self.human_players,
-        }
-
-        self.trajectory.append(transition)
-
+            
     def get_data(self):
         """
         Returns and then clears the accumulated trajectory
         """
         data = {
-            "uid": self.psiturk_uid + "_" + str(time()),
+            "uid": str(time()),
             "trajectory": self.trajectory,
         }
         self.trajectory = []
@@ -744,6 +705,8 @@ class OvercookedPsiturk(OvercookedGame):
             data_path = create_dirs(configs)
             # the 3-layer-directory structure should be able to uniquely define any experiment
             with open(os.path.join(data_path, "result.pkl"), "wb") as f:
+                import sys 
+                print("Saving data at {}".format(os.path.join(data_path, "result.pkl")), file = sys.stderr)
                 pickle.dump(data, f)
         return data
 
@@ -781,6 +744,8 @@ class OvercookedTutorial(OvercookedGame):
         self.max_players = 2
         self.ticks_per_ai_action = 1
         self.curr_phase = 0
+        #we don't collect tutorial data
+        self.write_data = False 
 
     @property
     def reset_timeout(self):

@@ -11,9 +11,7 @@ $(function() {
         params.layouts = [params.layout]
         data = {
             "params" : params,
-            //changed to psiturk to always enable data collection
-            //will decide whether to write data during class creation
-            "game_name" : "psiturk",
+            "game_name" : "overcooked",
             "create_if_not_found" : false
         };
         socket.emit("create", data);

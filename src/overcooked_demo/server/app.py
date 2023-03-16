@@ -20,7 +20,7 @@ from threading import Lock
 import game
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from game import Game, OvercookedGame, OvercookedPsiturk, OvercookedTutorial
+from game import Game, OvercookedGame, OvercookedTutorial
 from utils import ThreadSafeDict, ThreadSafeSet
 
 ### Thoughts -- where I'll log potential issues/ideas as they come up
@@ -59,9 +59,6 @@ MAX_GAMES = CONFIG["MAX_GAMES"]
 # Frames per second cap for serving to client
 MAX_FPS = CONFIG["MAX_FPS"]
 
-# Default configuration for psiturk experiment
-PSITURK_CONFIG = json.dumps(CONFIG["psiturk"])
-
 # Default configuration for tutorial
 TUTORIAL_CONFIG = json.dumps(CONFIG["tutorial"])
 
@@ -96,7 +93,6 @@ USER_ROOMS = ThreadSafeDict()
 GAME_NAME_TO_CLS = {
     "overcooked": OvercookedGame,
     "tutorial": OvercookedTutorial,
-    "psiturk": OvercookedPsiturk,
 }
 
 game._configure(MAX_GAME_LENGTH, AGENT_DIR)
@@ -369,27 +365,17 @@ def index():
         "index.html", agent_names=agent_names, layouts=LAYOUTS
     )
 
-
-@app.route("/psiturk")
-def psiturk():
-    uid = request.args.get("UID")
-    psiturk_config = request.args.get("config", PSITURK_CONFIG)
-    return render_template("psiturk.html", uid=uid, config=psiturk_config)
-
-
 @app.route("/instructions")
 def instructions():
-    psiturk = request.args.get("psiturk", False)
     return render_template(
-        "instructions.html", layout_conf=LAYOUT_GLOBALS, psiturk=psiturk
+        "instructions.html", layout_conf=LAYOUT_GLOBALS
     )
 
 
 @app.route("/tutorial")
 def tutorial():
-    psiturk = request.args.get("psiturk", False)
     return render_template(
-        "tutorial.html", config=TUTORIAL_CONFIG, psiturk=psiturk
+        "tutorial.html", config=TUTORIAL_CONFIG
     )
 
 
@@ -442,9 +428,50 @@ def debug():
 # communication is needed
 
 
+def creation_params(params):
+    """
+    This function extracts the dataCollection and oldDynamics settings from the input and
+    process them before sending them to game creation 
+    """
+    # this params file should be a dictionary that can have these keys:
+    # playerZero: human/Rllib*agent
+    # playerOne: human/Rllib*agent
+    # layout: one of the layouts in the config file, I don't think this one is used
+    # gameTime: time in seconds
+    # oldDynamics: on/off
+    # dataCollection: on/off
+    # layouts: [layout in the config file], this one is used if one wants to run a sequence of runs
+    # 
+    enable_data_collection = (
+        "dataCollection" in params and params["dataCollection"] == "on"
+    )
+    if enable_data_collection:
+        # config the necessary setting to properly save data
+        params["dataCollection"] = True
+        mapping = {"human": "H"}
+        # gameType is either HH, HA, AH, AA depending on the config
+        gameType = "{}{}".format(
+            mapping.get(params["playerZero"], "A"),
+            mapping.get(params["playerOne"], "A"),
+        )
+        params["collection_config"] = {
+            "time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
+            "type": gameType,
+            "layout": params["layout"],
+        }
+    else:
+        params["dataCollection"] = False
+
+    if "oldDynamics" in params and params["oldDynamics"] == "on":
+        params["mdp_params"] = {"old_dynamics": True}
+
+
 @socketio.on("create")
 def on_create(data):
     user_id = request.sid
+    import sys 
+    print("inside on_create", file = sys.stderr)
+    print(user_id, file = sys.stderr)
     with USERS[user_id]:
         # Retrieve current game if one exists
         curr_game = get_curr_game(user_id)
@@ -453,35 +480,9 @@ def on_create(data):
             return
 
         params = data.get("params", {})
-        # this params file should be a dictionary that can have these keys:
-        # playerZero: human/Rllib*agent
-        # playerOne: human/Rllib*agent
-        # layout: one of the layouts in the config file
-        # gameTime: time in seconds
-        # oldDynamics: on/off
-        # dataCollection: on/off
-        # layouts: [layout in the config file], I don't think this is used
-        enable_data_collection = (
-            "dataCollection" in params and params["dataCollection"] == "on"
-        )
-        if enable_data_collection:
-            # config the necessary setting to properly save data
-            params["dataCollection"] = True
-            mapping = {"human": "H"}
-            # gameType is either HH, HA, AH, AA depending on the config
-            gameType = "{}{}".format(
-                mapping.get(params["playerZero"], "A"),
-                mapping.get(params["playerOne"], "A"),
-            )
-            params["collection_config"] = {
-                "time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
-                "type": gameType,
-                "layout": params["layout"],
-            }
-        else:
-            params["dataCollection"] = False
-        if "oldDynamics" in params and params["oldDynamics"] == "on":
-            params["mdp_params"] = {"old_dynamics": True}
+
+        creation_params(params)
+
         game_name = data.get("game_name", "overcooked")
         _create_game(user_id, game_name, params)
 
@@ -489,6 +490,10 @@ def on_create(data):
 @socketio.on("join")
 def on_join(data):
     user_id = request.sid
+    import sys 
+    print("inside on_join", file = sys.stderr)
+    print(user_id, file = sys.stderr)
+    print(data, file=sys.stderr)
     with USERS[user_id]:
         create_if_not_found = data.get("create_if_not_found", True)
 
@@ -504,6 +509,7 @@ def on_join(data):
         if not game and create_if_not_found:
             # No available game was found so create a game
             params = data.get("params", {})
+            creation_params(params)
             game_name = data.get("game_name", "overcooked")
             _create_game(user_id, game_name, params)
             return
@@ -537,6 +543,9 @@ def on_join(data):
 @socketio.on("leave")
 def on_leave(data):
     user_id = request.sid
+    import sys 
+    print("inside on_leave", file = sys.stderr)
+    print(user_id, file = sys.stderr)
     with USERS[user_id]:
         was_active = _leave_game(user_id)
 

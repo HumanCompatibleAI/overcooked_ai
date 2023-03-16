@@ -5,7 +5,7 @@
     "MAX_GAME_LENGTH" : 120,
     "AGENT_DIR" : "./static/assets/agents",
     "MAX_FPS" : 30,
-    "psiturk" : {
+    "predefined" : {
         "experimentParams" : {
             "layouts" : ["counter_circuit", "cramped_room"],
             "gameTime" : 11,
