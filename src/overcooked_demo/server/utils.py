@@ -75,7 +75,11 @@ def create_dirs(config: dict, cur_layout: str):
     We group the data by layout/type/time
     """
     path = os.path.join(
-        DOCKER_VOLUME, cur_layout,config["old_dynamics"], config["type"], config["time"]
+        DOCKER_VOLUME,
+        cur_layout,
+        config["old_dynamics"],
+        config["type"],
+        config["time"],
     )
     if not os.path.exists(path):
         os.makedirs(path)

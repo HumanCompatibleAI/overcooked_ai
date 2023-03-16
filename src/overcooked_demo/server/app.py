@@ -367,27 +367,28 @@ def index():
         "index.html", agent_names=agent_names, layouts=LAYOUTS
     )
 
+
 @app.route("/predefined")
 def predefined():
     uid = request.args.get("UID")
     num_layouts = len(CONFIG["predefined"]["experimentParams"]["layouts"])
 
-    return render_template("predefined.html", uid=uid, config=PREDEFINED_CONFIG, num_layouts = num_layouts)
-
+    return render_template(
+        "predefined.html",
+        uid=uid,
+        config=PREDEFINED_CONFIG,
+        num_layouts=num_layouts,
+    )
 
 
 @app.route("/instructions")
 def instructions():
-    return render_template(
-        "instructions.html", layout_conf=LAYOUT_GLOBALS
-    )
+    return render_template("instructions.html", layout_conf=LAYOUT_GLOBALS)
 
 
 @app.route("/tutorial")
 def tutorial():
-    return render_template(
-        "tutorial.html", config=TUTORIAL_CONFIG
-    )
+    return render_template("tutorial.html", config=TUTORIAL_CONFIG)
 
 
 @app.route("/debug")
@@ -442,7 +443,7 @@ def debug():
 def creation_params(params):
     """
     This function extracts the dataCollection and oldDynamics settings from the input and
-    process them before sending them to game creation 
+    process them before sending them to game creation
     """
     # this params file should be a dictionary that can have these keys:
     # playerZero: human/Rllib*agent
@@ -452,13 +453,13 @@ def creation_params(params):
     # oldDynamics: on/off
     # dataCollection: on/off
     # layouts: [layout in the config file], this one determines which layout to use, and if there is more than one layout, a series of game is run back to back
-    # 
+    #
 
     use_old = False
     if "oldDynamics" in params and params["oldDynamics"] == "on":
         params["mdp_params"] = {"old_dynamics": True}
         use_old = True
-    
+
     if "dataCollection" in params and params["dataCollection"] == "on":
         # config the necessary setting to properly save data
         params["dataCollection"] = True
@@ -477,10 +478,8 @@ def creation_params(params):
         else:
             params["collection_config"]["old_dynamics"] = "New"
 
-
     else:
         params["dataCollection"] = False
-
 
 
 @socketio.on("create")

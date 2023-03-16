@@ -309,7 +309,7 @@ class Game(ABC):
 
     def get_data(self):
         """
-        Return any game metadata to server driver.  
+        Return any game metadata to server driver.
         """
         return {}
 
@@ -468,13 +468,13 @@ class OvercookedGame(Game):
         # Only kill ray after loading both agents to avoid having to restart ray during loading
         if ray.is_initialized():
             ray.shutdown()
-        
+
         if kwargs["dataCollection"]:
             self.write_data = True
             self.write_config = kwargs["collection_config"]
-        else: 
+        else:
             self.write_data = False
-        
+
         self.trajectory = []
 
     def _curr_game_over(self):
@@ -690,7 +690,7 @@ class OvercookedGame(Game):
                     return pickle.load(f)
             except Exception as e:
                 raise IOError("Error loading agent\n{}".format(e.__repr__()))
-            
+
     def get_data(self):
         """
         Returns and then clears the accumulated trajectory
@@ -704,7 +704,7 @@ class OvercookedGame(Game):
         if self.write_data and len(data["trajectory"]) > 0:
             configs = self.write_config
             # create necessary dirs
-            data_path = create_dirs(configs,self.curr_layout)
+            data_path = create_dirs(configs, self.curr_layout)
             # the 3-layer-directory structure should be able to uniquely define any experiment
             with open(os.path.join(data_path, "result.pkl"), "wb") as f:
                 pickle.dump(data, f)
@@ -744,8 +744,8 @@ class OvercookedTutorial(OvercookedGame):
         self.max_players = 2
         self.ticks_per_ai_action = 1
         self.curr_phase = 0
-        #we don't collect tutorial data
-        self.write_data = False 
+        # we don't collect tutorial data
+        self.write_data = False
 
     @property
     def reset_timeout(self):
