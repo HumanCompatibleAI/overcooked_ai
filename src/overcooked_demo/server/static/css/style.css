@@ -247,3 +247,7 @@ h1 {
     padding: 10px;
     text-align: center;
 }
+
+.tooltip.top .tooltip-inner {
+  font-size: 30px; /* Adjust font size here */
+}

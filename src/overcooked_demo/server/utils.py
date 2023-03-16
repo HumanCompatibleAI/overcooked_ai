@@ -66,7 +66,7 @@ class ThreadSafeDict(dict):
         return retval
 
 
-def create_dirs(config: dict):
+def create_dirs(config: dict, cur_layout: str):
     """
     config has 3 keys:
      {"time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
@@ -75,7 +75,7 @@ def create_dirs(config: dict):
     We group the data by layout/type/time
     """
     path = os.path.join(
-        DOCKER_VOLUME, config["layout"], config["type"], config["time"]
+        DOCKER_VOLUME, cur_layout,config["old_dynamics"], config["type"], config["time"]
     )
     if not os.path.exists(path):
         os.makedirs(path)

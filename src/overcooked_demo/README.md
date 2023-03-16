@@ -64,9 +64,9 @@ If a more complex or custom loading routing is necessary, one can subclass the `
 
 ### 1): Using Docker Compose CLI to deploy on EC2
 With the Overcooked demo, you can test the interaction between two human players. To do this, you need to deploy this code on a server (https://docs.docker.com/language/python/deploy/). 
-After successful deployment, the first user should open http://[server_ip_address]/, select the human keyboard input for both players, select the setting you want for this game (e.g. whether to collect data or to run the game with old dynamics, which means the soup starts cooking automatically when all ingredients are received), and click on "Create game". If everything has been successful, he will receive a message: "Waiting for game to start". 
+After successful deployment, the first user (User 1) should go to http://[server_ip_address]/, select the human keyboard input for both players, and select the setting for this game (e.g. whether to collect data or to run the game with old dynamics, which means the soup starts cooking automatically when all ingredients are received), and click "Create game". If everything has been successful, he will receive a message: "Waiting for game to start". 
 
-Another user should open the same page, and click "Join Existing Game". If there are multiple existing games, this will pair the second use with the game that was created first. 
+Another user (User 2) should open the same page, and click "Join Existing Game". If there are multiple existing games, this will pair User 2 with the game that was created first. 
 
 Note that if there are existing games, the settings User 2 chooses have no influence on the game. If there is no existing game, clicking "Join Existing Game" will create a game with the settings selected and place the user in a waiting room.
 
@@ -96,6 +96,16 @@ overcooked-demo-up
 ```
 
 7: Once the server is up, you can access the game through your browser by passing in the public ip of your server and port 80.
+
+### 3): Running predefined experiments
+
+One can also define a series of experiments to be run when players join the game. To do that, go to [`config.json`](./server/config.json) and modify the "predefined" parameters by changing what the layouts you want to include and the settings for them. 
+
+Save the changes and spin up a server by ways described in the earlier sections. User 1 should go to http://[server_ip_address]/predefined, and he/she should be placed in a waiting room, and he will see how many layouts are there in the current series of experiments. User 2 can now go to http://[server_ip_address]/predefined, and the game should automatically starts. The games will be run back to back until it goes through all the predefined layouts in the config file.
+
+Note if a participant wants to leave the waiting room, use the "leave" button instead of closing the tab when possible. The leave button handles closing the room more gracefully, and without it the server sometimes doesn't detect the disconnection in time, thus can lead to pairing of new players with old players that are no longer in the waiting room. In general closing the tab in the middle of a game can lead to unpredictable behaviors so it is discouraged. 
+
+
 ## Updating
 Changes to the JSON state representation of the game will require updating the JS graphics. At the highest level, a graphics implementation must implement the functions `graphics_start`, called at the start of each game, `graphics_end`, called at the end of each game, and `drawState`, called at every timestep tick. See [dummy_graphcis.js](server/graphics/dummy_graphics.js) for a barebones example.
 

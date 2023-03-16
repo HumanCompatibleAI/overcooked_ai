@@ -472,6 +472,8 @@ class OvercookedGame(Game):
         if kwargs["dataCollection"]:
             self.write_data = True
             self.write_config = kwargs["collection_config"]
+        else: 
+            self.write_data = False
         
         self.trajectory = []
 
@@ -702,11 +704,9 @@ class OvercookedGame(Game):
         if self.write_data and len(data["trajectory"]) > 0:
             configs = self.write_config
             # create necessary dirs
-            data_path = create_dirs(configs)
+            data_path = create_dirs(configs,self.curr_layout)
             # the 3-layer-directory structure should be able to uniquely define any experiment
             with open(os.path.join(data_path, "result.pkl"), "wb") as f:
-                import sys 
-                print("Saving data at {}".format(os.path.join(data_path, "result.pkl")), file = sys.stderr)
                 pickle.dump(data, f)
         return data
 

@@ -59,6 +59,9 @@ MAX_GAMES = CONFIG["MAX_GAMES"]
 # Frames per second cap for serving to client
 MAX_FPS = CONFIG["MAX_FPS"]
 
+# Default configuration for predefined experiment
+PREDEFINED_CONFIG = json.dumps(CONFIG["predefined"])
+
 # Default configuration for tutorial
 TUTORIAL_CONFIG = json.dumps(CONFIG["tutorial"])
 
@@ -157,7 +160,6 @@ def cleanup_game(game: OvercookedGame):
 
     # Socketio tracking
     socketio.close_room(game.id)
-
     # Game tracking
     FREE_MAP[game.id] = True
     FREE_IDS.put(game.id)
@@ -365,6 +367,15 @@ def index():
         "index.html", agent_names=agent_names, layouts=LAYOUTS
     )
 
+@app.route("/predefined")
+def predefined():
+    uid = request.args.get("UID")
+    num_layouts = len(CONFIG["predefined"]["experimentParams"]["layouts"])
+
+    return render_template("predefined.html", uid=uid, config=PREDEFINED_CONFIG, num_layouts = num_layouts)
+
+
+
 @app.route("/instructions")
 def instructions():
     return render_template(
@@ -440,12 +451,15 @@ def creation_params(params):
     # gameTime: time in seconds
     # oldDynamics: on/off
     # dataCollection: on/off
-    # layouts: [layout in the config file], this one is used if one wants to run a sequence of runs
+    # layouts: [layout in the config file], this one determines which layout to use, and if there is more than one layout, a series of game is run back to back
     # 
-    enable_data_collection = (
-        "dataCollection" in params and params["dataCollection"] == "on"
-    )
-    if enable_data_collection:
+
+    use_old = False
+    if "oldDynamics" in params and params["oldDynamics"] == "on":
+        params["mdp_params"] = {"old_dynamics": True}
+        use_old = True
+    
+    if "dataCollection" in params and params["dataCollection"] == "on":
         # config the necessary setting to properly save data
         params["dataCollection"] = True
         mapping = {"human": "H"}
@@ -457,21 +471,21 @@ def creation_params(params):
         params["collection_config"] = {
             "time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
             "type": gameType,
-            "layout": params["layout"],
         }
+        if use_old:
+            params["collection_config"]["old_dynamics"] = "Old"
+        else:
+            params["collection_config"]["old_dynamics"] = "New"
+
+
     else:
         params["dataCollection"] = False
 
-    if "oldDynamics" in params and params["oldDynamics"] == "on":
-        params["mdp_params"] = {"old_dynamics": True}
 
 
 @socketio.on("create")
 def on_create(data):
     user_id = request.sid
-    import sys 
-    print("inside on_create", file = sys.stderr)
-    print(user_id, file = sys.stderr)
     with USERS[user_id]:
         # Retrieve current game if one exists
         curr_game = get_curr_game(user_id)
@@ -490,10 +504,6 @@ def on_create(data):
 @socketio.on("join")
 def on_join(data):
     user_id = request.sid
-    import sys 
-    print("inside on_join", file = sys.stderr)
-    print(user_id, file = sys.stderr)
-    print(data, file=sys.stderr)
     with USERS[user_id]:
         create_if_not_found = data.get("create_if_not_found", True)
 
@@ -543,9 +553,6 @@ def on_join(data):
 @socketio.on("leave")
 def on_leave(data):
     user_id = request.sid
-    import sys 
-    print("inside on_leave", file = sys.stderr)
-    print(user_id, file = sys.stderr)
     with USERS[user_id]:
         was_active = _leave_game(user_id)
 
@@ -579,6 +586,7 @@ def on_connect():
 
 @socketio.on("disconnect")
 def on_disconnect():
+    print("disonnect triggered", file=sys.stderr)
     # Ensure game data is properly cleaned-up in case of unexpected disconnect
     user_id = request.sid
     if user_id not in USERS:
