@@ -101,7 +101,7 @@ overcooked-demo-up
 
 One can also define a series of experiments to be run when players join the game. To do that, go to [`config.json`](./server/config.json) and modify the "predefined" parameters by changing what the layouts you want to include and the settings for them. 
 
-Save the changes and spin up a server by ways described in the earlier sections. User 1 should go to http://[server_ip_address]/predefined, and he/she should be placed in a waiting room, and he will see how many layouts are there in the current series of experiments. User 2 can now go to http://[server_ip_address]/predefined, and the game should automatically starts. The games will be run back to back until it goes through all the predefined layouts in the config file.
+Save the changes and spin up a server by ways described in the earlier sections. User 1 should go to http://[server_ip_address]/predefined, where they should be placed in a waiting room, and they will see how many layouts are there in the current series of experiments. User 2 can now go to http://[server_ip_address]/predefined, and the game should automatically start. The games will be run back to back until it goes through all the predefined layouts in the config file.
 
 Note if a participant wants to leave the waiting room, use the "leave" button instead of closing the tab when possible. The leave button handles closing the room more gracefully, and without it the server sometimes doesn't detect the disconnection in time, thus can lead to pairing of new players with old players that are no longer in the waiting room. In general closing the tab in the middle of a game can lead to unpredictable behaviors so it is discouraged. 
 
