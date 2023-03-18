@@ -64,7 +64,7 @@ If a more complex or custom loading routing is necessary, one can subclass the `
 
 ### 1): Using Docker Compose CLI to deploy on EC2
 With the Overcooked demo, you can test the interaction between two human players. To do this, you need to deploy this code on a server (https://docs.docker.com/language/python/deploy/). 
-After successful deployment, the first user (User 1) should go to http://[server_ip_address]/, select the human keyboard input for both players, and select the setting for this game (e.g. whether to collect data or to run the game with old dynamics, which means the soup starts cooking automatically when all ingredients are received), and click "Create game". If everything has been successful, he will receive a message: "Waiting for game to start". 
+After successful deployment, the first user (User 1) should go to http://[server_ip_address]/, select the human keyboard input for both players, and select the setting for this game (e.g. whether to collect data and/or to run the game with new dynamics, which means the soup requires an additional "interact" action to start cooking), and click "Create game". If everything has been successful, he will receive a message: "Waiting for game to start". 
 
 Another user (User 2) should open the same page, and click "Join Existing Game". If there are multiple existing games, this will pair User 2 with the game that was created first. 
 
