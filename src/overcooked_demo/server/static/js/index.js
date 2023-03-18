@@ -25,6 +25,12 @@ $(function() {
     });
 });
 
+$(function(){
+    $('[data-toggle="tooltip"]').tooltip({
+      delay: { "show": 100, "hide": 100 } /* Adjust delay times here */
+    });
+});
+
 $(function() {
     $('#join').click(function() {
         socket.emit("join", {});

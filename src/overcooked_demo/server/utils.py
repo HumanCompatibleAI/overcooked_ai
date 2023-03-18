@@ -1,4 +1,8 @@
+import os
 from threading import Lock
+
+# this is the mounted volume
+DOCKER_VOLUME = "/app/data"
 
 
 class ThreadSafeSet(set):
@@ -60,3 +64,23 @@ class ThreadSafeDict(dict):
             else:
                 retval = None
         return retval
+
+
+def create_dirs(config: dict, cur_layout: str):
+    """
+    config has 3 keys:
+     {"time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
+      "type": gameType/a str of either "HH","HA","AH","AA",
+      "layout": a layout string}
+    We group the data by layout/type/time
+    """
+    path = os.path.join(
+        DOCKER_VOLUME,
+        cur_layout,
+        config["old_dynamics"],
+        config["type"],
+        config["time"],
+    )
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path

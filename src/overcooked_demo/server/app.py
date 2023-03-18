@@ -14,12 +14,13 @@ import logging
 # All other imports must come after patch to ensure eventlet compatibility
 import pickle
 import queue
+from datetime import datetime
 from threading import Lock
 
 import game
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from game import Game, OvercookedGame, OvercookedPsiturk, OvercookedTutorial
+from game import Game, OvercookedGame, OvercookedTutorial
 from utils import ThreadSafeDict, ThreadSafeSet
 
 ### Thoughts -- where I'll log potential issues/ideas as they come up
@@ -58,8 +59,8 @@ MAX_GAMES = CONFIG["MAX_GAMES"]
 # Frames per second cap for serving to client
 MAX_FPS = CONFIG["MAX_FPS"]
 
-# Default configuration for psiturk experiment
-PSITURK_CONFIG = json.dumps(CONFIG["psiturk"])
+# Default configuration for predefined experiment
+PREDEFINED_CONFIG = json.dumps(CONFIG["predefined"])
 
 # Default configuration for tutorial
 TUTORIAL_CONFIG = json.dumps(CONFIG["tutorial"])
@@ -95,7 +96,6 @@ USER_ROOMS = ThreadSafeDict()
 GAME_NAME_TO_CLS = {
     "overcooked": OvercookedGame,
     "tutorial": OvercookedTutorial,
-    "psiturk": OvercookedPsiturk,
 }
 
 game._configure(MAX_GAME_LENGTH, AGENT_DIR)
@@ -150,7 +150,7 @@ def try_create_game(game_name, **kwargs):
         return game, None
 
 
-def cleanup_game(game):
+def cleanup_game(game: OvercookedGame):
     if FREE_MAP[game.id]:
         raise ValueError("Double free on a game")
 
@@ -160,7 +160,6 @@ def cleanup_game(game):
 
     # Socketio tracking
     socketio.close_room(game.id)
-
     # Game tracking
     FREE_MAP[game.id] = True
     FREE_IDS.put(game.id)
@@ -369,27 +368,27 @@ def index():
     )
 
 
-@app.route("/psiturk")
-def psiturk():
+@app.route("/predefined")
+def predefined():
     uid = request.args.get("UID")
-    psiturk_config = request.args.get("config", PSITURK_CONFIG)
-    return render_template("psiturk.html", uid=uid, config=psiturk_config)
+    num_layouts = len(CONFIG["predefined"]["experimentParams"]["layouts"])
+
+    return render_template(
+        "predefined.html",
+        uid=uid,
+        config=PREDEFINED_CONFIG,
+        num_layouts=num_layouts,
+    )
 
 
 @app.route("/instructions")
 def instructions():
-    psiturk = request.args.get("psiturk", False)
-    return render_template(
-        "instructions.html", layout_conf=LAYOUT_GLOBALS, psiturk=psiturk
-    )
+    return render_template("instructions.html", layout_conf=LAYOUT_GLOBALS)
 
 
 @app.route("/tutorial")
 def tutorial():
-    psiturk = request.args.get("psiturk", False)
-    return render_template(
-        "tutorial.html", config=TUTORIAL_CONFIG, psiturk=psiturk
-    )
+    return render_template("tutorial.html", config=TUTORIAL_CONFIG)
 
 
 @app.route("/debug")
@@ -441,6 +440,48 @@ def debug():
 # communication is needed
 
 
+def creation_params(params):
+    """
+    This function extracts the dataCollection and oldDynamics settings from the input and
+    process them before sending them to game creation
+    """
+    # this params file should be a dictionary that can have these keys:
+    # playerZero: human/Rllib*agent
+    # playerOne: human/Rllib*agent
+    # layout: one of the layouts in the config file, I don't think this one is used
+    # gameTime: time in seconds
+    # oldDynamics: on/off
+    # dataCollection: on/off
+    # layouts: [layout in the config file], this one determines which layout to use, and if there is more than one layout, a series of game is run back to back
+    #
+
+    use_old = False
+    if "oldDynamics" in params and params["oldDynamics"] == "on":
+        params["mdp_params"] = {"old_dynamics": True}
+        use_old = True
+
+    if "dataCollection" in params and params["dataCollection"] == "on":
+        # config the necessary setting to properly save data
+        params["dataCollection"] = True
+        mapping = {"human": "H"}
+        # gameType is either HH, HA, AH, AA depending on the config
+        gameType = "{}{}".format(
+            mapping.get(params["playerZero"], "A"),
+            mapping.get(params["playerOne"], "A"),
+        )
+        params["collection_config"] = {
+            "time": datetime.today().strftime("%Y-%m-%d_%H-%M-%S"),
+            "type": gameType,
+        }
+        if use_old:
+            params["collection_config"]["old_dynamics"] = "Old"
+        else:
+            params["collection_config"]["old_dynamics"] = "New"
+
+    else:
+        params["dataCollection"] = False
+
+
 @socketio.on("create")
 def on_create(data):
     user_id = request.sid
@@ -452,8 +493,9 @@ def on_create(data):
             return
 
         params = data.get("params", {})
-        if "oldDynamics" in params and params["oldDynamics"] == "on":
-            params["mdp_params"] = {"old_dynamics": True}
+
+        creation_params(params)
+
         game_name = data.get("game_name", "overcooked")
         _create_game(user_id, game_name, params)
 
@@ -476,6 +518,7 @@ def on_join(data):
         if not game and create_if_not_found:
             # No available game was found so create a game
             params = data.get("params", {})
+            creation_params(params)
             game_name = data.get("game_name", "overcooked")
             _create_game(user_id, game_name, params)
             return
@@ -542,6 +585,7 @@ def on_connect():
 
 @socketio.on("disconnect")
 def on_disconnect():
+    print("disonnect triggered", file=sys.stderr)
     # Ensure game data is properly cleaned-up in case of unexpected disconnect
     user_id = request.sid
     if user_id not in USERS:
@@ -571,7 +615,7 @@ def on_exit():
 #############
 
 
-def play_game(game, fps=30):
+def play_game(game: OvercookedGame, fps=30):
     """
     Asynchronously apply real-time game updates and broadcast state to all clients currently active
     in the game. Note that this loop must be initiated by a parallel thread for each active game
