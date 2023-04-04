@@ -32,6 +32,7 @@ if __name__ == "__main__":
             continue
         params_to_override = {
             "layouts": [layout],
+            "layout_name": layout,
             "data_path": CLEAN_2019_HUMAN_DATA_TRAIN,
             "epochs": 100,
             "old_dynamics": True,
