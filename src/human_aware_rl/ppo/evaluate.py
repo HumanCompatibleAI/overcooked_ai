@@ -143,23 +143,23 @@ hp = [
     os.path.join(bc_path, "test/random3"),
 ]
 
-# reproduced agents ppo agents trained with bc, fill in the blanks with the path of your trained agents
+# reproduced agents ppo agents trained with bc, change the comments to the path of your trained agents
 # change this to one of the agents creatd after running run_ppo_bc_experiments.sh bash script
 ppo_bc = [
-    ppo_bc_crammed_room,
-    ppo_bc_asymmetric_advantages,
-    ppo_bc_coordination_ring,
-    ppo_bc_forced_coordination,
-    ppo_bc_counter_circuit_o_1order,
+    #ppo_bc_crammed_room,
+    #ppo_bc_asymmetric_advantages,
+    #ppo_bc_coordination_ring,
+    #ppo_bc_forced_coordination,
+    #ppo_bc_counter_circuit_o_1order,
 ]
-# reproduced agents ppo agents trained with self-play, fill in the blanks with the path of your trained agents
+# reproduced agents ppo agents trained with self-play, change the comments to the path of your trained agents
 # change this to one of the agents creatd after running run_experiments.sh bash script
 ppo_sp = [
-    ppo_sp_crammed_room,
-    ppo_sp_asymmetric_advantages,
-    ppo_sp_coordination_ring,
-    ppo_sp_forced_coordination,
-    ppo_sp_counter_circuit_o_1order,
+    #ppo_sp_crammed_room,
+    #ppo_sp_asymmetric_advantages,
+    #ppo_sp_coordination_ring,
+    #ppo_sp_forced_coordination,
+    #ppo_sp_counter_circuit_o_1order,
 ]
 
 
