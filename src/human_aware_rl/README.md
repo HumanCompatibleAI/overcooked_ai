@@ -81,7 +81,7 @@ This graph shows the performance of reproduced agents in a similar style as orig
 
 ![Performance graph](./graph.jpg)
 
-It was created with the reproduced agents from running run_experiments.sh and run_bc_experiments.sh
+It was created with the reproduced agents from running run_experiments.sh and run_ppo_bc_experiments.sh
 
 The evaluation and plotting code can be found under human_aware_rl/ppo directory
 
