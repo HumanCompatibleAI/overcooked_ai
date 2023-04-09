@@ -7,7 +7,7 @@ from evaluate import eval_models
 from matplotlib.patches import Patch
 
 
-#importing from utils causes werid dependency conflicts. Copying here
+# importing from utils causes werid dependency conflicts. Copying here
 def set_style(font_scale=1.6):
     import matplotlib
     import seaborn
