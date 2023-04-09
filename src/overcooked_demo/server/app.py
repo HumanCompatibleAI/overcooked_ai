@@ -615,7 +615,7 @@ def on_exit():
 #############
 
 
-def play_game(game: OvercookedGame, fps=30):
+def play_game(game: OvercookedGame, fps=6):
     """
     Asynchronously apply real-time game updates and broadcast state to all clients currently active
     in the game. Note that this loop must be initiated by a parallel thread for each active game

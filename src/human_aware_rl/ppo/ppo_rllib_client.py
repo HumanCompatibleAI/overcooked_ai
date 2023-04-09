@@ -387,6 +387,20 @@ def main(params):
     seeds = params["seeds"]
     del params["seeds"]
 
+    # this is required if we want to pass schedules in as command-line args, and we need to pass the string as a list of tuples
+    bc_schedule = params["environment_params"]["multi_agent_params"][
+        "bc_schedule"
+    ]
+    if not isinstance(bc_schedule[0], list):
+        tuples_lst = []
+        for i in range(0, len(bc_schedule), 2):
+            x = int(bc_schedule[i].strip("("))
+            y = int(bc_schedule[i + 1].strip(")"))
+            tuples_lst.append((x, y))
+        params["environment_params"]["multi_agent_params"][
+            "bc_schedule"
+        ] = tuples_lst
+
     # List to store results dicts (to be passed to sacred slack observer)
     results = []
 
