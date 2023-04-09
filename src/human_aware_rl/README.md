@@ -75,6 +75,18 @@ You can also try to train agents for 5 classical layouts
 Please choose the `num_workers` parameters to be less than the number of CPUs on your machine. For more information
 check the ray [documentation](https://docs.ray.io/en/latest/rllib/rllib-training.html)
 
+## Experiments results
+
+This graph shows the performance of reproduced agents in a similar style as original ones in the Neurips 2019 paper
+
+![Performance graph](./graph.jpg)
+
+It was created with the reproduced agents from running run_experiments.sh and run_bc_experiments.sh
+
+The evaluation and plotting code can be found under human_aware_rl/ppo directory
+
+
+
 # Repo Structure Overview
 
 `ppo/`:
