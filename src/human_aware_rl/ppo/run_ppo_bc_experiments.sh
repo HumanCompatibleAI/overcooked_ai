@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # This file contains the script to generate the ppo self-play agents for the 5 classic layouts
 
-#First we need to create the BC-agents, the agent will be saved in the bc_runs directory under human_aware_rl/bc_runs directory
+# This bash script can be run from anywhere
+
+#First we need to create the BC-agents, the agent will be saved in the bc_runs directory under human_aware_rl/imitation/bc_runs directory
 python "$(dirname "$0")/../imitation/reproduce_bc.py"
 
 #Now we create the PPO agents trained with BC agents

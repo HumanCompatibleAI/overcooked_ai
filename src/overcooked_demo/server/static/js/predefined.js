@@ -1,3 +1,4 @@
+// This is the javascript that defines transitions and interactions in the predefined.html page
 // Persistent network connection that will be used to transmit real-time data
 var socket = io();
 
