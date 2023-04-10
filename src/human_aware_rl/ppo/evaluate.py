@@ -173,17 +173,17 @@ def eval_models(order):
     for i in range(5):
         # hp vs ppo_bc
         _, res = evaluate_hp_ppo(hp[i], ppo_bc[i], layouts[i], order)
-        hp_PBC[layouts[i]] = (np.mean(res), np.std(res)/len(res)**0.5)
+        hp_PBC[layouts[i]] = (np.mean(res), np.std(res) / len(res) ** 0.5)
         # hp vs ppo_sp
         _, res = evaluate_hp_ppo(hp[i], ppo_sp[i], layouts[i], order)
-        hp_PSP[layouts[i]] = (np.mean(res), np.std(res)/len(res)**0.5)
+        hp_PSP[layouts[i]] = (np.mean(res), np.std(res) / len(res) ** 0.5)
         # bc vs ppo_bc
         _, res = evaluate_ppo_bc(ppo_bc[i], layouts[i], order)
-        bc_PBC[layouts[i]] = (np.mean(res), np.std(res)/len(res)**0.5)
+        bc_PBC[layouts[i]] = (np.mean(res), np.std(res) / len(res) ** 0.5)
         # ppo_sp vs ppo_sp
         _, res = evaluate_ppo(ppo_sp[i], layouts[i])
-        PSP_PSP[layouts[i]] = (np.mean(res), np.std(res)/len(res)**0.5)
+        PSP_PSP[layouts[i]] = (np.mean(res), np.std(res) / len(res) ** 0.5)
         # bc vs hp
         _, res = evaluate_hp_bc(bc[i], hp[i], layouts[i], order)
-        hp_BC[layouts[i]] = (np.mean(res), np.std(res)/len(res)**0.5)
+        hp_BC[layouts[i]] = (np.mean(res), np.std(res) / len(res) ** 0.5)
     return PSP_PSP, hp_PSP, hp_PBC, hp_BC, bc_PBC
