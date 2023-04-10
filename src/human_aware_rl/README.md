@@ -79,7 +79,7 @@ check the ray [documentation](https://docs.ray.io/en/latest/rllib/rllib-training
 
 This graph shows the performance of reproduced agents in a similar style as the original ones in the Neurips 2019 paper.
 
-![Performance graph](./graph.jpg)
+![Performance graph](./performance.jpg)
 
 It was created with the reproduced agents from running `run_experiments.sh` and `run_ppo_bc_experiments.sh`.
 
