@@ -77,13 +77,13 @@ check the ray [documentation](https://docs.ray.io/en/latest/rllib/rllib-training
 
 ## Experiments results
 
-This graph shows the performance of reproduced agents in a similar style as original ones in the Neurips 2019 paper
+This graph shows the performance of reproduced agents in a similar style as the original ones in the Neurips 2019 paper.
 
 ![Performance graph](./graph.jpg)
 
-It was created with the reproduced agents from running run_experiments.sh and run_ppo_bc_experiments.sh
+It was created with the reproduced agents from running `run_experiments.sh` and `run_ppo_bc_experiments.sh`.
 
-The evaluation and plotting code can be found under human_aware_rl/ppo directory
+The evaluation and plotting code can be found under the `human_aware_rl/ppo` directory.
 
 
 
