@@ -2975,7 +2975,7 @@ class OvercookedGridworld(object):
             "tomato_value": Recipe._tomato_value
             if Recipe._tomato_value
             else 13,
-            "onion_value": Recipe._onion_value if Recipe._tomato_value else 21,
+            "onion_value": Recipe._onion_value if Recipe._onion_value else 21,
             **POTENTIAL_CONSTANTS.get(
                 self.layout_name, POTENTIAL_CONSTANTS["default"]
             ),
