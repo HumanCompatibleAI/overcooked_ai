@@ -665,20 +665,6 @@ class OvercookedEnv(object):
         return stuck_matrix
 
 
-class OvercookedEnv_PettingZoo(gymnasium.Wrapper):
-    """
-    Create environment for gymnasium for pettingZoo
-    """
-
-    def step(self, joint_action):
-        obs, reward, done, info = super().step(joint_action)
-        # from the doc, this is true only if a pre set goal is achieved, which we don't have in this environment
-        # the only termination condition is the preset max steps in the environment
-        terminated = False
-        truncated = done
-        return obs, reward, terminated, truncated, info
-
-
 from pettingzoo.utils.env import ParallelEnv
 
 from overcooked_ai_py.agents.agent import AgentPair
