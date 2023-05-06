@@ -8,7 +8,6 @@ from math import factorial
 
 import gym
 import numpy as np
-
 from overcooked_ai_py.agents.agent import (
     AgentGroup,
     AgentPair,
@@ -1716,12 +1715,17 @@ class TestGymEnvironment(unittest.TestCase):
 
 class TestPettingZooEnvironment(unittest.TestCase):
     def test_api(self):
+        from human_aware_rl.rllib.rllib import load_agent_pair
         from pettingzoo.test import parallel_api_test
 
-        ap = AgentPair(
-            GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam)
-        )
         base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
+        # get the current directory of the file
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        agent_dir = os.path.join(
+            current_dir,
+            "../src/overcooked_demo/server/static/assets/agents/RllibCrampedRoomSP/agent",
+        )
+        ap = load_agent_pair(agent_dir, "ppo", "ppo")
         env = OvercookedEnv.from_mdp(base_mdp, info_level=0, horizon=1000)
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv_Pet
 
