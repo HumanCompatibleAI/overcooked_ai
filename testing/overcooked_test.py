@@ -1713,22 +1713,20 @@ class TestGymEnvironment(unittest.TestCase):
 
     # TODO: write more tests here
 
+
 class TestPettingZooEnvironment(unittest.TestCase):
     def test_api(self):
         from pettingzoo.test import parallel_api_test
+
         ap = AgentPair(
             GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam)
         )
         base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         env = OvercookedEnv.from_mdp(base_mdp, info_level=0, horizon=1000)
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv_Pet
-        wrapped_env = OvercookedEnv_Pet(env,ap)
+
+        wrapped_env = OvercookedEnv_Pet(env, ap)
         parallel_api_test(wrapped_env, num_cycles=1000)
-
-
-
-
-
 
 
 class TestTrajectories(unittest.TestCase):
