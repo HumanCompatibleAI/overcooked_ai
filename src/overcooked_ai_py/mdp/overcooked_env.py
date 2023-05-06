@@ -1,25 +1,18 @@
+import copy
 import time
 
+import cv2
 import gym
 import numpy as np
+import pygame
 import tqdm
-
 from overcooked_ai_py.mdp.actions import Action
-from overcooked_ai_py.mdp.overcooked_mdp import (
-    EVENT_TYPES,
-    OvercookedGridworld,
-)
-from overcooked_ai_py.mdp.overcooked_trajectory import (
-    DEFAULT_TRAJ_KEYS,
-    EPISODE_TRAJ_KEYS,
-    TIMESTEP_TRAJ_KEYS,
-)
-from overcooked_ai_py.planning.planners import (
-    NO_COUNTERS_PARAMS,
-    MediumLevelActionManager,
-    MotionPlanner,
-)
+from overcooked_ai_py.mdp.overcooked_mdp import EVENT_TYPES, OvercookedGridworld
+from overcooked_ai_py.mdp.overcooked_trajectory import DEFAULT_TRAJ_KEYS, EPISODE_TRAJ_KEYS, TIMESTEP_TRAJ_KEYS
+from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelActionManager, MotionPlanner
 from overcooked_ai_py.utils import append_dictionaries, mean_and_std_err
+from overcooked_ai_py.visualization import pygame_utils
+from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
 
 DEFAULT_ENV_PARAMS = {"horizon": 400}
 
@@ -716,6 +709,7 @@ class Overcooked(gym.Env):
         self.observation_space = self._setup_observation_space()
         self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.reset()
+        self.visualizer = StateVisualizer()
 
     def _setup_observation_space(self):
         dummy_mdp = self.base_env.mdp
@@ -792,5 +786,21 @@ class Overcooked(gym.Env):
             "other_agent_env_idx": 1 - self.agent_idx,
         }
 
-    def render(self, mode="human", close=False):
-        pass
+    def render(self):
+        rewards_dict = {}  # dictionary of details you want rendered in the UI
+        for key, value in self.base_env.game_stats.items():
+            if key in ['cumulative_shaped_rewards_by_agent', 'cumulative_sparse_rewards_by_agent']:
+                rewards_dict[key] = value
+
+        image = self.visualizer.render_state(state=self.base_env.state, grid=self.base_env.mdp.terrain_mtx,
+                                             hud_data=StateVisualizer.default_hud_data(self.base_env.state, **rewards_dict))
+
+        buffer = pygame.surfarray.array3d(image)
+        image = copy.deepcopy(buffer)
+        image = np.flip(np.rot90(image, 3), 1)
+
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        image = cv2.resize(image, (2*528, 2*464))
+
+        return image
+
