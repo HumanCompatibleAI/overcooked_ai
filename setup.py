@@ -43,6 +43,7 @@ setup(
         "scipy",
         "tqdm",
         "gym",
+        "pettingzoo",
         "ipython",
         "pygame",
         "ipywidgets",
