@@ -766,7 +766,7 @@ class OvercookedEnvPettingZoo(ParallelEnv):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         # when an environment terminates/truncates, PettingZoo wants all agents removed, so during reset we re-add them
-        self.agents = self.possible_agents[:]
+        self.agents = ["agent_0", "agent_1"]
         # return the obsevations as dict
         obs_dict = {
             agent: self.agent_map[agent].featurize(dummy_state)[0]
