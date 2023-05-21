@@ -670,19 +670,21 @@ from pettingzoo.utils.env import ParallelEnv
 from overcooked_ai_py.agents.agent import AgentPair
 
 
-class OvercookedEnv_Pet(ParallelEnv):
+class OvercookedEnvPettingZoo(ParallelEnv):
     def __init__(self, base_env, agents):
         """
         base_env: OvercookedEnv
-        featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
+        agents: AgentPair
 
-        Example creating a gym env:
+        Example creating a PettingZoo env from a base_env:
 
         mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages")
         base_env = OvercookedEnv.from_mdp(mdp, horizon=500)
-        env = gym.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
+        agent_pair = load_agent_pair("path/to/checkpoint", "ppo", "ppo")
+        env = OvercookedEnvPettingZoo(base_env, agent_pair)
+
         """
-        # we need agent dependent observation space, and the best way to do it is just to include an agentPair
+        # we need agent-dependent observation space, and the best way to do it is just to include an agentPair
         assert isinstance(
             agents, AgentPair
         ), "agents must be an AgentPair object"
@@ -727,8 +729,8 @@ class OvercookedEnv_Pet(ParallelEnv):
         ]
         obs, reward, done, info = self.base_env.step(joint_action)
         # https://gymnasium.farama.org/content/basic_usage/
-        # if the environment has terminated, this is returned by step, which is never the case in overcooked
-        # Similarly, we may also want the environment to end after a fixed number of timesteps, in this case, the environment issues a truncated signal.
+        # we have no early termination condition in this env, and the environment only terminates when the time horizon is reached
+        # therefore the terminated is always False, and we set truncated to done
         terminated = False
         truncated = done
 
@@ -758,19 +760,14 @@ class OvercookedEnv_Pet(ParallelEnv):
 
     def reset(self, seed=None, options=None):
         """
-        When training on individual maps, we want to randomize which agent is assigned to which
-        starting location, in order to make sure that the agents are trained to be able to
-        complete the task starting at either of the hardcoded positions.
-
-        NOTE: a nicer way to do this would be to just randomize starting positions, and not
-        have to deal with randomizing indices.
+        Reset the embedded OvercookedEnv envrionment to the starting state
         """
         self.base_env.reset()
-        # return the obsevations as dict
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         # when an environment terminates/truncates, PettingZoo wants all agents removed, so during reset we re-add them
-        self.agents = ["agent_0", "agent_1"]
+        self.agents = self.possible_agents[:]
+        # return the obsevations as dict
         obs_dict = {
             agent: self.agent_map[agent].featurize(dummy_state)[0]
             for agent in self.agents

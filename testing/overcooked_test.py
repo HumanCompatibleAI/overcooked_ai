@@ -1729,9 +1729,9 @@ class TestPettingZooEnvironment(unittest.TestCase):
         )
         ap = load_agent_pair(agent_dir, "ppo", "ppo")
         env = OvercookedEnv.from_mdp(base_mdp, info_level=0, horizon=1000)
-        from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv_Pet
+        from overcooked_ai_py.mdp.overcooked_env import OvercookedEnvPettingZoo
 
-        wrapped_env = OvercookedEnv_Pet(env, ap)
+        wrapped_env = OvercookedEnvPettingZoo(env, ap)
         parallel_api_test(wrapped_env, num_cycles=1000)
 
 
