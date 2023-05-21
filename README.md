@@ -155,6 +155,8 @@ python -m unittest discover -s testing/ -p "*_test.py"
 
 See [this Google Colab](https://colab.research.google.com/drive/1AAVP2P-QQhbx6WTOnIG54NXLXFbO7y6n#scrollTo=Z1RBlqADnTDw) for some sample code for visualizing trajectories in python.
 
+We have incorporated a [notebook](Overcooked%20Tutorial.ipynb) that guides users on the process of training, loading, and evaluating agents. Ideally, we would like to enable users to execute the notebook in Google Colab; however, due to Colab's default kernel being Python 3.10 and our repository being optimized for Python 3.7, some functions are presently incompatible with Colab. To provide a seamless experience, we have pre-executed all the cells in the notebook, allowing you to view the expected output when running it locally following the appropriate setup.
+
 Overcooked_demo can also start an interactive game in the browser for visualizations. Details can be found in its [README](src/overcooked_demo/README.md)
 
 ## Raw Data :ledger:
