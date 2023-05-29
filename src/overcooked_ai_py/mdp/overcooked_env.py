@@ -798,9 +798,5 @@ class Overcooked(gym.Env):
         buffer = pygame.surfarray.array3d(image)
         image = copy.deepcopy(buffer)
         image = np.flip(np.rot90(image, 3), 1)
-
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         image = cv2.resize(image, (2*528, 2*464))
-
         return image
-
