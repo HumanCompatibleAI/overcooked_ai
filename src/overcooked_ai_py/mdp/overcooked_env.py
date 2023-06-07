@@ -772,7 +772,7 @@ class OvercookedEnvPettingZoo(ParallelEnv):
             agent: self.agent_map[agent].featurize(dummy_state)[0]
             for agent in self.agents
         }
-        return obs_dict
+        return obs_dict, None
 
     def render(self, mode="human", close=False):
         pass
