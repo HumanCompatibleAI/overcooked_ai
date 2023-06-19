@@ -1075,6 +1075,7 @@ POTENTIAL_CONSTANTS = {
 }
 
 
+
 class OvercookedGridworld(object):
     """
     An MDP grid world based off of the Overcooked game.
@@ -1235,6 +1236,13 @@ class OvercookedGridworld(object):
     #####################
     # BASIC CLASS UTILS #
     #####################
+    
+    class Explanations:
+        def __init__(self):
+            self.Collide = False
+            
+    explain=Explanations()
+    
     def __eq__(self, other):
         return (
             np.array_equal(self.terrain_mtx, other.terrain_mtx)
@@ -1407,7 +1415,7 @@ class OvercookedGridworld(object):
         assert new_state.player_orientations == state.player_orientations
 
         # Resolve player movements
-        Collide = self.resolve_movement(new_state, joint_action)
+        self.resolve_movement(new_state, joint_action)
 
 
         # Finally, environment effects
@@ -1428,7 +1436,7 @@ class OvercookedGridworld(object):
             infos["phi_s_prime"] = self.potential_function(
                 new_state, motion_planner
             )
-        return new_state, infos, Collide
+        return new_state, infos
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
@@ -1646,7 +1654,6 @@ class OvercookedGridworld(object):
         (
             new_positions,
             new_orientations,
-            Collide
         ) = self.compute_new_positions_and_orientations(
             state.players, joint_action
         )
@@ -1654,7 +1661,6 @@ class OvercookedGridworld(object):
             state.players, new_positions, new_orientations
         ):
             player_state.update_pos_and_or(new_pos, new_o)
-        return Collide
 
     def compute_new_positions_and_orientations(
         self, old_player_states, joint_action
@@ -1670,11 +1676,11 @@ class OvercookedGridworld(object):
         )
         old_positions = tuple(p.position for p in old_player_states)
         if self.is_transition_collision(old_positions, new_positions):
-            Collide = True 
+            self.explain.Collide = True 
         else:
-            Collide = False
+            self.explain.Collide = False
         new_positions = self._handle_collisions(old_positions, new_positions)
-        return new_positions, new_orientations, Collide
+        return new_positions, new_orientations
 
     def is_transition_collision(self, old_positions, new_positions):
         # Checking for any players ending in same square
