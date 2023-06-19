@@ -220,11 +220,11 @@ class Game(ABC):
             pass
 
     def is_stuck(self):
-    	prev_state, joint_action, info,Collide = self.apply_actions()
-    	if (Collide ==True):
+    	collide = self.mdp.Is_collide()
+    	if (collide ==True):
     	    return "I'm stuck"
     	else:
-    	    return 
+    	    return False
 
     def get_state(self):
         """
@@ -564,7 +564,7 @@ class OvercookedGame(Game):
 
         # Apply overcooked game logic to get state transition
         prev_state = self.state
-        self.state, info,Collide = self.mdp.get_state_transition(
+        self.state, info = self.mdp.get_state_transition(
             prev_state, joint_action
         )
         if self.show_potential:
@@ -602,7 +602,7 @@ class OvercookedGame(Game):
         
 
         # Return about the current transition
-        return prev_state, joint_action, info,Collide 
+        return prev_state, joint_action, info
 
     def enqueue_action(self, player_id, action):
         overcooked_action = self.action_to_overcooked_action[action]
