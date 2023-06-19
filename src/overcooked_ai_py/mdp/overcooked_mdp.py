@@ -1517,7 +1517,7 @@ class OvercookedGridworld(object):
 
                 # Give shaped reward if pickup is useful
                 if self.is_dish_pickup_useful(new_state, pot_states):
-                    shaped_reward[player_idx] += 0*self.reward_shaping_params[
+                    shaped_reward[player_idx] += self.reward_shaping_params[
                         "DISH_PICKUP_REWARD"
                     ]
 
@@ -1547,7 +1547,7 @@ class OvercookedGridworld(object):
                     player.remove_object()  # Remove the dish
                     obj = new_state.remove_object(i_pos)  # Get soup
                     player.set_object(obj)
-                    shaped_reward[player_idx] += 0*self.reward_shaping_params[
+                    shaped_reward[player_idx] += self.reward_shaping_params[
                         "SOUP_PICKUP_REWARD"
                     ]
 
@@ -1566,7 +1566,7 @@ class OvercookedGridworld(object):
                         soup.add_ingredient(obj)
                         shaped_reward[
                             player_idx
-                        ] += 0*self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
+                        ] += self.reward_shaping_params["PLACEMENT_IN_POT_REW"]
 
                         # Log potting
                         self.log_object_potting(
@@ -1584,7 +1584,7 @@ class OvercookedGridworld(object):
                 obj = player.get_object()
                 if obj.name == "soup":
                     delivery_rew = self.deliver_soup(new_state, player, obj)
-                    sparse_reward[player_idx] += 0*delivery_rew
+                    sparse_reward[player_idx] += delivery_rew
 
                     # Log soup delivery
                     events_infos["soup_delivery"][player_idx] = True
