@@ -10,6 +10,7 @@ if os.getenv("FLASK_ENV", "production") == "production":
 import atexit
 import json
 import logging
+from logging import StreamHandler
 
 # All other imports must come after patch to ensure eventlet compatibility
 import pickle
@@ -34,6 +35,7 @@ from utils import ThreadSafeDict, ThreadSafeSet
 ###########
 
 # Read in global config
+
 CONF_PATH = os.getenv("CONF_PATH", "config.json")
 with open(CONF_PATH, "r") as f:
     CONFIG = json.load(f)
@@ -115,6 +117,10 @@ socketio = SocketIO(app, cors_allowed_origins="*", logger=app.config["DEBUG"])
 handler = logging.FileHandler(LOGFILE)
 handler.setLevel(logging.ERROR)
 app.logger.addHandler(handler)
+
+stream_handler = StreamHandler(sys.stdout)
+stream_handler.setLevel(logging.INFO)
+app.logger.addHandler(stream_handler)
 
 
 #################################
@@ -565,7 +571,6 @@ def on_leave(data):
 def on_action(data):
     user_id = request.sid
     action = data["action"]
-
     game = get_curr_game(user_id)
     if not game:
         return
@@ -642,6 +647,7 @@ def play_game(game: OvercookedGame, fps=6):
             )
             socketio.sleep(game.reset_timeout / 1000)
         else:
+            app.logger.info(game.is_stuck())
             socketio.emit(
                 "state_pong", {"state": game.get_state()}, room=game.id
             )
@@ -662,7 +668,6 @@ if __name__ == "__main__":
     # Dynamically parse host and port from environment variables (set by docker build)
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 80))
-
     # Attach exit handler to ensure graceful shutdown
     atexit.register(on_exit)
 
