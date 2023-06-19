@@ -1239,7 +1239,7 @@ class OvercookedGridworld(object):
     
     class Explanations:
         def __init__(self):
-            self.Collide = False
+            self.collide = False
             
     explain=Explanations()
     
@@ -1436,7 +1436,11 @@ class OvercookedGridworld(object):
             infos["phi_s_prime"] = self.potential_function(
                 new_state, motion_planner
             )
-        return new_state, infos,self.explain.Collide
+        return new_state, infos
+
+
+    def Is_collide(self):
+        return self.explain.collide
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
@@ -1676,9 +1680,9 @@ class OvercookedGridworld(object):
         )
         old_positions = tuple(p.position for p in old_player_states)
         if self.is_transition_collision(old_positions, new_positions):
-            self.explain.Collide = True 
+            self.explain.collide = True 
         else:
-            self.explain.Collide = False
+            self.explain.collide = False
         new_positions = self._handle_collisions(old_positions, new_positions)
         return new_positions, new_orientations
 
