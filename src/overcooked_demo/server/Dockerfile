@@ -10,11 +10,13 @@ WORKDIR /app
 COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
+RUN echo "deb http://archive.debian.org/debian stretch main" > /etc/apt/sources.list
+
 # Install eventlet production server if production build
 RUN if [ "$BUILD_ENV" = "production" ] ; then pip install eventlet ; fi
 
 # Clone chai code
-RUN git clone --recursive https://github.com/HumanCompatibleAI/overcooked_ai.git --branch $OVERCOOKED_BRANCH --single-branch /overcooked_ai
+RUN git clone --recursive https://github.com/AurusLaRuse/overcooked_ai.git --branch $OVERCOOKED_BRANCH --single-branch /overcooked_ai
 
 # Dummy data_dir so things don't break
 RUN echo "import os; DATA_DIR=os.path.abspath('.')" >> /overcooked_ai/src/human_aware_rl/data_dir.py
@@ -37,6 +39,7 @@ COPY ./config.json ./config.json
 ENV HOST 0.0.0.0
 ENV PORT 5000
 ENV CONF_PATH config.json
+
 
 # Do the thing
 EXPOSE 5000
