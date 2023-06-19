@@ -1436,7 +1436,7 @@ class OvercookedGridworld(object):
             infos["phi_s_prime"] = self.potential_function(
                 new_state, motion_planner
             )
-        return new_state, infos
+        return new_state, infos,self.explain.Collide
 
     def resolve_interacts(self, new_state, joint_action, events_infos):
         """
