@@ -25,7 +25,6 @@ AGENT_DIR = None
 # Maximum allowable game time (in seconds)
 MAX_GAME_TIME = None
 
-
 def _configure(max_game_time, agent_dir):
     global AGENT_DIR, MAX_GAME_TIME
     MAX_GAME_TIME = max_game_time
@@ -219,6 +218,13 @@ class Game(ABC):
             self.pending_actions[player_idx].put(action)
         except Full:
             pass
+
+    def is_stuck(self):
+    	prev_state, joint_action, info,Collide = self.apply_actions()
+    	if (Collide ==True):
+    	    return "I'm stuck"
+    	else:
+    	    return 
 
     def get_state(self):
         """
@@ -420,7 +426,7 @@ class OvercookedGame(Game):
         randomized=False,
         ticks_per_ai_action=1,
         **kwargs
-    ):
+    ): 
         super(OvercookedGame, self).__init__(**kwargs)
         self.show_potential = showPotential
         self.mdp_params = mdp_params
@@ -445,7 +451,6 @@ class OvercookedGame(Game):
         self.curr_tick = 0
         self.human_players = set()
         self.npc_players = set()
-
         if randomized:
             random.shuffle(self.layouts)
 
@@ -526,6 +531,8 @@ class OvercookedGame(Game):
             or not self.spectators
             and not self.human_players
         )
+        
+        
 
     def is_ready(self):
         """
@@ -535,6 +542,7 @@ class OvercookedGame(Game):
 
     def apply_action(self, player_id, action):
         pass
+        
 
     def apply_actions(self):
         # Default joint action, as NPC policies and clients probably don't enqueue actions fast
@@ -556,7 +564,7 @@ class OvercookedGame(Game):
 
         # Apply overcooked game logic to get state transition
         prev_state = self.state
-        self.state, info = self.mdp.get_state_transition(
+        self.state, info,Collide = self.mdp.get_state_transition(
             prev_state, joint_action
         )
         if self.show_potential:
@@ -591,9 +599,10 @@ class OvercookedGame(Game):
         }
 
         self.trajectory.append(transition)
+        
 
         # Return about the current transition
-        return prev_state, joint_action, info
+        return prev_state, joint_action, info,Collide 
 
     def enqueue_action(self, player_id, action):
         overcooked_action = self.action_to_overcooked_action[action]
