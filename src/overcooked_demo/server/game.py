@@ -219,13 +219,15 @@ class Game(ABC):
         except Full:
             pass
 
+    """
     def is_stuck(self):
-    	collide = self.mdp.Is_collide()
-    	if (collide ==True):
-    	    return "I'm stuck"
-    	else:
-    	    return False
-
+        f = self.mdp.Is_collide()
+        if collide:
+            return "I'm stuck"
+        else:
+            return False
+    """
+    
     def get_state(self):
         """
         Return a JSON compatible serialized state of the game. Note that this should be as minimalistic as possible
