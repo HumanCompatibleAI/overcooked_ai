@@ -602,7 +602,7 @@ class OvercookedEnv(object):
     @staticmethod
     def _get_discounted_rewards_with_horizon(rewards_matrix, gamma, horizon):
         rewards_matrix = np.array(rewards_matrix)
-        discount_array = [gamma**i for i in range(horizon)]
+        discount_array = [gamma ** i for i in range(horizon)]
         rewards_matrix = rewards_matrix[:, :horizon]
         discounted_rews = np.sum(rewards_matrix * discount_array, axis=1)
         return discounted_rews
@@ -914,14 +914,22 @@ class Overcooked(gym.Env):
     def render(self):
         rewards_dict = {}  # dictionary of details you want rendered in the UI
         for key, value in self.base_env.game_stats.items():
-            if key in ['cumulative_shaped_rewards_by_agent', 'cumulative_sparse_rewards_by_agent']:
+            if key in [
+                "cumulative_shaped_rewards_by_agent",
+                "cumulative_sparse_rewards_by_agent",
+            ]:
                 rewards_dict[key] = value
 
-        image = self.visualizer.render_state(state=self.base_env.state, grid=self.base_env.mdp.terrain_mtx,
-                                             hud_data=StateVisualizer.default_hud_data(self.base_env.state, **rewards_dict))
+        image = self.visualizer.render_state(
+            state=self.base_env.state,
+            grid=self.base_env.mdp.terrain_mtx,
+            hud_data=StateVisualizer.default_hud_data(
+                self.base_env.state, **rewards_dict
+            ),
+        )
 
         buffer = pygame.surfarray.array3d(image)
         image = copy.deepcopy(buffer)
         image = np.flip(np.rot90(image, 3), 1)
-        image = cv2.resize(image, (2*528, 2*464))
+        image = cv2.resize(image, (2 * 528, 2 * 464))
         return image

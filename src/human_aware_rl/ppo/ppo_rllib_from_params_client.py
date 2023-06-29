@@ -233,21 +233,18 @@ def my_config():
 
     outer_shape = (5, 4)
 
-    params_str = (
-        "nw=%d_vf=%f_es=%f_en=%f_kl=%f_outer_shape=%d_%d--inner_shape=%d_%d--prop_empty=%f--prop_feats=%f"
-        % (
-            num_workers,
-            vf_loss_coeff,
-            entropy_coeff_start,
-            entropy_coeff_end,
-            kl_coeff,
-            outer_shape[0],
-            outer_shape[1],
-            5,
-            4,
-            0.95,
-            0.1,
-        )
+    params_str = "nw=%d_vf=%f_es=%f_en=%f_kl=%f_outer_shape=%d_%d--inner_shape=%d_%d--prop_empty=%f--prop_feats=%f" % (
+        num_workers,
+        vf_loss_coeff,
+        entropy_coeff_start,
+        entropy_coeff_end,
+        kl_coeff,
+        outer_shape[0],
+        outer_shape[1],
+        5,
+        4,
+        0.95,
+        0.1,
     )
 
     # Name of directory to store training results in (stored in ~/ray_results/<experiment_name>)
