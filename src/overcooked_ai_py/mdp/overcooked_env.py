@@ -602,7 +602,7 @@ class OvercookedEnv(object):
     @staticmethod
     def _get_discounted_rewards_with_horizon(rewards_matrix, gamma, horizon):
         rewards_matrix = np.array(rewards_matrix)
-        discount_array = [gamma ** i for i in range(horizon)]
+        discount_array = [gamma**i for i in range(horizon)]
         rewards_matrix = rewards_matrix[:, :horizon]
         discounted_rews = np.sum(rewards_matrix * discount_array, axis=1)
         return discounted_rews

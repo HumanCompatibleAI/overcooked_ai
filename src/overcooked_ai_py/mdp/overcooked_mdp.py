@@ -1622,7 +1622,7 @@ class OvercookedGridworld(object):
             )
 
             return (
-                gamma ** recipe.time
+                gamma**recipe.time
                 * gamma ** (pot_onion_steps * n_onions)
                 * gamma ** (pot_tomato_steps * n_tomatoes)
                 * self.get_recipe_value(state, recipe, discounted=False)
