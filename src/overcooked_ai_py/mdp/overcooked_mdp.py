@@ -1402,6 +1402,7 @@ class OvercookedGridworld(object):
         (
             sparse_reward_by_agent,
             shaped_reward_by_agent,
+            shaped_info_by_agent, # From HSP
         ) = self.resolve_interacts(new_state, joint_action, events_infos)
         assert new_state.player_positions == state.player_positions
         assert new_state.player_orientations == state.player_orientations
@@ -1418,6 +1419,7 @@ class OvercookedGridworld(object):
             "event_infos": events_infos,
             "sparse_reward_by_agent": sparse_reward_by_agent,
             "shaped_reward_by_agent": shaped_reward_by_agent,
+            "shaped_info_by_agent": shaped_info_by_agent, # For HSP
         }
         if display_phi:
             assert (
@@ -1443,6 +1445,26 @@ class OvercookedGridworld(object):
             [0] * self.num_players,
         )
 
+        # From HSP   
+        # TODO: check https://github.com/samjia2000/HSP/blob/main/hsp/envs/overcooked/overcooked_ai_py/mdp/overcooked_mdp.py to full in those shpaed info     
+        shaped_info = [{
+            "put_onion_on_X": 0,
+            # "put_tomato_on_X": 0,
+            "put_dish_on_X": 0,
+            "put_soup_on_X": 0,
+            "pickup_onion_from_X": 0,
+            "pickup_onion_from_O": 0,
+            # "pickup_tomato_from_X": 0,
+            # "pickup_tomato_from_T": 0,
+            "pickup_dish_from_X": 0,
+            "pickup_dish_from_D": 0,
+            "pickup_soup_from_X": 0,
+            "USEFUL_DISH_PICKUP": 0, # counted when #taken_dishes < #cooking_pots + #partially_full_pots and no dishes on the counter
+            "SOUP_PICKUP": 0, # counted when soup in the pot is picked up (not a soup placed on the table)
+            "PLACEMENT_IN_POT": 0, # counted when some ingredient is put into pot
+            "delivery": 0,
+        } for _ in range(self.num_players)]
+
         for player_idx, (player, action) in enumerate(
             zip(new_state.players, joint_action)
         ):
@@ -1458,6 +1480,7 @@ class OvercookedGridworld(object):
             if terrain_type == "X":
                 if player.has_object() and not new_state.has_object(i_pos):
                     obj_name = player.get_object().name
+                    # TODO: HSP: shaped_info[player_idx][f"put_{player.get_object().name}_on_X"] += 1
                     self.log_object_drop(
                         events_infos,
                         new_state,
@@ -1576,7 +1599,7 @@ class OvercookedGridworld(object):
                     # Log soup delivery
                     events_infos["soup_delivery"][player_idx] = True
 
-        return sparse_reward, shaped_reward
+        return sparse_reward, shaped_reward, shaped_info
 
     def get_recipe_value(
         self,
