@@ -1,6 +1,6 @@
 # Human Experiment Data
 
-This subdirectory is the home of all human experiment data for the Overcooked game. All data was collected through Mturk and is fully anonymized. While the data collection code we used for the Neurips 2019 submission was based on PsiTurk and was very janky, we have instructions for how to set up the human vs human mode [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/overcooked_demo#use-the-human-vs-human-game-mode). If you are thinking of collecting your own data, you should use that code and those (partial) instructions.
+This subdirectory is the home of all human experiment data for the Overcooked game. All data was collected through Mturk and is fully anonymized. While the data collection code we used for the Neurips 2019 submission was based on PsiTurk and was very janky, we have instructions for how to set up a new version of the human vs human mode [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/overcooked_demo#use-the-human-vs-human-game-mode). If you are thinking of collecting your own data, you should use that code and those (partial) instructions.
 
 Data was collected on behalf of the Center for Human-Compatible AI (CHAI) at UC Berkeley. If you have questions regarding data rights, privacy, or distrubion please contact either Jackson Yan at yanzeyi1999@berkeley.edu or Micah Carroll at mdc@berkeley.edu.
 
