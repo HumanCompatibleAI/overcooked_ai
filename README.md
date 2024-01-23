@@ -68,7 +68,7 @@ If you just want to use the environment:
 pip install -e overcooked_ai/
 ```
 
-If you also need the DRL implementations:
+If you also need the DRL implementations (you may have to input this in your terminal as `pip install -e '.[harl]'`):
 
 ```
 pip install -e overcooked_ai[harl]
