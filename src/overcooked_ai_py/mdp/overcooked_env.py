@@ -235,9 +235,8 @@ class OvercookedEnv(object):
         if fname is None:
             print(output_string)
         else:
-            f = open(fname, "a")
-            print(output_string, file=f)
-            f.close()
+            with open(fname, "a", encoding='utf-8') as f:
+                print(output_string, file=f)
 
     ###################
     # BASIC ENV LOGIC #
@@ -446,9 +445,8 @@ class OvercookedEnv(object):
 
         if dir != None:
             fname = dir + "/roll_out_" + str(time.time()) + ".txt"
-            f = open(fname, "w+")
-            print(self, file=f)
-            f.close()
+            with open(fname, "w+", encoding='utf-8') as f:
+                print(self, file=f)
         while not done:
             s_t = self.state
 
