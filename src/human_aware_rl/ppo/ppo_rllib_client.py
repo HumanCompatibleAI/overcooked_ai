@@ -37,7 +37,8 @@ if os.path.exists("slack.json") and not LOCAL_TESTING:
 # Note: tensorflow and tensorflow dependent imports must also come after rllib imports
 # This is because rllib disables eager execution. Otherwise, it must be manually disabled
 import ray
-from ray.rllib.agents.ppo.ppo import PPOTrainer
+#from ray.rllib.agents.ppo.ppo import PPOTrainer
+from ray.rllib.algorithms.ppo import PPOTrainer
 from ray.rllib.models import ModelCatalog
 from ray.tune.registry import register_env
 from ray.tune.result import DEFAULT_RESULTS_DIR
