@@ -2603,7 +2603,7 @@ class OvercookedGridworld(object):
                         be 0 even if there are more than j pots on layout, if the pot is not reachable by player i
                     pi_closest_pot_{j}_{is_empty|is_full|is_cooking|is_ready}: {0, 1} depending on boolean value for jth closest pot
                     pi_closest_pot_{j}_{num_onions|num_tomatoes}: int value for number of this ingredient in jth closest pot
-                    pi_closest_pot_{j}_cook_time: int value for seconds remaining on soup. 0 if no soup is cooking
+                    pi_closest_pot_{j}_cook_time: int value for seconds remaining on soup. -1 if no soup is cooking
                     pi_closest_pot_{j}: (dx, dy) to jth closest pot from player i location
                     pi_wall: length 4 boolean value of whether player i has wall in each direction
 
