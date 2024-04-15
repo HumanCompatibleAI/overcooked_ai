@@ -1154,7 +1154,7 @@ class OvercookedGridworld(object):
         ordered_features_p0 = np.squeeze(np.concatenate([p0_features, p1_features, p1_rel_to_p0, abs_pos_p0]))
 
         p0_rel_to_p1 = np.array(pos_distance(p0.position, p1.position))
-        abs_pos_p1 = np.array(p0.position)
+        abs_pos_p1 = np.array(p1.position)
         ordered_features_p1 = np.squeeze(np.concatenate([p1_features, p0_features, p0_rel_to_p1, abs_pos_p1]))
         return ordered_features_p0, ordered_features_p1
 
