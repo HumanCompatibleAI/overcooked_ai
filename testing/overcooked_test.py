@@ -1323,7 +1323,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         shutil.rmtree(self.dummy_dir)
 
     def _assert_files_equal(self, file_1, file_2):
-        with open(file_1, "r", encoding='utf-8') as f:
+        with open(file_1, "r", encoding="utf-8") as f:
             lines_1 = f.readlines()
         with open(file_2, "r", encoding="utf-8") as f:
             lines_2 = f.readlines()
