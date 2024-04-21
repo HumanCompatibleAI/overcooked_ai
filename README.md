@@ -65,13 +65,13 @@ Finally, use python setup-tools to locally install
 If you just want to use the environment:
 
 ```
-pip install -e overcooked_ai/
+pip install -e .
 ```
 
-If you also need the DRL implementations (you may have to input this in your terminal as `pip install -e 'overcooked_ai[harl]'`):
+If you also need the DRL implementations (you may have to input this in your terminal as `pip install -e '.[harl]'`):
 
 ```
-pip install -e overcooked_ai[harl]
+pip install -e .[harl]
 ```
 
 
@@ -83,7 +83,7 @@ When building from source, you can verify the installation by running the Overco
 python testing/overcooked_test.py
 ```
 
-To check whether the humam_aware_rl is installed correctly, you can run the following script from the src/human_aware_rl directory
+To check whether the `humam_aware_rl` is installed correctly, you can run the following command from the `src/human_aware_rl` directory:
 
 ```
 $ ./run_tests.sh
@@ -165,5 +165,5 @@ The raw data used in training is >100 MB, which makes it inconvenient to distrib
 
 ## Further Issues and questions ❓
 
-If you have issues or questions, don't hesitate to contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
+If you have issues or questions, you can contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
 

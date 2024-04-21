@@ -1718,7 +1718,11 @@ class TestPettingZooEnvironment(unittest.TestCase):
     def test_api(self):
         from pettingzoo.test import parallel_api_test
 
-        from human_aware_rl.rllib.rllib import load_agent_pair
+        # Check whether ray is installed and skip if not
+        try:
+            from human_aware_rl.rllib.rllib import load_agent_pair
+        except ModuleNotFoundError:
+            return
 
         base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         # get the current directory of the file
