@@ -1,7 +1,7 @@
 on: ['push', 'pull_request']
 jobs:
   osx_mdp_tests:
-    runs-on: macos-latest
+    runs-on: macos-12.7.4
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.7
