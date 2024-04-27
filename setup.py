@@ -39,7 +39,7 @@ setup(
     },
     install_requires=[
         "dill",
-        "numpy==1.19",
+        "numpy==1.18",
         "scipy",
         "tqdm",
         "gym",
