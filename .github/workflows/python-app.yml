@@ -16,7 +16,7 @@ jobs:
       - name: Python setup #removed conda setup
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: 3.7
       - name: Installing dependencies
         run: pip install -e .[harl]
       - name: Test human_aware_rl with unittest
