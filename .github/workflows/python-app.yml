@@ -8,7 +8,7 @@ on:
 
 jobs:
   build_osx:
-    runs-on: macos-12.7.4
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -16,7 +16,7 @@ jobs:
       - name: Python setup #removed conda setup
         uses: actions/setup-python@v4
         with:
-          python-version: 3.7
+          python-version: 3.9
       - name: Installing dependencies
         run: pip install -e .[harl]
       - name: Test human_aware_rl with unittest
