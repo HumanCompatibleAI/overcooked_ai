@@ -7,9 +7,11 @@ import dill
 import numpy as np
 
 from overcooked_ai_py.mdp.actions import Action
-from overcooked_ai_py.mdp.overcooked_mdp import Recipe
 from overcooked_ai_py.utils import OvercookedException
-
+from overcooked_ai_py.mdp.overcooked_mdp import (
+    Recipe,
+    OvercookedState,
+)
 
 class Agent(object):
     agent_file_name = "agent.pickle"
@@ -601,6 +603,135 @@ class SampleAgent(Agent):
         action_probs = action_probs / len(self.agents)
         return Action.sample(action_probs), {"action_probs": action_probs}
 
+import itertools
+
+class ModelBasedAgent(Agent):
+    """
+    A model-based agent that learns transition and reward models using
+    ground truths from the Overcooked MDP and performs offline planning.
+    """
+
+    def __init__(self, mlam, agent_index, discount_factor=0.95):
+        """
+        Initialize the agent.
+
+        Args:
+            mlam (MediumLevelActionManager): Manages high-level actions.
+            agent_index (int): Index of this agent (0 or 1).
+            discount_factor (float): Discount factor for future rewards.
+        """
+        super().__init__()
+        self.mlam = mlam
+        self.mdp = mlam.mdp
+        self.agent_index = agent_index
+        self.discount_factor = discount_factor
+        self.transition_model = defaultdict(lambda: defaultdict(int))
+        self.reward_model = defaultdict(float)
+        self.value_function = {}
+        self.models_built = False  # Flag to prevent re-building models
+
+    def reset(self):
+        """
+        Reset agent-specific attributes, preserving learned models.
+        """
+        self.prev_state = None  # Reset trajectory-specific state
+        # Preserve transition_model, reward_model, and value_function
+        self.agent_index = None
+
+    def build_models(self, initial_state, max_horizon=1000):
+        """
+        Explore reachable states and construct transition and reward models.
+
+        Args:
+            initial_state (OvercookedState): Starting state for exploration.
+            max_horizon (int): Maximum number of states to explore.
+        """
+        if self.models_built:
+            return
+
+        visited = set()
+        queue = [initial_state]
+        states_explored = 0
+
+        while queue and states_explored < max_horizon:
+            state = queue.pop(0)
+            if state in visited:
+                continue
+            visited.add(state)
+            states_explored += 1
+
+            # Debug log every 100 states
+            if states_explored % 100 == 0:
+                print(f"States explored: {states_explored}")
+
+            valid_joint_actions = self.mdp.get_actions(state)
+            for joint_action in itertools.product(*valid_joint_actions):
+                next_state, infos = self.mdp.get_state_transition(state, joint_action)
+
+                # Use hashable states as keys
+                reward = infos["sparse_reward_by_agent"][self.agent_index]
+                self.transition_model[(state, joint_action)][next_state] += 1
+                self.reward_model[(state, joint_action)] += reward
+                if next_state not in visited:
+                    queue.append(next_state)
+
+        # Normalize transition probabilities
+        for state_action, next_states in self.transition_model.items():
+            total_transitions = sum(next_states.values())
+            self.transition_model[state_action] = {
+                ns: count / total_transitions for ns, count in next_states.items()
+            }
+
+        self.models_built = True  # Mark models as built
+
+    def plan_value_function(self):
+        """
+        Use value iteration to compute the optimal value function.
+        """
+        all_states = {state for state, _ in self.transition_model.keys()}
+        self.value_function = {state: 0 for state in all_states}
+
+        for _ in range(50):  # Fixed number of iterations
+            new_value_function = {}
+            for state in all_states:
+                max_value = float('-inf')
+                for action in Action.ALL_ACTIONS:
+                    transitions = self.transition_model.get((state, action), {})
+                    reward = self.reward_model.get((state, action), 0)
+                    value = reward + self.discount_factor * sum(
+                        prob * self.value_function.get(next_state, 0)
+                        for next_state, prob in transitions.items()
+                    )
+                    max_value = max(max_value, value)
+                new_value_function[state] = max_value
+            self.value_function = new_value_function
+
+    def action(self, state):
+        """
+        Select the best action based on the learned value function.
+
+        Args:
+            state (OvercookedState): Current state.
+
+        Returns:
+            tuple: Chosen action and metadata.
+        """
+        best_action = Action.STAY
+        max_value = float('-inf')
+
+        for action in Action.ALL_ACTIONS:
+            transitions = self.transition_model.get((state, action), {})
+            reward = self.reward_model.get((state, action), 0)
+            value = reward + self.discount_factor * sum(
+                prob * self.value_function.get(next_state, 0)
+                for next_state, prob in transitions.items()
+            )
+            if value > max_value:
+                max_value = value
+                best_action = action
+        
+        print(f"Action selected: {best_action}, Value: {max_value}")
+        return best_action, {"value_estimate": max_value}
 
 # Deprecated. Need to fix Heuristic to work with the new MDP to reactivate Planning
 # class CoupledPlanningAgent(Agent):

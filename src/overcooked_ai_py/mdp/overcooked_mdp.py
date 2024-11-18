@@ -889,6 +889,26 @@ class OvercookedState(object):
     @property
     def bonus_orders(self):
         return sorted(self._bonus_orders)
+    
+    def __hash__(self):
+        """
+        Compute a unique hash for the state using its key attributes.
+        """
+        return hash((
+            tuple(self.players),        # Player positions and orientations
+            tuple(self.objects.items()),  # Objects and their states
+        ))
+
+    def __eq__(self, other):
+        """
+        Check equality between two states based on their key attributes.
+        """
+        if not isinstance(other, OvercookedState):
+            return False
+        return (self.players == other.players and
+                self.objects == other.objects and
+                self.timer == other.timer and
+                self.bonus_orders == other.bonus_orders)
 
     def has_object(self, pos):
         return pos in self.objects
