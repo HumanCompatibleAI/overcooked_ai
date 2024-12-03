@@ -1,0 +1,26 @@
+name: Human Aware Rllib
+
+on:
+  push:
+    branches: "*"
+  pull_request:
+    branches: "*"
+
+jobs:
+  build_ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Python setup #removed conda setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.7
+      - name: Installing dependencies
+        run: pip install -e .[harl]
+      - name: Test human_aware_rl with unittest
+        run: |
+          cd src/human_aware_rl
+          sudo chmod 777 ./run_tests.sh
+          ./run_tests.sh

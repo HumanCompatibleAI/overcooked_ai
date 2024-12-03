@@ -1,0 +1,21 @@
+version : '3.7'
+
+services:
+    app:
+        build:
+            context: ./server
+            args:
+                BUILD_ENV: "${BUILD_ENV:-production}"
+                OVERCOOKED_BRANCH: "${OVERCOOKED_BRANCH:-master}"
+                GRAPHICS: "${GRAPHICS:-overcooked_graphics_v2.2.js}"
+            shm_size: "5gb"
+        shm_size: "5gb"
+        environment: 
+            FLASK_ENV: "${BUILD_ENV:-production}"
+        ports:
+            - "80:5000"
+        volumes:
+            - data:/app/data
+volumes:
+  data:
+        

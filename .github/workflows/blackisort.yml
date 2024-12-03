@@ -1,0 +1,22 @@
+name: black isort
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      # https://black.readthedocs.io/en/stable/integrations/github_actions.html
+      - name: running Black
+        uses: psf/black@stable
+        with:
+          options: "--check --diff --line-length 79"
+          version: "23.3.0"
+      # https://pycqa.github.io/isort/docs/configuration/github_action.html
+      - name: running isort
+        uses: jamescurtin/isort-action@master
+        if: always()
+        with:
+          configuration: "--check-only --line-length 79 --profile black"
