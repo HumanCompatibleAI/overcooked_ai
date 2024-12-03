@@ -1,1 +1,0 @@
-You can download trained examples here - https://drive.google.com/file/d/1vIrZ7CphtRFBdLShO9WbGAl2qsbbJfMB/view?usp=sharing
