@@ -2,7 +2,6 @@ import copy
 import time
 
 import cv2
-import gym
 import gymnasium
 import numpy as np
 import pygame
@@ -715,8 +714,8 @@ class OvercookedEnvPettingZoo(ParallelEnv):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         obs_shape = agent.featurize(dummy_state)[0].shape
-        high = np.ones(obs_shape) * float("inf")
-        low = np.zeros(obs_shape)
+        high = np.ones(obs_shape, dtype=np.float32) * float("inf")
+        low = np.zeros(obs_shape, dtype=np.float32)
         return gymnasium.spaces.Box(low, high, dtype=np.float32)
 
     # we want to return the same space object every time
@@ -780,7 +779,7 @@ class OvercookedEnvPettingZoo(ParallelEnv):
         pass
 
 
-class Overcooked(gym.Env):
+class Overcooked(gymnasium.Env):
     """
     Wrapper for the Env class above that is SOMEWHAT compatible with the standard gym API.
     Why only somewhat? Because we need to flatten a multi-agent env to be a single-agent env (as gym requires).
@@ -814,7 +813,7 @@ class Overcooked(gym.Env):
 
         mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages")
         base_env = OvercookedEnv.from_mdp(mdp, horizon=500)
-        env = gym.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
+        env = gymnasium.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
         """
         if baselines_reproducible:
             # NOTE:
@@ -830,7 +829,7 @@ class Overcooked(gym.Env):
         self.base_env = base_env
         self.featurize_fn = featurize_fn
         self.observation_space = self._setup_observation_space()
-        self.action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
+        self.action_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.reset()
         self.visualizer = StateVisualizer()
 
@@ -838,9 +837,9 @@ class Overcooked(gym.Env):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         obs_shape = self.featurize_fn(dummy_state)[0].shape
-        high = np.ones(obs_shape) * float("inf")
-        low = np.zeros(obs_shape)
-        return gym.spaces.Box(low, high, dtype=np.float32)
+        high = np.ones(obs_shape, dtype=np.float32) * float("inf")
+        low = np.zeros(obs_shape, dtype=np.float32)
+        return gymnasium.spaces.Box(low, high, dtype=np.float32)
 
     def step(self, action):
         """

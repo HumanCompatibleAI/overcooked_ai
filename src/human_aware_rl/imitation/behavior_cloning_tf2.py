@@ -474,8 +474,8 @@ class BehaviorCloningPolicy(RllibPolicy):
         """
         RLLib compatible constructor for initializing a behavior cloning model
 
-        observation_space (gym.Space|tuple)     Shape of the featurized observations
-        action_space (gym.space|tuple)          Shape of the action space (len(Action.All_ACTIONS),)
+        observation_space (gymnasium.Space|tuple)     Shape of the featurized observations
+        action_space (gymnasium.space|tuple)          Shape of the action space (len(Action.All_ACTIONS),)
         config (dict)                           Dictionary of relavant bc params
             - model_dir (str)                   Path to pickled keras.Model used to map observations to action logits
             - stochastic (bool)                 Whether action should return logit argmax or sample over distribution
@@ -519,7 +519,7 @@ class BehaviorCloningPolicy(RllibPolicy):
         self.context = self._create_execution_context()
 
     def _setup_shapes(self):
-        # This is here to make the class compatible with both tuples or gym.Space objs for the spaces
+        # This is here to make the class compatible with both tuples or gymnasium.Space objs for the spaces
         # Note: action_space = (len(Action.ALL_ACTIONS,)) is technically NOT the action space shape, which would be () since actions are scalars
         self.observation_shape = (
             self.observation_space

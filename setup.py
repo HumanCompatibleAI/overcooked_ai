@@ -42,7 +42,7 @@ setup(
         "numpy",
         "scipy",
         "tqdm",
-        "gym",
+        "gymnasium",
         "pettingzoo",
         "ipython",
         "pygame",
