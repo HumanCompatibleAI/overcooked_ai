@@ -165,7 +165,7 @@ class MotionPlanner(object):
         to go from starting position to goal position (not including
         interaction action)."""
         # NOTE: currently unused, pretty bad code. If used in future, clean up
-        min_cost = np.Inf
+        min_cost = np.inf
         for d1, d2 in itertools.product(Direction.ALL_DIRECTIONS, repeat=2):
             start = (pos1, d1)
             end = (pos2, d2)
@@ -364,8 +364,8 @@ class MotionPlanner(object):
         Determines the minimum number of timesteps necessary for a player to go from any
         terrain feature in list1 to any feature in list2 and perform an interact action
         """
-        min_dist = np.Inf
-        min_manhattan = np.Inf
+        min_dist = np.inf
+        min_manhattan = np.inf
         for pos1, pos2 in itertools.product(pos_list1, pos_list2):
             for mg1, mg2 in itertools.product(
                 self.motion_goals_for_pos[pos1],
@@ -383,7 +383,7 @@ class MotionPlanner(object):
                     min_dist = curr_dist
 
         # +1 to account for interaction action
-        if manhattan_if_fail and min_dist == np.Inf:
+        if manhattan_if_fail and min_dist == np.inf:
             min_dist = min_manhattan
         min_cost = min_dist + 1
         return min_cost
@@ -401,7 +401,7 @@ class MotionPlanner(object):
         """
         start_pos = start_pos_and_or[0]
         assert self.mdp.get_terrain_type_at_pos(start_pos) != "X"
-        min_dist = np.Inf
+        min_dist = np.inf
         best_feature = None
         for feature_pos in feature_pos_list:
             for feature_goal in self.motion_goals_for_pos[feature_pos]:
@@ -841,7 +841,7 @@ class JointMotionPlanner(object):
                 if self._agents_are_in_same_position(
                     (curr_pos_or0, curr_pos_or1)
                 ):
-                    return None, None, [np.Inf, np.Inf]
+                    return None, None, [np.inf, np.inf]
 
             else:
                 curr_pos_or0, curr_pos_or1 = next_pos_or0, next_pos_or1
@@ -860,7 +860,7 @@ class JointMotionPlanner(object):
 
         end_pos_and_or = (curr_pos_or0, curr_pos_or1)
         finishing_times = (
-            (np.Inf, idx1) if wait_agent_idx == 0 else (idx0, np.Inf)
+            (np.inf, idx1) if wait_agent_idx == 0 else (idx0, np.inf)
         )
         return joint_plan, end_pos_and_or, finishing_times
 

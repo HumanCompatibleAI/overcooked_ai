@@ -430,7 +430,7 @@ class OvercookedEnv(object):
         display=False,
         dir=None,
         display_phi=False,
-        display_until=np.Inf,
+        display_until=np.inf,
     ):
         """
         Trajectory returned will a list of state-action pairs (s_t, joint_a_t, r_t, done_t, info_t).
@@ -491,7 +491,7 @@ class OvercookedEnv(object):
         dir=None,
         final_state=False,
         display_phi=False,
-        display_until=np.Inf,
+        display_until=np.inf,
         metadata_fn=None,
         metadata_info_fn=None,
         info=True,
