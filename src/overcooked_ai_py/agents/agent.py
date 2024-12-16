@@ -445,7 +445,7 @@ class GreedyHumanModel(Agent):
         Chooses motion goal that has the lowest cost action plan.
         Returns the motion goal itself and the first action on the plan.
         """
-        min_cost = np.Inf
+        min_cost = np.inf
         best_action, best_goal = None, None
         for goal in motion_goals:
             action_plan, _, plan_cost = self.mlam.motion_planner.get_plan(
