@@ -220,7 +220,9 @@ class OvercookedMultiAgent(MultiAgentEnv):
         for agent in agents:
             action_sp[agent] = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.action_space = gymnasium.spaces.Dict(action_sp)
-        self.shared_action_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
+        self.shared_action_space = gymnasium.spaces.Discrete(
+            len(Action.ALL_ACTIONS)
+        )
 
     def _setup_observation_space(self, agents):
         dummy_state = self.base_env.mdp.get_standard_start_state()
