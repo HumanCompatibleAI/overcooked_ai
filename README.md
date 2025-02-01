@@ -92,7 +92,7 @@ $ ./run_tests.sh
 
 ⚠️**Be sure to change your CWD to the human_aware_rl directory before running the script, as the test script uses the CWD to dynamically generate a path to save temporary training runs/checkpoints. The testing script will fail if not being run from the correct directory.**
 
-This will run all tests belonging to the human_aware_rl module. You can checkout the README in the submodule for instructions of running target-specific tests. This can be initiated from any directory.
+This will run all tests belonging to the human_aware_rl module. _These tests don't work anymore out of the box, due to package version issues_: if you fix them, feel free to make a PR. You can checkout the README in the submodule for instructions of running target-specific tests. This can be initiated from any directory.
 
 If you're thinking of using the planning code extensively, you should run the full testing suite that verifies all of the Overcooked accessory tools (this can take 5-10 mins): 
 ```

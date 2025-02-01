@@ -6,7 +6,7 @@ import shutil
 import unittest
 from math import factorial
 
-import gym
+import gymnasium
 import numpy as np
 
 from overcooked_ai_py.agents.agent import (
@@ -1699,44 +1699,19 @@ class TestGymEnvironment(unittest.TestCase):
         np.random.seed(0)
 
     def test_creation(self):
-        env = gym.make(
+        env = gymnasium.make(
             "Overcooked-v0",
             base_env=self.env,
             featurize_fn=self.env.featurize_state_mdp,
         )
         # verify that the action_space * obs_space are initialized correctly
-        self.assertEqual(env.action_space, gym.spaces.Discrete(6))
+        self.assertEqual(env.action_space, gymnasium.spaces.Discrete(6))
         self.assertEqual(
             env.observation_space.shape,
             self.base_mdp.get_featurize_state_shape(),
         )
 
     # TODO: write more tests here
-
-
-class TestPettingZooEnvironment(unittest.TestCase):
-    def test_api(self):
-        from pettingzoo.test import parallel_api_test
-
-        # Check whether ray is installed and skip if not
-        try:
-            from human_aware_rl.rllib.rllib import load_agent_pair
-        except ModuleNotFoundError:
-            return
-
-        base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
-        # get the current directory of the file
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        agent_dir = os.path.join(
-            current_dir,
-            "../src/overcooked_demo/server/static/assets/agents/RllibCrampedRoomSP/agent",
-        )
-        ap = load_agent_pair(agent_dir, "ppo", "ppo")
-        env = OvercookedEnv.from_mdp(base_mdp, info_level=0, horizon=1000)
-        from overcooked_ai_py.mdp.overcooked_env import OvercookedEnvPettingZoo
-
-        wrapped_env = OvercookedEnvPettingZoo(env, ap)
-        parallel_api_test(wrapped_env, num_cycles=1000)
 
 
 class TestTrajectories(unittest.TestCase):

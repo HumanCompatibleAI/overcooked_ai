@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime
 
 import dill
-import gym
+import gymnasium
 import numpy as np
 import ray
 from ray.rllib.agents.ppo import PPOTrainer
@@ -32,8 +32,8 @@ from overcooked_ai_py.mdp.overcooked_mdp import (
     OvercookedGridworld,
 )
 
-action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
-obs_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
+action_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
+obs_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
 timestr = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
 
 
@@ -218,9 +218,13 @@ class OvercookedMultiAgent(MultiAgentEnv):
     def _setup_action_space(self, agents):
         action_sp = {}
         for agent in agents:
-            action_sp[agent] = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
-        self.action_space = gym.spaces.Dict(action_sp)
-        self.shared_action_space = gym.spaces.Discrete(len(Action.ALL_ACTIONS))
+            action_sp[agent] = gymnasium.spaces.Discrete(
+                len(Action.ALL_ACTIONS)
+            )
+        self.action_space = gymnasium.spaces.Dict(action_sp)
+        self.shared_action_space = gymnasium.spaces.Discrete(
+            len(Action.ALL_ACTIONS)
+        )
 
     def _setup_observation_space(self, agents):
         dummy_state = self.base_env.mdp.get_standard_start_state()
@@ -232,7 +236,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
 
         high = np.ones(obs_shape) * float("inf")
         low = np.ones(obs_shape) * 0
-        self.ppo_observation_space = gym.spaces.Box(
+        self.ppo_observation_space = gymnasium.spaces.Box(
             np.float32(low), np.float32(high), dtype=np.float32
         )
 
@@ -243,7 +247,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
         obs_shape = featurize_fn_bc(dummy_state)[0].shape
         high = np.ones(obs_shape) * 100
         low = np.ones(obs_shape) * -100
-        self.bc_observation_space = gym.spaces.Box(
+        self.bc_observation_space = gymnasium.spaces.Box(
             np.float32(low), np.float32(high), dtype=np.float32
         )
         # hardcode mapping between action space and agent
@@ -253,7 +257,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
                 ob_space[agent] = self.ppo_observation_space
             else:
                 ob_space[agent] = self.bc_observation_space
-        self.observation_space = gym.spaces.Dict(ob_space)
+        self.observation_space = gymnasium.spaces.Dict(ob_space)
 
     def _get_featurize_fn(self, agent_id):
         if agent_id.startswith("ppo"):
