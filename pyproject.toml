@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "overcooked_ai"
+version = "1.1.0"
+description = "Cooperative multi-agent environment based on Overcooked"
+readme = "README.md"
+authors = [
+    { name = "Micah Carroll", email = "mdc@berkeley.edu" },
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+keywords = ["Overcooked", "AI", "Reinforcement Learning"]
+dependencies = [
+    "dill>=0.3.9",
+    "gymnasium>=1.0.0",
+    "ipython>=8.12.3",
+    "ipywidgets>=8.1.5",
+    "opencv-python>=4.11.0.86",
+    "pygame>=2.6.1",
+    "scipy>=1.10.1",
+    "tqdm>=4.67.1",
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/HumanCompatibleAI/overcooked_ai"
+Download = "https://github.com/HumanCompatibleAI/overcooked_ai/archive/refs/tags/1.1.0.tar.gz"
+
+[project.optional-dependencies]
+harl = [
+    "wandb",
+    "GitPython",
+    "memory_profiler",
+    "sacred",
+    "pymongo",
+    "matplotlib",
+    "requests",
+    "seaborn==0.9.0",
+    "ray[rllib]==2.0.0",
+    "protobuf",
+    "tensorflow==2.10",
+]
+
+[project.scripts]
+overcooked-demo-up = "overcooked_demo:start_server"
+overcooked-demo-move = "overcooked_demo:move_agent"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"overcooked_ai_py" = [
+    "data/layouts/*.layout",
+    "data/planners/*.py",
+    "data/human_data/*.pickle",
+    "data/graphics/*.png",
+    "data/graphics/*.json",
+    "data/fonts/*.ttf",
+]
+"human_aware_rl" = [
+    "static/**/*.pickle",
+    "static/**/*.csv",
+    "ppo/trained_example/*.pkl",
+    "ppo/trained_example/*.json",
+    "ppo/trained_example/*/.is_checkpoint",
+    "ppo/trained_example/*/.tune_metadata",
+    "ppo/trained_example/*/checkpoint-500",
+] 
