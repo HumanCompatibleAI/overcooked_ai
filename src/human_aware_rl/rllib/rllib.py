@@ -218,7 +218,9 @@ class OvercookedMultiAgent(MultiAgentEnv):
     def _setup_action_space(self, agents):
         action_sp = {}
         for agent in agents:
-            action_sp[agent] = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
+            action_sp[agent] = gymnasium.spaces.Discrete(
+                len(Action.ALL_ACTIONS)
+            )
         self.action_space = gymnasium.spaces.Dict(action_sp)
         self.shared_action_space = gymnasium.spaces.Discrete(
             len(Action.ALL_ACTIONS)
