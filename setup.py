@@ -43,7 +43,6 @@ setup(
         "scipy",
         "tqdm",
         "gymnasium",
-        "pydantic<2.0",
         "ipython",
         "pygame",
         "ipywidgets",
