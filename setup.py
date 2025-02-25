@@ -39,7 +39,7 @@ setup(
     },
     install_requires=[
         "dill",
-        "numpy",
+        "numpy<2.0.0",
         "scipy",
         "tqdm",
         "gymnasium",
@@ -47,6 +47,8 @@ setup(
         "pygame",
         "ipywidgets",
         "opencv-python",
+        "flask",
+        "flask-socketio",
     ],
     # removed overlapping dependencies
     extras_require={
@@ -59,9 +61,9 @@ setup(
             "matplotlib",
             "requests",
             "seaborn==0.9.0",
-            "ray[rllib]==2.0.0",
+            "ray[rllib]>=2.5.0",
             "protobuf",
-            "tensorflow==2.10",
+            "tensorflow>=2.14.0",
         ]
     },
     entry_points={

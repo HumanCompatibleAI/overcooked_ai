@@ -9,13 +9,16 @@ import dill
 import gymnasium
 import numpy as np
 import ray
-from ray.rllib.agents.ppo import PPOTrainer
+# Updated import for Ray 2.5+
+from ray.rllib.algorithms.ppo import PPO as PPOTrainer
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.models import ModelCatalog
 from ray.tune.logger import UnifiedLogger
 from ray.tune.registry import register_env
-from ray.tune.result import DEFAULT_RESULTS_DIR
+
+# Define DEFAULT_RESULTS_DIR since it's no longer available in Ray 2.5+
+DEFAULT_RESULTS_DIR = os.path.join(os.path.expanduser("~"), "ray_results")
 
 from human_aware_rl.rllib.utils import (
     get_base_ae,
