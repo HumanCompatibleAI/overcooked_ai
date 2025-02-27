@@ -7,7 +7,7 @@
         "REW_SHAPING_PARAMS": null
     },
     "MAX_GAME_LENGTH" : 900,
-    "AGENT_DIR" : "../../../data/agents",
+    "AGENT_DIR" : "/app/data/agents",
     "MAX_GAMES" : 10,
     "MAX_FPS" : 30,
     "predefined" : {

@@ -16,15 +16,20 @@ RUN uv venv
 COPY ./pyproject.toml ./pyproject.toml
 COPY ./dev_helper.py ./dev_helper.py
 
-# Clone chai code for the human_aware_rl module
-RUN apt-get update && apt-get install -y git
-RUN git clone --recursive https://github.com/HumanCompatibleAI/overcooked_ai.git --branch $OVERCOOKED_BRANCH --single-branch /overcooked_ai
+# Install necessary packages for build
+RUN apt-get update && apt-get install -y git build-essential
+
+# Copy local overcooked_ai directory instead of git cloning
+COPY ./overcooked_ai /overcooked_ai
 
 # Dummy data_dir so things don't break
 RUN echo "import os; DATA_DIR=os.path.abspath('.')" >> /overcooked_ai/src/human_aware_rl/data_dir.py
 
 # Install server dependencies
 RUN . .venv/bin/activate && uv pip install -e .
+
+# Install a specific version of Ray that's compatible with the overcooked_ai codebase
+RUN . .venv/bin/activate && uv pip install "ray[rllib]>=2.5.0"
 
 # Install the cloned overcooked_ai in development mode
 RUN . .venv/bin/activate && uv pip install -e /overcooked_ai
@@ -35,6 +40,10 @@ RUN if [ "$BUILD_ENV" = "production" ] ; then . .venv/bin/activate && uv pip ins
 # Install needed packages
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy over remaining files
@@ -50,4 +59,5 @@ ENV CONF_PATH config.json
 
 # Expose port and run the app, using dev_helper to ensure proper Python path
 EXPOSE 5000
-CMD [".venv/bin/python", "-m", "dev_helper", "app.py"]
+# CMD [".venv/bin/python", "-m", "dev_helper", "app.py"]
+CMD ["uv", "run", "app.py"]

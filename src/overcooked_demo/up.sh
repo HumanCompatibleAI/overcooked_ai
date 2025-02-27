@@ -50,12 +50,15 @@ if [[ $1 = local* ]]; then
     exit 0
 fi
 
+mkdir -p server/overcooked_ai
+cp -r ../../* server/overcooked_ai/
 # Docker mode
 if [[ $1 = prod* ]]; then
     echo "production"
     export BUILD_ENV=production
 
-    # Completely re-build all images from scatch without using build cache
+    # Completely re-build all images from scratch without using build cache
+    # Copy the overcooked_ai directory from the project root to the server directory
     docker compose build --no-cache
     docker compose up --force-recreate -d
 else

@@ -16,3 +16,4 @@ Werkzeug==2.0.3
 tensorflow==2.0.3
 requests==2.23.0
 protobuf==3.19
+ray[rllib]==1.13.0
