@@ -17,10 +17,13 @@ jobs:
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    - name: Install dependencies
+    - name: Setup virtual environment and install dependencies
       run: |
+        uv venv
+        source .venv/bin/activate
         uv pip install flake8
     - name: Lint with flake8
       run: |
+        source .venv/bin/activate
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics

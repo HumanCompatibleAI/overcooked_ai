@@ -30,13 +30,18 @@ jobs:
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    - name: Install dependencies
+    - name: Setup virtual environment and install dependencies
       run: |
+        uv venv
+        source .venv/bin/activate
         uv pip install coverage
     - name: Setup # needs -e flag for coverage tests to work
-      run: uv pip install -e ".[harl]"
+      run: |
+        source .venv/bin/activate
+        uv pip install -e ".[harl]"
     - name: Run tests and generate coverage report
       run: |
+        source .venv/bin/activate
         coverage run -m unittest discover -s testing/ -p "*_test.py"
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1

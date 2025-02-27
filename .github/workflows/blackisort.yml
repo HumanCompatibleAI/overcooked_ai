@@ -14,13 +14,17 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - name: Install black and isort
+      - name: Setup virtual environment and install black and isort
         run: |
+          uv venv
+          source .venv/bin/activate
           uv pip install black==23.3.0 isort
       - name: Running Black
         run: |
+          source .venv/bin/activate
           black --check --diff --line-length 79 .
       - name: Running isort
         if: always()
         run: |
+          source .venv/bin/activate
           isort --check-only --line-length 79 --profile black .
