@@ -7,6 +7,9 @@ A web application where humans can play Overcooked with trained AI agents.
 
 * [Installation](#installation)
 * [Usage](#usage)
+  * [Docker Deployment](#docker-deployment)
+  * [Local Run with uv](#local-run-with-uv)
+  * [Command Line](#command-line)
 * [Dependencies](#dependencies)
 * [Using Pre-trained Agents](#using-pre-trained-agents)
 * [Updating](#updating)
@@ -17,7 +20,13 @@ A web application where humans can play Overcooked with trained AI agents.
 
 Building the server image requires [Docker](https://docs.docker.com/get-docker/)
 
+For local development with uv, you'll need:
+- Python 3.7 or later
+- [uv](https://github.com/astral-sh/uv) - Install with `pip install uv`
+
 ## Usage
+
+### Docker Deployment
 
 The server can be deployed locally using the driver script included in the repo. To run the production server, use the command
 ```bash
@@ -35,6 +44,23 @@ In order to kill the production server, run
 ```bash
 ./down.sh
 ```
+
+### Local Run with uv
+
+To run the server locally using uv without Docker, use:
+
+```bash
+./up.sh local
+```
+
+This will:
+1. Create a virtual environment in the server directory if it doesn't exist
+2. Install all dependencies using uv
+3. Start the server on port 5000
+
+After running this command, navigate to http://localhost:5000
+
+### Command Line
 
 You can also start the server via the command line. After installing the `overcooked_ai` via pip, you can start the server by typing
 

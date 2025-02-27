@@ -8,15 +8,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-      # https://black.readthedocs.io/en/stable/integrations/github_actions.html
-      - name: running Black
-        uses: psf/black@stable
         with:
-          options: "--check --diff --line-length 79"
-          version: "23.3.0"
-      # https://pycqa.github.io/isort/docs/configuration/github_action.html
-      - name: running isort
-        uses: jamescurtin/isort-action@master
+          python-version: 3.8
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Setup virtual environment and install black and isort
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install black==23.3.0 isort
+      - name: Running Black
+        run: |
+          source .venv/bin/activate
+          black --check --diff --line-length 79 .
+      - name: Running isort
         if: always()
-        with:
-          configuration: "--check-only --line-length 79 --profile black"
+        run: |
+          source .venv/bin/activate
+          isort --check-only --line-length 79 --profile black .
