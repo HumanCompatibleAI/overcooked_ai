@@ -51,13 +51,20 @@ COPY ./static ./static
 COPY ./*.py ./
 COPY ./graphics/$GRAPHICS ./static/js/graphics.js
 COPY ./config.json ./config.json
+COPY ./init.sh ./init.sh
+
+# Make init script executable
+RUN chmod +x ./init.sh
+
+# Create data directories
+RUN mkdir -p /app/data/agents
 
 # Set environment variables that will be used by app.py
 ENV HOST 0.0.0.0
 ENV PORT 5000
 ENV CONF_PATH config.json
 
-# Expose port and run the app, using dev_helper to ensure proper Python path
+# Expose port and run the app, using init.sh as entrypoint
 EXPOSE 5000
-# CMD [".venv/bin/python", "-m", "dev_helper", "app.py"]
+ENTRYPOINT ["./init.sh"]
 CMD ["uv", "run", "app.py"]

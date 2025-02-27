@@ -4,7 +4,12 @@
     "layout_globals" : {
         "NUM_PLAYERS": 2,
         "PROP_FEATS_ENCODING": false,
-        "REW_SHAPING_PARAMS": null
+        "REW_SHAPING_PARAMS": null,
+        "max_num_ingredients": 3,
+        "onion_value": 21,
+        "tomato_value": 13,
+        "onion_time": 10,
+        "tomato_time": 7
     },
     "MAX_GAME_LENGTH" : 900,
     "AGENT_DIR" : "/app/data/agents",
