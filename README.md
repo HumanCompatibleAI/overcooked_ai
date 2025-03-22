@@ -17,11 +17,9 @@ The goal of the game is to deliver soups as fast as possible. Each soup requires
 
 You can **try out the game [here](https://humancompatibleai.github.io/overcooked-demo/)** (playing with some previously trained DRL agents). To play with your own trained agents using this interface, or to collect more human-AI or human-human data, you can use the code [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/overcooked_demo). You can find some human-human and human-AI gameplay data already collected [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/human_aware_rl/static/human_data).
 
-DRL implementations compatible with the environment are included in the repo as a submodule under src/human_aware_rl. 
+**NOTE + LOOKING FOR CONTRIBUTORS:** DRL and BC implementations are now deprecated. We used to include code for training BC and PPO agents in the `human_aware_rl` directory. See [this issue](https://github.com/HumanCompatibleAI/overcooked_ai/issues/162) for more details.
 
-The old [human_aware_rl](https://github.com/HumanCompatibleAI/human_aware_rl) is being deprecated and should only used to reproduce the results in the 2019 paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* (also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)).
-
-For simple usage of the environment, it's worthwhile considering using [this environment wrapper](https://github.com/Stanford-ILIAD/PantheonRL).
+This benchmark was build in the context of a 2019 paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)*. Also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/).
 
 ## Research Papers using Overcooked-AI 📑
 
@@ -45,34 +43,20 @@ You can install the pre-compiled wheel file using pip.
 ```
 pip install overcooked-ai
 ```
-Note that PyPI releases are stable but infrequent. For the most up-to-date development features, build from source with `pip install -e .`.
+Note that PyPI releases are stable but infrequent. For the most up-to-date development features, build from source. We recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) to install the package, so that you can use the provided lockfile to ensure no minimal package version issues.
 
 
 ### Building from source 🔧
-
-It is useful to setup a conda environment with Python 3.7 (virtualenv works too):
-
-```
-conda create -n overcooked_ai python=3.7
-conda activate overcooked_ai
-```
 
 Clone the repo 
 ```
 git clone https://github.com/HumanCompatibleAI/overcooked_ai.git
 ```
-Finally, use python setup-tools to locally install
 
-If you just want to use the environment:
-
+Using uv (recommended):
 ```
-pip install -e .
-```
-
-If you also need the DRL implementations (you may have to input this in your terminal as `pip install -e '.[harl]'`):
-
-```
-pip install -e .[harl]
+uv venv
+uv sync
 ```
 
 
@@ -84,21 +68,15 @@ When building from source, you can verify the installation by running the Overco
 python testing/overcooked_test.py
 ```
 
-To check whether the `humam_aware_rl` is installed correctly, you can run the following command from the `src/human_aware_rl` directory:
 
-```
-$ ./run_tests.sh
-```
 
-⚠️**Be sure to change your CWD to the human_aware_rl directory before running the script, as the test script uses the CWD to dynamically generate a path to save temporary training runs/checkpoints. The testing script will fail if not being run from the correct directory.**
-
-This will run all tests belonging to the human_aware_rl module. _These tests don't work anymore out of the box, due to package version issues_: if you fix them, feel free to make a PR. You can checkout the README in the submodule for instructions of running target-specific tests. This can be initiated from any directory.
 
 If you're thinking of using the planning code extensively, you should run the full testing suite that verifies all of the Overcooked accessory tools (this can take 5-10 mins): 
 ```
 python -m unittest discover -s testing/ -p "*_test.py"
 ```
 
+See this [notebook](Overcooked%20Tutorial.ipynb) for a quick guide on getting started using the environment.
 
 ## Code Structure Overview 🗺
 
@@ -117,7 +95,16 @@ python -m unittest discover -s testing/ -p "*_test.py"
 - `planners.py`: near-optimal agent planning logic
 - `search.py`: A* search and shortest path logic
 
-`human_aware_rl` contains:
+`overcooked_demo` contains:
+
+`server/`:
+- `app.py`: The Flask app 
+- `game.py`: The main logic of the game. State transitions are handled by overcooked.Gridworld object embedded in the game environment
+- `move_agents.py`: A script that simplifies copying checkpoints to [agents](src/overcooked_demo/server/static/assets/agents/) directory. Instruction of how to use can be found inside the file or by running `python move_agents.py -h`
+
+`up.sh`: Shell script to spin up the Docker server that hosts the game 
+
+`human_aware_rl` contains (NOTE: this is not supported anymore, see bottom of the README for more info):
 
 `ppo/`:
 - `ppo_rllib.py`: Primary module where code for training a PPO agent resides. This includes an rllib compatible wrapper on `OvercookedEnv`, utilities for converting rllib `Policy` classes to Overcooked `Agent`s, as well as utility functions and callbacks
@@ -142,29 +129,17 @@ python -m unittest discover -s testing/ -p "*_test.py"
 
 `utils.py`: utils for the repo
 
-`overcooked_demo` contains:
-
-`server/`:
-- `app.py`: The Flask app 
-- `game.py`: The main logic of the game. State transitions are handled by overcooked.Gridworld object embedded in the game environment
-- `move_agents.py`: A script that simplifies copying checkpoints to [agents](src/overcooked_demo/server/static/assets/agents/) directory. Instruction of how to use can be found inside the file or by running `python move_agents.py -h`
-
-`up.sh`: Shell script to spin up the Docker server that hosts the game 
-
-
-## Python Visualizations 🌠
-
-See [this Google Colab](https://colab.research.google.com/drive/1AAVP2P-QQhbx6WTOnIG54NXLXFbO7y6n#scrollTo=Z1RBlqADnTDw) for some sample code for visualizing trajectories in python.
-
-We have incorporated a [notebook](Overcooked%20Tutorial.ipynb) that guides users on the process of training, loading, and evaluating agents. Ideally, we would like to enable users to execute the notebook in Google Colab; however, due to Colab's default kernel being Python 3.10 and our repository being optimized for Python 3.7, some functions are presently incompatible with Colab. To provide a seamless experience, we have pre-executed all the cells in the notebook, allowing you to view the expected output when running it locally following the appropriate setup.
-
-Overcooked_demo can also start an interactive game in the browser for visualizations. Details can be found in its [README](src/overcooked_demo/README.md)
 
 ## Raw Data :ledger:
 
-The raw data used in training is >100 MB, which makes it inconvenient to distribute via git. The code uses pickled dataframes for training and testing, but in case one needs to original data it can be found [here](https://drive.google.com/drive/folders/1aGV8eqWeOG5BMFdUcVoP2NHU_GFPqi57?usp=share_link) 
+The raw data used during BC training is >100 MB, which makes it inconvenient to distribute via git. The code uses pickled dataframes for training and testing, but in case one needs to original data it can be found [here](https://drive.google.com/drive/folders/1aGV8eqWeOG5BMFdUcVoP2NHU_GFPqi57?usp=share_link) 
+
+## Deprecated: Behavior Cloning and Reinforcement Learning 
+
+
+
+
 
 ## Further Issues and questions ❓
 
 If you have issues or questions, you can contact [Micah Carroll](https://micahcarroll.github.io) at mdc@berkeley.edu.
-

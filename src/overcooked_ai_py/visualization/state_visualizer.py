@@ -16,7 +16,6 @@ from overcooked_ai_py.mdp.layout_generator import (
 )
 from overcooked_ai_py.static import FONTS_DIR, GRAPHICS_DIR
 from overcooked_ai_py.utils import (
-    classproperty,
     cumulative_rewards_from_rew_list,
     generate_temporary_file_path,
 )
@@ -53,9 +52,7 @@ class StateVisualizer:
         os.path.join(GRAPHICS_DIR, "chefs.json"),
     )
     ARROW_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, "arrow.png"))
-    INTERACT_IMG = pygame.image.load(
-        os.path.join(GRAPHICS_DIR, "interact.png")
-    )
+    INTERACT_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, "interact.png"))
     STAY_IMG = pygame.image.load(os.path.join(GRAPHICS_DIR, "stay.png"))
     UNSCALED_TILE_SIZE = 15
     DEFAULT_VALUES = {
@@ -159,9 +156,7 @@ class StateVisualizer:
         )
         return [
             StateVisualizer.default_hud_data(state, score=scores[i])
-            for i, state in enumerate(
-                trajectories["ep_states"][trajectory_idx]
-            )
+            for i, state in enumerate(trajectories["ep_states"][trajectory_idx])
         ]
 
     def display_rendered_trajectory(
@@ -243,12 +238,10 @@ class StateVisualizer:
         window_display (bool): if True render state into pygame window
         action_probs(list(list(float))): action probs for every player acessed in the way action_probs[player][action]
         """
-        assert (
-            window_display or img_path or ipython_display
-        ), "specify at least one of the ways to output result state image: window_display, img_path, or ipython_display"
-        surface = self.render_state(
-            state, grid, hud_data, action_probs=action_probs
+        assert window_display or img_path or ipython_display, (
+            "specify at least one of the ways to output result state image: window_display, img_path, or ipython_display"
         )
+        surface = self.render_state(state, grid, hud_data, action_probs=action_probs)
 
         if img_path is None and ipython_display:
             img_path = generate_temporary_file_path(
@@ -274,17 +267,13 @@ class StateVisualizer:
         pygame.init()
         grid = grid or self.grid
         assert grid
-        grid_surface = pygame.surface.Surface(
-            self._unscaled_grid_pixel_size(grid)
-        )
+        grid_surface = pygame.surface.Surface(self._unscaled_grid_pixel_size(grid))
         self._render_grid(grid_surface, grid)
         self._render_players(grid_surface, state.players)
         self._render_objects(grid_surface, state.objects, grid)
 
         if self.scale_by_factor != 1:
-            grid_surface = scale_surface_by_factor(
-                grid_surface, self.scale_by_factor
-            )
+            grid_surface = scale_surface_by_factor(grid_surface, self.scale_by_factor)
 
         # render text after rescaling as text looks bad when is rendered small resolution and then rescalled to bigger one
         if self.is_rendering_cooking_timer:
@@ -292,9 +281,7 @@ class StateVisualizer:
 
         # arrows does not seem good when rendered in very small resolution
         if self.is_rendering_action_probs and action_probs is not None:
-            self._render_actions_probs(
-                grid_surface, state.players, action_probs
-            )
+            self._render_actions_probs(grid_surface, state.players, action_probs)
 
         if self.is_rendering_hud and hud_data:
             hud_width = self.width or grid_surface.get_width()
@@ -336,9 +323,7 @@ class StateVisualizer:
 
     @staticmethod
     def _check_config_validity(config):
-        assert set(config.keys()).issubset(
-            set(StateVisualizer.DEFAULT_VALUES.keys())
-        )
+        assert set(config.keys()).issubset(set(StateVisualizer.DEFAULT_VALUES.keys()))
 
     def _init_font(self, font_size, font_path=None, system_font_name=None):
         if system_font_name:
@@ -348,9 +333,7 @@ class StateVisualizer:
             )
         else:
             key = "%i-path:%s" % (font_size, font_path)
-            font = self._fonts.get(key) or pygame.font.Font(
-                font_path, font_size
-            )
+            font = self._fonts.get(key) or pygame.font.Font(font_path, font_size)
         self._fonts[key] = font
         return font
 
@@ -442,9 +425,7 @@ class StateVisualizer:
                     soup_status = "idle"
             else:  # grid[x][y] != POT
                 soup_status = "done"
-            frame_name = StateVisualizer._soup_frame_name(
-                obj.ingredients, soup_status
-            )
+            frame_name = StateVisualizer._soup_frame_name(obj.ingredients, soup_status)
             self.SOUPS_IMG.blit_on_surface(
                 surface,
                 self._position_in_unscaled_pixels(obj.position),
@@ -466,8 +447,7 @@ class StateVisualizer:
             (x_pos, y_pos) = obj.position
             if obj.name == "soup" and grid[y_pos][x_pos] == POT:
                 if obj._cooking_tick != -1 and (
-                    obj._cooking_tick <= obj.cook_time
-                    or self.show_timer_when_cooked
+                    obj._cooking_tick <= obj.cook_time or self.show_timer_when_cooked
                 ):
                     text_surface = self.cooking_timer_font.render(
                         str(obj._cooking_tick),
@@ -481,13 +461,9 @@ class StateVisualizer:
                     # calculate font position to be in center on x axis, and 0.9 from top on y axis
                     font_position = (
                         tile_pos_x
-                        + int(
-                            (self.tile_size - text_surface.get_width()) * 0.5
-                        ),
+                        + int((self.tile_size - text_surface.get_width()) * 0.5),
                         tile_pos_y
-                        + int(
-                            (self.tile_size - text_surface.get_height()) * 0.9
-                        ),
+                        + int((self.tile_size - text_surface.get_height()) * 0.9),
                     )
                     surface.blit(text_surface, font_position)
 
@@ -538,9 +514,7 @@ class StateVisualizer:
                 frame_name = StateVisualizer._soup_frame_name(
                     order_dict["ingredients"], "done"
                 )
-                unscaled_order_surface = pygame.surface.Surface(
-                    unscaled_order_size
-                )
+                unscaled_order_surface = pygame.surface.Surface(unscaled_order_size)
                 unscaled_order_surface.fill(self.background_color)
                 self.SOUPS_IMG.blit_on_surface(
                     unscaled_order_surface, (0, 0), frame_name
@@ -552,14 +526,10 @@ class StateVisualizer:
                         unscaled_order_surface, (order_width, order_width)
                     )
                 recipes_surface.blit(scaled_order_surface, (next_surface_x, 0))
-                next_surface_x += (
-                    order_width + self.hud_distance_between_orders
-                )
+                next_surface_x += order_width + self.hud_distance_between_orders
             return recipes_surface
 
-        for hud_line_num, (key, value) in enumerate(
-            self._sorted_hud_items(hud_data)
-        ):
+        for hud_line_num, (key, value) in enumerate(self._sorted_hud_items(hud_data)):
             hud_text = self._key_to_hud_text(key)
             if key not in [
                 "all_orders",
@@ -569,9 +539,7 @@ class StateVisualizer:
             ]:
                 hud_text += str(value)
 
-            text_surface = self.hud_font.render(
-                hud_text, True, self.hud_font_color
-            )
+            text_surface = self.hud_font.render(hud_text, True, self.hud_font_color)
             text_surface_position = hud_text_position(hud_line_num)
             surface.blit(text_surface, text_surface_position)
 
@@ -681,9 +649,7 @@ class StateVisualizer:
                     # use math sqrt to make probability proportional to area of the image
                     size = math.sqrt(probs[Action.ACTION_TO_INDEX[action]])
                     if action == "interact":
-                        img = pygame.transform.rotozoom(
-                            rescaled_interact, 0, size
-                        )
+                        img = pygame.transform.rotozoom(rescaled_interact, 0, size)
                         self._render_on_tile_position(
                             surface,
                             img,
@@ -701,15 +667,10 @@ class StateVisualizer:
                             vertical_align="center",
                         )
                     else:
-                        position = Action.move_in_direction(
-                            player.position, action
-                        )
+                        position = Action.move_in_direction(player.position, action)
                         img = pygame.transform.rotozoom(
                             rescaled_arrow, direction_to_rotation[action], size
                         )
                         self._render_on_tile_position(
-                            surface,
-                            img,
-                            position,
-                            **direction_to_aligns[action]
+                            surface, img, position, **direction_to_aligns[action]
                         )

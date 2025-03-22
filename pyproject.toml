@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "overcooked_ai"
+version = "2.0.0"
+description = "Cooperative multi-agent environment based on Overcooked"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Micah Carroll", email = "mdc@berkeley.edu" }]
+urls = { homepage = "https://github.com/HumanCompatibleAI/overcooked_ai" }
+keywords = ["Overcooked", "AI", "Reinforcement Learning"]
+dependencies = [
+    "dill",
+    "gymnasium",
+    "ipywidgets",
+    "numpy<2",
+    "opencv-python",
+    "pygame",
+    "scipy",
+    "setuptools>=77.0.3",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+harl = [
+    "ipykernel",
+    "ray[rllib,tune]==2.2",
+    "dm-tree",
+    "lz4",
+    "tensorflow[and-cuda]==2.19.0",
+    "wandb",
+    "gym",
+]
+
+[project.scripts]
+overcooked-demo-up = "overcooked_demo:start_server"
+overcooked-demo-move = "overcooked_demo:move_agent"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = { find = { where = ["src"] } }
+
+[tool.setuptools.package-data]
+"overcooked_ai_py" = [
+    "data/layouts/*.layout",
+    "data/planners/*.py",
+    "data/graphics/*.png",
+    "data/graphics/*.json",
+    "data/fonts/*.ttf",
+]
+"human_aware_rl" = [
+    "static/**/*.pickle",
+    "static/**/*.csv",
+    "ppo/trained_example/*.pkl",
+    "ppo/trained_example/*.json",
+    "ppo/trained_example/*/.is_checkpoint",
+    "ppo/trained_example/*/.tune_metadata",
+    "ppo/trained_example/*/checkpoint-500",
+]

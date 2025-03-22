@@ -1,13 +1,7 @@
 import os
 
-from human_aware_rl.imitation.behavior_cloning_tf2 import (
-    get_bc_params,
-    train_bc_model,
-)
-from human_aware_rl.static import (
-    CLEAN_2019_HUMAN_DATA_TEST,
-    CLEAN_2019_HUMAN_DATA_TRAIN,
-)
+from human_aware_rl.imitation.behavior_cloning_tf2 import get_bc_params, train_bc_model
+from human_aware_rl.static import CLEAN_2019_HUMAN_DATA_TRAIN
 
 if __name__ == "__main__":
     # random 3 is counter_circuit
