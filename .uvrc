@@ -1,9 +1,0 @@
-[application]
-default-python = "3.8"
-isolated = true
-
-[venv]
-location = ".venv"
-
-[pypi]
-url = "https://pypi.org/simple" 

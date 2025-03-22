@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "overcooked_ai"
-version = "1.1.0"
+version = "2.0.0"
 description = "Cooperative multi-agent environment based on Overcooked"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10,<3.11"
 license = {file = "LICENSE"}
 authors = [
     {name = "Micah Carroll", email = "mdc@berkeley.edu"}
@@ -15,33 +15,27 @@ authors = [
 urls = {homepage = "https://github.com/HumanCompatibleAI/overcooked_ai"}
 keywords = ["Overcooked", "AI", "Reinforcement Learning"]
 dependencies = [
-    "dill",
-    "numpy<2.0.0",
-    "scipy",
-    "tqdm",
-    "gymnasium",
-    "ipython",
-    "pygame",
-    "ipywidgets",
-    "opencv-python",
-    "eventlet>=0.39.0",
-    "flask",
-    "flask-socketio",
+    "dill>=0.3.9",
+    "gymnasium>=1.1.1",
+    "ipywidgets>=8.1.5",
+    "numpy<=1.23.5",
+    "opencv-python>=4.11.0.86",
+    "pygame>=2.6.1",
+    "scipy>=1.15.2",
+    "setuptools>=77.0.3",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
 harl = [
-    "wandb",
-    "GitPython",
-    "memory_profiler",
-    "sacred",
-    "pymongo",
-    "matplotlib",
-    "requests",
-    "seaborn==0.9.0",
-    "ray[rllib]>=2.5.0",
-    "protobuf",
-    "tensorflow>=2.14.0",
+    "ipykernel>=6.29.5",
+    "ray[rllib,tune]==2.0",
+    "sacred>=0.8.7",
+    "dm-tree>=0.1.9",
+    "lz4>=4.4.3",
+    "tensorflow>=2.11.1",
+    "pydantic<2",
+    "wandb>=0.18.7",
 ]
 
 [project.scripts]
@@ -56,7 +50,6 @@ packages = {find = {where = ["src"]}}
 "overcooked_ai_py" = [
     "data/layouts/*.layout",
     "data/planners/*.py",
-    "data/human_data/*.pickle",
     "data/graphics/*.png",
     "data/graphics/*.json",
     "data/fonts/*.ttf",

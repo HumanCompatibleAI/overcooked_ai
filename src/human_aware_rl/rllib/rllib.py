@@ -4,21 +4,19 @@ import os
 import random
 import tempfile
 from datetime import datetime
+from pathlib import Path
 
 import dill
-import gymnasium
+import gym as gymnasium  # Things break with gymnasium because rllib can't handle it
 import numpy as np
 import ray
-# Updated import for Ray 2.5+
-from ray.rllib.algorithms.ppo import PPO as PPOTrainer
+from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.models import ModelCatalog
 from ray.tune.logger import UnifiedLogger
 from ray.tune.registry import register_env
-
-# Define DEFAULT_RESULTS_DIR since it's no longer available in Ray 2.5+
-DEFAULT_RESULTS_DIR = os.path.join(os.path.expanduser("~"), "ray_results")
+from ray.tune.result import DEFAULT_RESULTS_DIR
 
 from human_aware_rl.rllib.utils import (
     get_base_ae,
@@ -27,13 +25,8 @@ from human_aware_rl.rllib.utils import (
     softmax,
 )
 from overcooked_ai_py.agents.agent import Agent, AgentPair
-from overcooked_ai_py.agents.benchmarking import AgentEvaluator
 from overcooked_ai_py.mdp.actions import Action
-from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-from overcooked_ai_py.mdp.overcooked_mdp import (
-    EVENT_TYPES,
-    OvercookedGridworld,
-)
+from overcooked_ai_py.mdp.overcooked_mdp import EVENT_TYPES
 
 action_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
 obs_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
@@ -77,9 +70,9 @@ class RlLibAgent(Agent):
         my_obs = obs[self.agent_index]
 
         # Compute non-normalized log probabilities from the underlying model
-        logits = self.policy.compute_actions(
-            np.array([my_obs]), self.rnn_state
-        )[2]["action_dist_inputs"]
+        logits = self.policy.compute_actions(np.array([my_obs]), self.rnn_state)[2][
+            "action_dist_inputs"
+        ]
 
         # Softmax in numpy to convert logits to normalized probabilities
         return softmax(logits)
@@ -170,9 +163,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
         self.base_env = base_env
         # since we are not passing featurize_fn in as an argument, we create it here and check its validity
         self.featurize_fn_map = {
-            "ppo": lambda state: self.base_env.lossless_state_encoding_mdp(
-                state
-            ),
+            "ppo": lambda state: self.base_env.lossless_state_encoding_mdp(state),
             "bc": lambda state: self.base_env.featurize_state_mdp(state),
         }
         self._validate_featurize_fns(self.featurize_fn_map)
@@ -188,31 +179,31 @@ class OvercookedMultiAgent(MultiAgentEnv):
     def _validate_featurize_fns(self, mapping):
         assert "ppo" in mapping, "At least one ppo agent must be specified"
         for k, v in mapping.items():
-            assert (
-                k in self.supported_agents
-            ), "Unsuported agent type in featurize mapping {0}".format(k)
+            assert k in self.supported_agents, (
+                "Unsuported agent type in featurize mapping {0}".format(k)
+            )
             assert callable(v), "Featurize_fn values must be functions"
-            assert (
-                len(get_required_arguments(v)) == 1
-            ), "Featurize_fn value must accept exactly one argument"
+            assert len(get_required_arguments(v)) == 1, (
+                "Featurize_fn value must accept exactly one argument"
+            )
 
     def _validate_schedule(self, schedule):
         timesteps = [p[0] for p in schedule]
         values = [p[1] for p in schedule]
 
-        assert (
-            len(schedule) >= 2
-        ), "Need at least 2 points to linearly interpolate schedule"
+        assert len(schedule) >= 2, (
+            "Need at least 2 points to linearly interpolate schedule"
+        )
         assert schedule[0][0] == 0, "Schedule must start at timestep 0"
-        assert all(
-            [t >= 0 for t in timesteps]
-        ), "All timesteps in schedule must be non-negative"
-        assert all(
-            [v >= 0 and v <= 1 for v in values]
-        ), "All values in schedule must be between 0 and 1"
-        assert (
-            sorted(timesteps) == timesteps
-        ), "Timesteps must be in increasing order in schedule"
+        assert all([t >= 0 for t in timesteps]), (
+            "All timesteps in schedule must be non-negative"
+        )
+        assert all([v >= 0 and v <= 1 for v in values]), (
+            "All values in schedule must be between 0 and 1"
+        )
+        assert sorted(timesteps) == timesteps, (
+            "Timesteps must be in increasing order in schedule"
+        )
 
         # To ensure we flatline after passing last timestep
         if schedule[-1][0] < float("inf"):
@@ -221,19 +212,15 @@ class OvercookedMultiAgent(MultiAgentEnv):
     def _setup_action_space(self, agents):
         action_sp = {}
         for agent in agents:
-            action_sp[agent] = gymnasium.spaces.Discrete(
-                len(Action.ALL_ACTIONS)
-            )
+            action_sp[agent] = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
         self.action_space = gymnasium.spaces.Dict(action_sp)
-        self.shared_action_space = gymnasium.spaces.Discrete(
-            len(Action.ALL_ACTIONS)
-        )
+        self.shared_action_space = gymnasium.spaces.Discrete(len(Action.ALL_ACTIONS))
 
     def _setup_observation_space(self, agents):
         dummy_state = self.base_env.mdp.get_standard_start_state()
         # ppo observation
-        featurize_fn_ppo = (
-            lambda state: self.base_env.lossless_state_encoding_mdp(state)
+        featurize_fn_ppo = lambda state: self.base_env.lossless_state_encoding_mdp(
+            state
         )
         obs_shape = featurize_fn_ppo(dummy_state)[0].shape
 
@@ -244,9 +231,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
         )
 
         # bc observation
-        featurize_fn_bc = lambda state: self.base_env.featurize_state_mdp(
-            state
-        )
+        featurize_fn_bc = lambda state: self.base_env.featurize_state_mdp(state)
         obs_shape = featurize_fn_bc(dummy_state)[0].shape
         high = np.ones(obs_shape) * 100
         low = np.ones(obs_shape) * -100
@@ -264,9 +249,7 @@ class OvercookedMultiAgent(MultiAgentEnv):
 
     def _get_featurize_fn(self, agent_id):
         if agent_id.startswith("ppo"):
-            return lambda state: self.base_env.lossless_state_encoding_mdp(
-                state
-            )
+            return lambda state: self.base_env.lossless_state_encoding_mdp(state)
         if agent_id.startswith("bc"):
             return lambda state: self.base_env.featurize_state_mdp(state)
         raise ValueError("Unsupported agent type {0}".format(agent_id))
@@ -342,12 +325,8 @@ class OvercookedMultiAgent(MultiAgentEnv):
 
         ob_p0, ob_p1 = self._get_obs(next_state)
 
-        shaped_reward_p0 = (
-            sparse_reward + self.reward_shaping_factor * dense_reward[0]
-        )
-        shaped_reward_p1 = (
-            sparse_reward + self.reward_shaping_factor * dense_reward[1]
-        )
+        shaped_reward_p0 = sparse_reward + self.reward_shaping_factor * dense_reward[0]
+        shaped_reward_p1 = sparse_reward + self.reward_shaping_factor * dense_reward[1]
 
         obs = {self.curr_agents[0]: ob_p0, self.curr_agents[1]: ob_p1}
         rewards = {
@@ -434,10 +413,9 @@ class OvercookedMultiAgent(MultiAgentEnv):
             and "env_params" in env_config
             and "multi_agent_params" in env_config
         )
-        assert (
-            "mdp_params" in env_config
-            or "mdp_params_schedule_fn" in env_config
-        ), "either a fixed set of mdp params or a schedule function needs to be given"
+        assert "mdp_params" in env_config or "mdp_params_schedule_fn" in env_config, (
+            "either a fixed set of mdp params or a schedule function needs to be given"
+        )
         # "layout_name" and "rew_shaping_params"
         if "mdp_params" in env_config:
             mdp_params = env_config["mdp_params"]
@@ -519,9 +497,7 @@ class TrainingCallbacks(DefaultCallbacks):
 
         # Anneal the bc factor based on environment paremeters and current timestep
         trainer.workers.foreach_worker(
-            lambda ev: ev.foreach_env(
-                lambda env: env.anneal_bc_factor(timestep)
-            )
+            lambda ev: ev.foreach_env(lambda env: env.anneal_bc_factor(timestep))
         )
 
     def on_postprocess_trajectory(
@@ -533,7 +509,7 @@ class TrainingCallbacks(DefaultCallbacks):
         policies,
         postprocessed_batch,
         original_batches,
-        **kwargs
+        **kwargs,
     ):
         pass
 
@@ -685,9 +661,7 @@ def gen_trainer_from_params(params):
             "include_dashboard": False,
             "_temp_dir": params["ray_params"]["temp_dir"],
             "log_to_driver": params["verbose"],
-            "logging_level": logging.INFO
-            if params["verbose"]
-            else logging.CRITICAL,
+            "logging_level": logging.INFO if params["verbose"] else logging.CRITICAL,
         }
         ray.init(**init_params)
     register_env("overcooked_multi_agent", params["ray_params"]["env_creator"])
@@ -784,9 +758,7 @@ def gen_trainer_from_params(params):
         environment_params["outer_shape"] = None
 
     if "mdp_params" in environment_params:
-        environment_params["eval_mdp_params"] = environment_params[
-            "mdp_params"
-        ]
+        environment_params["eval_mdp_params"] = environment_params["mdp_params"]
     trainer = PPOTrainer(
         env="overcooked_multi_agent",
         config={
@@ -837,8 +809,7 @@ def load_trainer(save_path, true_num_workers=False):
     Returns a ray compatible trainer object that was previously saved at `save_path` by a call to `save_trainer`
     Note that `save_path` is the full path to the checkpoint directory
     Additionally we decide if we want to use the same number of remote workers (see ray library Training APIs)
-    as we store in the previous configuration, by default = False, we use only the local worker
-    (see ray library API)
+    as we store in the previous configuration, by default = False, we use only the local worker (see ray library API)
     """
     # Read in params used to create trainer
     config_path = os.path.join(os.path.dirname(save_path), "config.pkl")
@@ -855,14 +826,31 @@ def load_trainer(save_path, true_num_workers=False):
 
     if "trained_example" in save_path:
         # For the unit testing we update the result directory in order to avoid an error
-        config[
-            "results_dir"
-        ] = "/Users/runner/work/human_aware_rl/human_aware_rl/human_aware_rl/ppo/results_temp"
+        config["results_dir"] = (
+            "/Users/runner/work/human_aware_rl/human_aware_rl/human_aware_rl/ppo/results_temp"
+        )
 
     # Get un-trained trainer object with proper config
     trainer = gen_trainer_from_params(config)
+
+    # Search for the checkpoint folder in the save_path that has the highest number. Checkpoint folders are named checkpoint_<number>
+    checkpoint_dirs = [d for d in os.listdir(save_path) if d.startswith("checkpoint_")]
+    if not checkpoint_dirs:
+        raise ValueError(f"No checkpoint directories found in {save_path}")
+
+    # Find directory with highest checkpoint number (2025: this was recently changed because previously checkpoints didn't have this format)
+    latest_dir = checkpoint_dirs[0]
+    latest_num = int(latest_dir.split("_")[1].lstrip("0") or "0")
+    for d in checkpoint_dirs[1:]:
+        num = int(d.split("_")[1].lstrip("0") or "0")
+        if num > latest_num:
+            latest_num = num
+            latest_dir = d
+
+    checkpoint_file = os.path.join(save_path, latest_dir + "/")
+
     # Load weights into dummy object
-    trainer.restore(save_path)
+    trainer.restore(checkpoint_file)
     return trainer
 
 
@@ -901,6 +889,4 @@ def load_agent(save_path, policy_id="ppo", agent_index=0):
     as the featurization is not symmetric for both players
     """
     trainer = load_trainer(save_path)
-    return get_agent_from_trainer(
-        trainer, policy_id=policy_id, agent_index=agent_index
-    )
+    return get_agent_from_trainer(trainer, policy_id=policy_id, agent_index=agent_index)
