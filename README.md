@@ -17,9 +17,9 @@ The goal of the game is to deliver soups as fast as possible. Each soup requires
 
 You can **try out the game [here](https://humancompatibleai.github.io/overcooked-demo/)** (playing with some previously trained DRL agents). To play with your own trained agents using this interface, or to collect more human-AI or human-human data, you can use the code [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/overcooked_demo). You can find some human-human and human-AI gameplay data already collected [here](https://github.com/HumanCompatibleAI/overcooked_ai/tree/master/src/human_aware_rl/static/human_data).
 
-DRL implementations compatible with the environment are included in the repo as a submodule under src/human_aware_rl. 
+**NOTE + LOOKING FOR CONTRIBUTORS:** DRL and BC implementations are now deprecated. We used to include code for training BC and PPO agents in the `human_aware_rl` directory. See [this issue](https://github.com/HumanCompatibleAI/overcooked_ai/issues/162) for more details.
 
-The old [human_aware_rl](https://github.com/HumanCompatibleAI/human_aware_rl) is being deprecated and should only used to reproduce the results in the 2019 paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)* (also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/)).
+This benchmark was build in the context of a 2019 paper: *[On the Utility of Learning about Humans for Human-AI Coordination](https://arxiv.org/abs/1910.05789)*. Also see our [blog post](https://bair.berkeley.edu/blog/2019/10/21/coordination/).
 
 ## Research Papers using Overcooked-AI 📑
 
@@ -136,7 +136,7 @@ The raw data used during BC training is >100 MB, which makes it inconvenient to 
 
 ## Deprecated: Behavior Cloning and Reinforcement Learning 
 
-We used to include code for training BC and PPO agents in the `human_aware_rl` module. This is now deprecated, because of package version issues which are hard to fix. See this [issue](https://github.com/HumanCompatibleAI/overcooked_ai/issues/162) for more details.
+
 
 
 
