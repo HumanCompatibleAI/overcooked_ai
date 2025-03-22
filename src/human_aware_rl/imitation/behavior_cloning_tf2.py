@@ -6,19 +6,11 @@ import numpy as np
 import tensorflow as tf
 from ray.rllib.policy import Policy as RllibPolicy
 from tensorflow import keras
-from tensorflow.compat.v1.keras.backend import get_session, set_session
+from tensorflow.compat.v1.keras.backend import get_session
 
 from human_aware_rl.data_dir import DATA_DIR
-from human_aware_rl.human.process_dataframes import (
-    get_human_human_trajectories,
-    get_trajs_from_data,
-)
-from human_aware_rl.rllib.rllib import (
-    RlLibAgent,
-    evaluate,
-    get_base_ae,
-    softmax,
-)
+from human_aware_rl.human.process_dataframes import get_human_human_trajectories
+from human_aware_rl.rllib.rllib import evaluate, get_base_ae, softmax
 from human_aware_rl.static import CLEAN_2019_HUMAN_DATA_TRAIN
 from human_aware_rl.utils import get_flattened_keys, recursive_dict_update
 from overcooked_ai_py.mdp.actions import Action
@@ -119,9 +111,7 @@ def get_bc_params(**args_to_override):
 
     all_keys = get_flattened_keys(params)
     if len(all_keys) != len(set(all_keys)):
-        raise ValueError(
-            "Every key at every level must be distict for BC params!"
-        )
+        raise ValueError("Every key at every level must be distict for BC params!")
 
     return params
 
@@ -198,9 +188,7 @@ def train_bc_model(model_dir, bc_params, verbose=False):
         class_weights = None
 
     # Retrieve un-initialized keras model
-    model = build_bc_model(
-        **bc_params, max_seq_len=np.max(seq_lens), verbose=verbose
-    )
+    model = build_bc_model(**bc_params, max_seq_len=np.max(seq_lens), verbose=verbose)
 
     # Initialize the model
     # Note: have to use lists for multi-output model support and not dicts because of tensorlfow 2.0.0 bug
@@ -225,9 +213,7 @@ def train_bc_model(model_dir, bc_params, verbose=False):
         # Early terminate training if loss doesn't improve for "patience" epochs
         keras.callbacks.EarlyStopping(monitor="loss", patience=20),
         # Reduce lr by "factor" after "patience" epochs of no improvement in loss
-        keras.callbacks.ReduceLROnPlateau(
-            monitor="loss", patience=3, factor=0.1
-        ),
+        keras.callbacks.ReduceLROnPlateau(monitor="loss", patience=3, factor=0.1),
         # Log all metrics model was compiled with to tensorboard every epoch
         keras.callbacks.TensorBoard(
             log_dir=os.path.join(model_dir, "logs"), write_graph=False
@@ -329,12 +315,8 @@ def evaluate_bc_model(model, bc_params, verbose=False):
         return base_env.featurize_state_mdp(state)
 
     # Wrap Keras models in rllib policies
-    agent_0_policy = BehaviorCloningPolicy.from_model(
-        model, bc_params, stochastic=True
-    )
-    agent_1_policy = BehaviorCloningPolicy.from_model(
-        model, bc_params, stochastic=True
-    )
+    agent_0_policy = BehaviorCloningPolicy.from_model(model, bc_params, stochastic=True)
+    agent_1_policy = BehaviorCloningPolicy.from_model(model, bc_params, stochastic=True)
 
     # Compute the results of the rollout(s)
     results = evaluate(
@@ -355,21 +337,17 @@ def evaluate_bc_model(model, bc_params, verbose=False):
 
 def _build_model(observation_shape, action_shape, mlp_params, **kwargs):
     ## Inputs
-    inputs = keras.Input(
-        shape=observation_shape, name="Overcooked_observation"
-    )
+    inputs = keras.Input(shape=observation_shape, name="Overcooked_observation")
     x = inputs
 
     ## Build fully connected layers
-    assert (
-        len(mlp_params["net_arch"]) == mlp_params["num_layers"]
-    ), "Invalid Fully Connected params"
+    assert len(mlp_params["net_arch"]) == mlp_params["num_layers"], (
+        "Invalid Fully Connected params"
+    )
 
     for i in range(mlp_params["num_layers"]):
         units = mlp_params["net_arch"][i]
-        x = keras.layers.Dense(
-            units, activation="relu", name="fc_{0}".format(i)
-        )(x)
+        x = keras.layers.Dense(units, activation="relu", name="fc_{0}".format(i))(x)
 
     ## output layer
     logits = keras.layers.Dense(action_shape[0], name="logits")(x)
@@ -378,12 +356,7 @@ def _build_model(observation_shape, action_shape, mlp_params, **kwargs):
 
 
 def _build_lstm_model(
-    observation_shape,
-    action_shape,
-    mlp_params,
-    cell_size,
-    max_seq_len=20,
-    **kwargs
+    observation_shape, action_shape, mlp_params, cell_size, max_seq_len=20, **kwargs
 ):
     ## Inputs
     obs_in = keras.Input(
@@ -395,21 +368,19 @@ def _build_lstm_model(
     x = obs_in
 
     ## Build fully connected layers
-    assert (
-        len(mlp_params["net_arch"]) == mlp_params["num_layers"]
-    ), "Invalid Fully Connected params"
+    assert len(mlp_params["net_arch"]) == mlp_params["num_layers"], (
+        "Invalid Fully Connected params"
+    )
 
     for i in range(mlp_params["num_layers"]):
         units = mlp_params["net_arch"][i]
         x = keras.layers.TimeDistributed(
-            keras.layers.Dense(
-                units, activation="relu", name="fc_{0}".format(i)
-            )
+            keras.layers.Dense(units, activation="relu", name="fc_{0}".format(i))
         )(x)
 
-    mask = keras.layers.Lambda(
-        lambda x: tf.sequence_mask(x, maxlen=max_seq_len)
-    )(seq_in)
+    mask = keras.layers.Lambda(lambda x: tf.sequence_mask(x, maxlen=max_seq_len))(
+        seq_in
+    )
 
     ## LSTM layer
     lstm_out, h_out, c_out = keras.layers.LSTM(
@@ -488,17 +459,15 @@ class BehaviorCloningPolicy(RllibPolicy):
         )
 
         if "bc_model" in config and config["bc_model"]:
-            assert (
-                "bc_params" in config
-            ), "must specify params in addition to model"
-            assert issubclass(
-                type(config["bc_model"]), keras.Model
-            ), "model must be of type keras.Model"
+            assert "bc_params" in config, "must specify params in addition to model"
+            assert issubclass(type(config["bc_model"]), keras.Model), (
+                "model must be of type keras.Model"
+            )
             model, bc_params = config["bc_model"], config["bc_params"]
         else:
-            assert (
-                "model_dir" in config
-            ), "must specify model directory if model not specified"
+            assert "model_dir" in config, (
+                "must specify model directory if model not specified"
+            )
             model, bc_params = load_bc_model(config["model_dir"])
 
         # Save the session that the model was loaded into so it is available at inference time if necessary
@@ -513,9 +482,7 @@ class BehaviorCloningPolicy(RllibPolicy):
         self.stochastic = config["stochastic"]
         self.use_lstm = bc_params["use_lstm"]
         self.cell_size = bc_params["cell_size"]
-        self.eager = (
-            config["eager"] if "eager" in config else bc_params["eager"]
-        )
+        self.eager = config["eager"] if "eager" in config else bc_params["eager"]
         self.context = self._create_execution_context()
 
     def _setup_shapes(self):
@@ -540,9 +507,7 @@ class BehaviorCloningPolicy(RllibPolicy):
             "bc_params": bc_params,
             "stochastic": stochastic,
         }
-        return cls(
-            bc_params["observation_shape"], bc_params["action_shape"], config
-        )
+        return cls(bc_params["observation_shape"], bc_params["action_shape"], config)
 
     @classmethod
     def from_model(cls, model, bc_params, stochastic=True):
@@ -551,9 +516,7 @@ class BehaviorCloningPolicy(RllibPolicy):
             "bc_params": bc_params,
             "stochastic": stochastic,
         }
-        return cls(
-            bc_params["observation_shape"], bc_params["action_shape"], config
-        )
+        return cls(bc_params["observation_shape"], bc_params["action_shape"], config)
 
     def compute_actions(
         self,
@@ -563,7 +526,7 @@ class BehaviorCloningPolicy(RllibPolicy):
         prev_reward_batch=None,
         info_batch=None,
         episodes=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Computes sampled actions for each of the corresponding OvercookedEnv states in obs_batch
@@ -641,9 +604,7 @@ class BehaviorCloningPolicy(RllibPolicy):
         if self.use_lstm:
             obs_batch = np.expand_dims(obs_batch, 1)
             seq_lens = np.ones(len(obs_batch))
-            model_out = self.model.predict(
-                [obs_batch, seq_lens] + state_batches
-            )
+            model_out = self.model.predict([obs_batch, seq_lens] + state_batches)
             logits, states = model_out[0], model_out[1:]
             logits = logits.reshape((logits.shape[0], -1))
             return logits, states
@@ -663,8 +624,6 @@ class BehaviorCloningPolicy(RllibPolicy):
 
 if __name__ == "__main__":
     params = get_bc_params()
-    model = train_bc_model(
-        os.path.join(BC_SAVE_DIR, "default"), params, verbose=True
-    )
+    model = train_bc_model(os.path.join(BC_SAVE_DIR, "default"), params, verbose=True)
     # Evaluate our model's performance in a rollout
     evaluate_bc_model(model, params)
