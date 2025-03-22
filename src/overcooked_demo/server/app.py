@@ -34,8 +34,7 @@ from utils import ThreadSafeDict, ThreadSafeSet
 ###########
 
 # Read in global config
-script_dir = os.path.dirname(os.path.abspath(__file__))
-CONF_PATH = os.getenv("CONF_PATH", os.path.join(script_dir, "config.json"))
+CONF_PATH = os.getenv("CONF_PATH", "config.json")
 with open(CONF_PATH, "r") as f:
     CONFIG = json.load(f)
 

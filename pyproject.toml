@@ -8,11 +8,9 @@ version = "2.0.0"
 description = "Cooperative multi-agent environment based on Overcooked"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
-license = {file = "LICENSE"}
-authors = [
-    {name = "Micah Carroll", email = "mdc@berkeley.edu"}
-]
-urls = {homepage = "https://github.com/HumanCompatibleAI/overcooked_ai"}
+license = { file = "LICENSE" }
+authors = [{ name = "Micah Carroll", email = "mdc@berkeley.edu" }]
+urls = { homepage = "https://github.com/HumanCompatibleAI/overcooked_ai" }
 keywords = ["Overcooked", "AI", "Reinforcement Learning"]
 dependencies = [
     "dill",
@@ -34,6 +32,7 @@ harl = [
     "lz4",
     "tensorflow[and-cuda]==2.19.0",
     "wandb",
+    "gym",
 ]
 
 [project.scripts]
@@ -41,8 +40,8 @@ overcooked-demo-up = "overcooked_demo:start_server"
 overcooked-demo-move = "overcooked_demo:move_agent"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
-packages = {find = {where = ["src"]}}
+package-dir = { "" = "src" }
+packages = { find = { where = ["src"] } }
 
 [tool.setuptools.package-data]
 "overcooked_ai_py" = [
@@ -60,4 +59,4 @@ packages = {find = {where = ["src"]}}
     "ppo/trained_example/*/.is_checkpoint",
     "ppo/trained_example/*/.tune_metadata",
     "ppo/trained_example/*/checkpoint-500",
-] 
+]
