@@ -10,6 +10,10 @@ jobs:
       with:
         python-version: 3.10.16
         architecture: 'x64'
+    - name: Install missing dependencies
+      run: |
+        brew install gettext
+        brew link --force gettext
     - name: Install uv
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
