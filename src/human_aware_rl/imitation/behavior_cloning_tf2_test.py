@@ -1,8 +1,10 @@
 import argparse
+import gc
 import os
 import pickle
 import shutil
 import sys
+import time
 import unittest
 import warnings
 
@@ -32,7 +34,6 @@ def _clear_pickle():
 
 
 class TestBCTraining(unittest.TestCase):
-
     """
     Unittests for behavior cloning training and utilities
 
@@ -48,9 +49,9 @@ class TestBCTraining(unittest.TestCase):
         self.compute_pickle = False
         self.strict = False
         self.min_performance = 0
-        assert not (
-            self.compute_pickle and self.strict
-        ), "Cannot compute pickle and run strict reproducibility tests at same time"
+        assert not (self.compute_pickle and self.strict), (
+            "Cannot compute pickle and run strict reproducibility tests at same time"
+        )
         if self.compute_pickle:
             _clear_pickle()
 
@@ -94,7 +95,17 @@ class TestBCTraining(unittest.TestCase):
             with open(BC_EXPECTED_DATA_PATH, "wb") as f:
                 pickle.dump(self.expected, f)
 
-        shutil.rmtree(self.model_dir)
+        # Force garbage collection to close any open files
+        gc.collect()
+
+        # Add a small delay to ensure files are released
+        time.sleep(0.1)
+
+        try:
+            # Use ignore_errors=True to force removal even if some files are still locked
+            shutil.rmtree(self.model_dir, ignore_errors=True)
+        except Exception as e:
+            print(f"Warning: Could not fully remove directory {self.model_dir}: {e}")
 
     def test_model_construction(self):
         model = build_bc_model(**self.bc_params)
@@ -115,9 +126,7 @@ class TestBCTraining(unittest.TestCase):
         loaded_model, loaded_params = load_bc_model(self.model_dir)
         self.assertDictEqual(self.bc_params, loaded_params)
         self.assertTrue(
-            np.allclose(
-                model(self.dummy_input), loaded_model(self.dummy_input)
-            )
+            np.allclose(model(self.dummy_input), loaded_model(self.dummy_input))
         )
 
     def test_training(self):
@@ -127,9 +136,7 @@ class TestBCTraining(unittest.TestCase):
             self.expected["test_training"] = model(self.dummy_input)
         if self.strict:
             self.assertTrue(
-                np.allclose(
-                    model(self.dummy_input), self.expected["test_training"]
-                )
+                np.allclose(model(self.dummy_input), self.expected["test_training"])
             )
 
     def test_agent_evaluation(self):
@@ -143,9 +150,7 @@ class TestBCTraining(unittest.TestCase):
         if self.compute_pickle:
             self.expected["test_agent_evaluation"] = results
         if self.strict:
-            self.assertAlmostEqual(
-                results, self.expected["test_agent_evaluation"]
-            )
+            self.assertAlmostEqual(results, self.expected["test_agent_evaluation"])
 
 
 class TestBCTrainingLSTM(TestBCTraining):
@@ -190,9 +195,7 @@ class TestBCTrainingLSTM(TestBCTraining):
         if self.compute_pickle:
             self.expected["test_lstm_evaluation"] = results
         if self.strict:
-            self.assertAlmostEqual(
-                results, self.expected["test_lstm_evaluation"]
-            )
+            self.assertAlmostEqual(results, self.expected["test_lstm_evaluation"])
 
     def test_lstm_save_and_load(self):
         self.bc_params["use_lstm"] = True

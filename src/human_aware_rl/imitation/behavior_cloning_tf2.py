@@ -6,7 +6,6 @@ import numpy as np
 import tensorflow as tf
 from ray.rllib.policy import Policy as RllibPolicy
 from tensorflow import keras
-from tensorflow.compat.v1.keras.backend import get_session
 
 from human_aware_rl.data_dir import DATA_DIR
 from human_aware_rl.human.process_dataframes import get_human_human_trajectories
@@ -176,6 +175,9 @@ def build_bc_model(use_lstm=True, eager=False, **kwargs):
 def train_bc_model(model_dir, bc_params, verbose=False):
     inputs, seq_lens, targets = load_data(bc_params, verbose)
 
+    # Ensure targets are int32 for SparseCategoricalCrossentropy
+    targets = tf.cast(targets, tf.int32)
+
     training_params = bc_params["training_params"]
 
     if training_params["use_class_weights"]:
@@ -220,7 +222,7 @@ def train_bc_model(model_dir, bc_params, verbose=False):
         ),
         # Save checkpoints of the models at the end of every epoch (saving only the best one so far)
         keras.callbacks.ModelCheckpoint(
-            filepath=os.path.join(model_dir, "checkpoints"),
+            filepath=os.path.join(model_dir, "checkpoints", "model.keras"),
             monitor="loss",
             save_best_only=True,
         ),
@@ -235,15 +237,25 @@ def train_bc_model(model_dir, bc_params, verbose=False):
 
     # Inputs unique to lstm model
     if bc_params["use_lstm"]:
-        inputs["seq_in"] = seq_lens
-        inputs["hidden_in"] = np.zeros((N, bc_params["cell_size"]))
-        inputs["memory_in"] = np.zeros((N, bc_params["cell_size"]))
+        inputs["seq_in"] = tf.cast(seq_lens, tf.int32)
+        inputs["hidden_in"] = tf.zeros((N, bc_params["cell_size"]), dtype=tf.float32)
+        inputs["memory_in"] = tf.zeros((N, bc_params["cell_size"]), dtype=tf.float32)
 
     # Batch size doesn't include time dimension (seq_len) so it should be smaller for rnn model
     batch_size = 1 if bc_params["use_lstm"] else training_params["batch_size"]
+    model_inputs = (
+        inputs
+        if not bc_params["use_lstm"]
+        else {
+            "Overcooked_observation": inputs,
+            "seq_in": seq_lens,
+            "hidden_in": np.zeros((N, bc_params["cell_size"])),
+            "memory_in": np.zeros((N, bc_params["cell_size"])),
+        }
+    )
     model.fit(
-        inputs,
-        targets,
+        model_inputs,
+        targets["logits"],
         callbacks=callbacks,
         batch_size=batch_size,
         epochs=training_params["epochs"],
@@ -260,18 +272,20 @@ def train_bc_model(model_dir, bc_params, verbose=False):
 
 def save_bc_model(model_dir, model, bc_params, verbose=False):
     """
-    Saves the specified model under the directory model_dir. This creates three items
-
-        assets/         stores information essential to reconstructing the context and tf graph
-        variables/      stores the model's trainable weights
-        saved_model.pd  the saved state of the model object
+    Saves the specified model under the directory model_dir. This creates a .keras file
+    containing the model's architecture, weights, and optimizer state.
 
     Additionally, saves a pickled dictionary containing all the parameters used to construct this model
     at model_dir/metadata.pickle
     """
     if verbose:
         print("Saving bc model at ", model_dir)
-    model.save(model_dir, save_format="tf")
+
+    # Save model with .keras extension
+    model_path = os.path.join(model_dir, "model.keras")
+    model.save(model_path)
+
+    # Save metadata
     with open(os.path.join(model_dir, "metadata.pickle"), "wb") as f:
         pickle.dump(bc_params, f)
 
@@ -283,7 +297,12 @@ def load_bc_model(model_dir, verbose=False):
     """
     if verbose:
         print("Loading bc model from ", model_dir)
-    model = keras.models.load_model(model_dir, custom_objects={"tf": tf})
+
+    # Load model from .keras file
+    model_path = os.path.join(model_dir, "model.keras")
+    model = keras.models.load_model(model_path, custom_objects={"tf": tf})
+
+    # Load metadata
     with open(os.path.join(model_dir, "metadata.pickle"), "rb") as f:
         bc_params = pickle.load(f)
     return model, bc_params
@@ -406,40 +425,6 @@ def _build_lstm_model(
 ################
 
 
-class NullContextManager:
-    """
-    No-op context manager that does nothing
-    """
-
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args):
-        pass
-
-
-class TfContextManager:
-    """
-    Properly sets the execution graph and session of the keras backend given a "session" object as input
-
-    Used for isolating tf execution in graph mode. Do not use with eager models or with eager mode on
-    """
-
-    def __init__(self, session):
-        self.session = session
-
-    def __enter__(self):
-        self.ctx = self.session.graph.as_default()
-        self.ctx.__enter__()
-        set_session(self.session)
-
-    def __exit__(self, *args):
-        self.ctx.__exit__(*args)
-
-
 class BehaviorCloningPolicy(RllibPolicy):
     def __init__(self, observation_space, action_space, config):
         """
@@ -470,8 +455,6 @@ class BehaviorCloningPolicy(RllibPolicy):
             )
             model, bc_params = load_bc_model(config["model_dir"])
 
-        # Save the session that the model was loaded into so it is available at inference time if necessary
-        self._sess = get_session()
         self._setup_shapes()
 
         # Basic check to make sure model dimensions match
@@ -482,8 +465,6 @@ class BehaviorCloningPolicy(RllibPolicy):
         self.stochastic = config["stochastic"]
         self.use_lstm = bc_params["use_lstm"]
         self.cell_size = bc_params["cell_size"]
-        self.eager = config["eager"] if "eager" in config else bc_params["eager"]
-        self.context = self._create_execution_context()
 
     def _setup_shapes(self):
         # This is here to make the class compatible with both tuples or gymnasium.Space objs for the spaces
@@ -542,11 +523,8 @@ class BehaviorCloningPolicy(RllibPolicy):
         # Cast to np.array if list (no-op if already np.array)
         obs_batch = np.array(obs_batch)
 
-        # Run the model
-        with self.context:
-            action_logits, states = self._forward(obs_batch, state_batches)
+        action_logits, states = self._forward(obs_batch, state_batches)
 
-        # Softmax in numpy to convert logits to probabilities
         action_probs = softmax(action_logits)
         if self.stochastic:
             # Sample according to action_probs for each row in the output
@@ -610,16 +588,6 @@ class BehaviorCloningPolicy(RllibPolicy):
             return logits, states
         else:
             return self.model.predict(obs_batch, verbose=0), []
-
-    def _create_execution_context(self):
-        """
-        Creates a private execution context for the model
-
-        Necessary if using with rllib in order to isolate this policy model from others
-        """
-        if self.eager:
-            return NullContextManager()
-        return TfContextManager(self._sess)
 
 
 if __name__ == "__main__":
