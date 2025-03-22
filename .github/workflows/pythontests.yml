@@ -1,31 +1,5 @@
 on: ['push', 'pull_request']
 jobs:
-  # Removed macos tests because github actions doesn't support python 3.7 anymore
-  osx_mdp_tests:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.10.16
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.10.16
-        architecture: 'x64'
-    - name: Install missing dependencies
-      run: |
-        brew install gettext
-        brew link --force gettext
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-    - name: Install dependencies
-      run: |
-        uv venv
-        source .venv/bin/activate
-        uv pip install -e .
-    - name: Run tests
-      run: |
-        source .venv/bin/activate
-        coverage run -m unittest discover -s testing/ -p "*_test.py"
   ubuntu_mdp_tests:
     runs-on: ubuntu-latest
     steps:
