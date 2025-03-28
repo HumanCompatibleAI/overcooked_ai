@@ -1630,16 +1630,29 @@ class OvercookedGridworld(object):
 
     def deliver_soup(self, state, player, soup):
         """
-        Deliver the soup, and get reward if there is no order list
-        or if the type of the delivered soup matches the next order.
+        Deliver the soup, and get a reward. Since there is no actual space decicated for throwing out soup if a recipe is not in the orders list it can be served for a reward of 0 points.  If the order was a bonus order it will get popped out of both "_all_orders" and "_bonus_orders" as if this is not done the game freezes completely.
         """
-        assert (
-            soup.name == "soup"
-        ), "Tried to deliver something that wasn't soup"
-        assert soup.is_ready, "Tried to deliever soup that isn't ready"
+        # Remove soup from player's hand
         player.remove_object()
 
-        return self.get_recipe_value(state, soup.recipe)
+        # Force 0 reward if not correct or not fully cooked
+        if (not soup.is_ready) or (soup.recipe not in state.all_orders):
+            return 0
+
+        delivered_recipe = soup.recipe
+        recipe_value = self.get_recipe_value(state, soup.recipe)
+
+        if delivered_recipe in state._all_orders:
+            new_orders = list(state._all_orders)
+            new_orders.remove(delivered_recipe)
+            state._all_orders = new_orders
+
+        if delivered_recipe in state._bonus_orders:
+            new_bonus = list(state._bonus_orders)
+            new_bonus.remove(delivered_recipe)
+            state._bonus_orders = new_bonus
+
+        return recipe_value
 
     def resolve_movement(self, state, joint_action):
         """Resolve player movement and deal with possible collisions"""
