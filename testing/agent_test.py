@@ -1,6 +1,5 @@
-import unittest
-
 import numpy as np
+import pytest
 
 from overcooked_ai_py.agents.agent import (
     AgentPair,
@@ -38,46 +37,29 @@ simple_mdp = OvercookedGridworld.from_layout_name("cramped_room")
 large_mdp = OvercookedGridworld.from_layout_name("corridor")
 
 
-class TestAgentEvaluator(unittest.TestCase):
-    def setUp(self):
+class TestAgentEvaluator:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.agent_eval = AgentEvaluator.from_layout_name(
             {"layout_name": "cramped_room"}, {"horizon": 100}
         )
 
     def test_human_model_pair(self):
         trajs = self.agent_eval.evaluate_human_model_pair()
-        try:
-            AgentEvaluator.check_trajectories(trajs, verbose=False)
-        except AssertionError as e:
-            self.fail(
-                "Trajectories were not returned in standard format:\n{}".format(
-                    e
-                )
-            )
+        AgentEvaluator.check_trajectories(trajs, verbose=False)
 
     def test_rollouts(self):
         ap = AgentPair(RandomAgent(), RandomAgent())
         trajs = self.agent_eval.evaluate_agent_pair(ap, num_games=5)
-        try:
-            AgentEvaluator.check_trajectories(trajs, verbose=False)
-        except AssertionError as e:
-            self.fail(
-                "Trajectories were not returned in standard format:\n{}".format(
-                    e
-                )
-            )
+        AgentEvaluator.check_trajectories(trajs, verbose=False)
 
     def test_mlam_computation(self):
-        try:
-            self.agent_eval.env.mlam
-        except Exception as e:
-            self.fail(
-                "Failed to compute MediumLevelActionManager:\n{}".format(e)
-            )
+        self.agent_eval.env.mlam
 
 
-class TestBasicAgents(unittest.TestCase):
-    def setUp(self):
+class TestBasicAgents:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.mlam_large = MediumLevelActionManager.from_pickle_or_compute(
             large_mdp, NO_COUNTERS_PARAMS, force_compute=force_compute_large
         )
@@ -91,10 +73,10 @@ class TestBasicAgents(unittest.TestCase):
             agent_pair, include_final_state=True, display=DISPLAY
         )
         end_state = trajectory[-1][0]
-        self.assertEqual(time_taken, 10)
-        self.assertEqual(
-            env.mdp.get_standard_start_state().player_positions,
-            end_state.player_positions,
+        assert time_taken == 10
+        assert (
+            env.mdp.get_standard_start_state().player_positions
+            == end_state.player_positions
         )
 
     def test_two_greedy_human_open_map(self):
@@ -132,10 +114,10 @@ class TestBasicAgents(unittest.TestCase):
                 0.08333333,
             ]
         )
-        self.assertTrue(np.allclose(probs, expected_probs))
+        assert np.allclose(probs, expected_probs)
 
 
-class TestAgentEvaluatorStatic(unittest.TestCase):
+class TestAgentEvaluatorStatic:
     layout_name_lst = [
         "asymmetric_advantages",
         "asymmetric_advantages_tomato",
@@ -150,37 +132,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
         "marshmallow_experiment_coordination",
         "you_shall_not_pass",
     ]
-
-    def test_from_mdp(self):
-        for layout_name in self.layout_name_lst:
-            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
-            ae = AgentEvaluator.from_mdp(
-                mdp=orignal_mdp, env_params={"horizon": 400}
-            )
-            ae_mdp = ae.env.mdp
-            self.assertEqual(
-                orignal_mdp,
-                ae_mdp,
-                "mdp with name "
-                + layout_name
-                + " experienced an inconsistency",
-            )
-
-    def test_from_mdp_params_layout(self):
-        for layout_name in self.layout_name_lst:
-            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
-            ae = AgentEvaluator.from_layout_name(
-                mdp_params={"layout_name": layout_name},
-                env_params={"horizon": 400},
-            )
-            ae_mdp = ae.env.mdp
-            self.assertEqual(
-                orignal_mdp,
-                ae_mdp,
-                "mdp with name "
-                + layout_name
-                + " experienced an inconsistency",
-            )
 
     mdp_gen_params_1 = {
         "inner_shape": (10, 7),
@@ -210,6 +161,39 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
 
     outer_shape = (10, 7)
 
+    layout_name_short_lst = [
+        "cramped_room",
+        "cramped_room_tomato",
+        "simple_o",
+        "simple_tomato",
+        "simple_o_t",
+    ]
+    biased = [0.1, 0.15, 0.2, 0.25, 0.3]
+    num_reset = 200000
+
+    def test_from_mdp(self):
+        for layout_name in self.layout_name_lst:
+            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
+            ae = AgentEvaluator.from_mdp(
+                mdp=orignal_mdp, env_params={"horizon": 400}
+            )
+            ae_mdp = ae.env.mdp
+            assert orignal_mdp == ae_mdp, (
+                "mdp with name " + layout_name + " experienced an inconsistency"
+            )
+
+    def test_from_mdp_params_layout(self):
+        for layout_name in self.layout_name_lst:
+            orignal_mdp = OvercookedGridworld.from_layout_name(layout_name)
+            ae = AgentEvaluator.from_layout_name(
+                mdp_params={"layout_name": layout_name},
+                env_params={"horizon": 400},
+            )
+            ae_mdp = ae.env.mdp
+            assert orignal_mdp == ae_mdp, (
+                "mdp with name " + layout_name + " experienced an inconsistency"
+            )
+
     def test_from_mdp_params_variable_across(self):
         for mdp_gen_params in self.mdp_gen_params_lst:
             ae0 = AgentEvaluator.from_mdp_params_infinite(
@@ -222,9 +206,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
                 env_params={"horizon": 400, "num_mdp": np.inf},
                 outer_shape=self.outer_shape,
             )
-            self.assertFalse(
-                ae0.env.mdp == ae1.env.mdp,
-                "2 randomly generated layouts across 2 evaluators are the same, which is wrong",
+            assert ae0.env.mdp != ae1.env.mdp, (
+                "2 randomly generated layouts across 2 evaluators are the same"
             )
 
     def test_from_mdp_params_variable_infinite(self):
@@ -238,9 +221,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             for _ in range(5):
                 ae.env.reset(regen_mdp=True)
                 mdp_1 = ae.env.mdp
-                self.assertFalse(
-                    mdp_0 == mdp_1,
-                    "with infinite layout generator and regen_mdp=True, the 2 layouts should not be the same",
+                assert mdp_0 != mdp_1, (
+                    "with infinite layout generator and regen_mdp=True, layouts should differ"
                 )
 
     def test_from_mdp_params_variable_infinite_no_regen(self):
@@ -254,9 +236,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             for _ in range(5):
                 ae.env.reset(regen_mdp=False)
                 mdp_1 = ae.env.mdp
-                self.assertTrue(
-                    mdp_0 == mdp_1,
-                    "with infinite layout generator and regen_mdp=False, the 2 layouts should be the same",
+                assert mdp_0 == mdp_1, (
+                    "with regen_mdp=False, layouts should be the same"
                 )
 
     def test_from_mdp_params_variable_infinite_specified(self):
@@ -270,9 +251,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             for _ in range(5):
                 ae.env.reset(regen_mdp=True)
                 mdp_1 = ae.env.mdp
-                self.assertFalse(
-                    mdp_0 == mdp_1,
-                    "with infinite layout generator and regen_mdp=True, the 2 layouts should not be the same",
+                assert mdp_0 != mdp_1, (
+                    "with regen_mdp=True, layouts should differ"
                 )
 
     def test_from_mdp_params_variable_finite(self):
@@ -292,24 +272,11 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
                         seen.append(mdp_i.copy())
                 elif len(seen) == 2:
                     mdp_0, mdp_1 = seen
-                    self.assertTrue(
-                        (mdp_i == mdp_0 or mdp_i == mdp_1),
-                        "more than 2 mdp was created, the function failed to perform",
+                    assert mdp_i == mdp_0 or mdp_i == mdp_1, (
+                        "more than 2 mdp was created"
                     )
                 else:
-                    self.assertTrue(
-                        False, "theoretically unreachable statement"
-                    )
-
-    layout_name_short_lst = [
-        "cramped_room",
-        "cramped_room_tomato",
-        "simple_o",
-        "simple_tomato",
-        "simple_o_t",
-    ]
-    biased = [0.1, 0.15, 0.2, 0.25, 0.3]
-    num_reset = 200000
+                    assert False, "theoretically unreachable statement"
 
     def test_from_mdp_lst_default(self):
         mdp_lst = [
@@ -320,7 +287,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             mdp_lst=mdp_lst, env_params={"horizon": 400}
         )
         counts = {}
-
         for _ in range(self.num_reset):
             ae.env.reset(regen_mdp=True)
             if ae.env.mdp.layout_name in counts:
@@ -329,8 +295,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
                 counts[ae.env.mdp.layout_name] = 1
 
         for k, v in counts.items():
-            self.assertAlmostEqual(
-                0.2, v / self.num_reset, 2, "more than 2 places off for " + k
+            assert round(v / self.num_reset, 2) == pytest.approx(0.2, abs=0.01), (
+                f"more than 2 places off for {k}"
             )
 
     def test_from_mdp_lst_uniform(self):
@@ -344,7 +310,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             sampling_freq=[0.2, 0.2, 0.2, 0.2, 0.2],
         )
         counts = {}
-
         for _ in range(self.num_reset):
             ae.env.reset(regen_mdp=True)
             if ae.env.mdp.layout_name in counts:
@@ -353,8 +318,8 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
                 counts[ae.env.mdp.layout_name] = 1
 
         for k, v in counts.items():
-            self.assertAlmostEqual(
-                0.2, v / self.num_reset, 2, "more than 2 places off for " + k
+            assert round(v / self.num_reset, 2) == pytest.approx(0.2, abs=0.01), (
+                f"more than 2 places off for {k}"
             )
 
     def test_from_mdp_lst_biased(self):
@@ -368,7 +333,6 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             sampling_freq=self.biased,
         )
         counts = {}
-
         for _ in range(self.num_reset):
             ae.env.reset(regen_mdp=True)
             if ae.env.mdp.layout_name in counts:
@@ -376,17 +340,11 @@ class TestAgentEvaluatorStatic(unittest.TestCase):
             else:
                 counts[ae.env.mdp.layout_name] = 1
 
-        # construct the ground truth
         gt = {
             self.layout_name_short_lst[i]: self.biased[i]
             for i in range(len(self.layout_name_short_lst))
         }
-
         for k, v in counts.items():
-            self.assertAlmostEqual(
-                gt[k], v / self.num_reset, 2, "more than 2 places off for " + k
+            assert round(v / self.num_reset, 2) == pytest.approx(gt[k], abs=0.01), (
+                f"more than 2 places off for {k}"
             )
-
-
-if __name__ == "__main__":
-    unittest.main()

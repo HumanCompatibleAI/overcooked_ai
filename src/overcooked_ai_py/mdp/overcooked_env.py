@@ -781,39 +781,35 @@ class OvercookedEnv(object):
 
 class Overcooked(gymnasium.Env):
     """
-    Wrapper for the Env class above that is SOMEWHAT compatible with the standard gym API.
-    Why only somewhat? Because we need to flatten a multi-agent env to be a single-agent env (as gym requires).
+    Wrapper for the Env class above that is compatible with the Gymnasium API.
+    Flattens a multi-agent env into a single-agent env (as Gymnasium requires).
 
-    NOTE: Observations returned are in a dictionary format with various information that is
-     necessary to be able to handle the multi-agent nature of the environment. There are probably
-     better ways to handle this, but we found this to work with minor modifications to OpenAI Baselines.
+    Observations are returned as a tuple of two numpy arrays (one per agent).
+    Additional metadata (overcooked_state, other_agent_env_idx) is provided
+    in the info dict returned by reset() and step().
 
-    NOTE: The index of the main agent (as gym envs are 'single-agent') in the mdp is randomized at each reset
+    NOTE: The index of the main agent in the mdp is randomized at each reset
      of the environment, and is kept track of by the self.agent_idx attribute. This means that it is necessary
      to pass on this information in the output to know for which agent index featurizations should be made for
      other agents.
 
     For example, say one is training A0 paired with A1, and A1 takes a custom state featurization.
-    Then in the runner.py loop in OpenAI Baselines, we will get the lossless encodings of the state,
-    and the true Overcooked state. When we encode the true state to feed to A1, we also need to know
+    When we encode the true state to feed to A1, we also need to know
     what agent index it has in the environment (as encodings will be index dependent).
     """
 
     env_name = "Overcooked-v0"
 
-    # gym checks for the action space and obs space while initializing the env and throws an error if none exists
-    # custom_init after __init__ no longer works
-    # might as well move all the initilization into the actual __init__
     def __init__(self, base_env, featurize_fn, baselines_reproducible=False):
         """
         base_env: OvercookedEnv
-        featurize_fn(mdp, state): fn used to featurize states returned in the 'both_agent_obs' field
+        featurize_fn(mdp, state): fn used to featurize states returned as observation tuples
 
-        Example creating a gym env:
+        Example:
 
         mdp = OvercookedGridworld.from_layout_name("asymmetric_advantages")
         base_env = OvercookedEnv.from_mdp(mdp, horizon=500)
-        env = gymnasium.make("Overcooked-v0",base_env = base_env, featurize_fn =base_env.featurize_state_mdp)
+        env = gymnasium.make("Overcooked-v0", base_env=base_env, featurize_fn=base_env.featurize_state_mdp)
         """
         if baselines_reproducible:
             # NOTE:
@@ -837,9 +833,10 @@ class Overcooked(gymnasium.Env):
         dummy_mdp = self.base_env.mdp
         dummy_state = dummy_mdp.get_standard_start_state()
         obs_shape = self.featurize_fn(dummy_state)[0].shape
-        high = np.ones(obs_shape, dtype=np.float32) * float("inf")
-        low = np.zeros(obs_shape, dtype=np.float32)
-        return gymnasium.spaces.Box(low, high, dtype=np.float32)
+        high = np.full(obs_shape, float("inf"), dtype=np.float64)
+        low = np.full(obs_shape, float("-inf"), dtype=np.float64)
+        single_agent_space = gymnasium.spaces.Box(low, high, dtype=np.float64)
+        return gymnasium.spaces.Tuple((single_agent_space, single_agent_space))
 
     def step(self, action):
         """
@@ -873,18 +870,16 @@ class Overcooked(gymnasium.Env):
             both_agents_ob = (ob_p1, ob_p0)
 
         env_info["policy_agent_idx"] = self.agent_idx
+        env_info["overcooked_state"] = next_state
+        env_info["other_agent_env_idx"] = 1 - self.agent_idx
 
         if "episode" in env_info.keys():
             env_info["episode"]["policy_agent_idx"] = self.agent_idx
 
-        obs = {
-            "both_agent_obs": both_agents_ob,
-            "overcooked_state": next_state,
-            "other_agent_env_idx": 1 - self.agent_idx,
-        }
-        return obs, reward, done, env_info
+        truncated = False  # Overcooked episodes end by horizon, not truncation
+        return both_agents_ob, reward, done, truncated, env_info
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
         """
         When training on individual maps, we want to randomize which agent is assigned to which
         starting location, in order to make sure that the agents are trained to be able to
@@ -893,6 +888,7 @@ class Overcooked(gymnasium.Env):
         NOTE: a nicer way to do this would be to just randomize starting positions, and not
         have to deal with randomizing indices.
         """
+        super().reset(seed=seed, options=options)
         self.base_env.reset()
         self.mdp = self.base_env.mdp
         self.agent_idx = np.random.choice([0, 1])
@@ -902,11 +898,11 @@ class Overcooked(gymnasium.Env):
             both_agents_ob = (ob_p0, ob_p1)
         else:
             both_agents_ob = (ob_p1, ob_p0)
-        return {
-            "both_agent_obs": both_agents_ob,
+        info = {
             "overcooked_state": self.base_env.state,
             "other_agent_env_idx": 1 - self.agent_idx,
         }
+        return both_agents_ob, info
 
     def render(self):
         rewards_dict = {}  # dictionary of details you want rendered in the UI

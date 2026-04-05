@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import dill
-import gym as gymnasium  # Things break with gymnasium because rllib can't handle it
+import gymnasium
 import numpy as np
 import ray
 from ray.rllib.agents.ppo import PPOTrainer
