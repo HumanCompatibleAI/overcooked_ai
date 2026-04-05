@@ -1,10 +1,10 @@
 import copy
 import json
 import os
-import unittest
 
 import numpy as np
 import pygame
+import pytest
 
 from overcooked_ai_py.agents.agent import RandomAgent
 from overcooked_ai_py.agents.benchmarking import AgentEvaluator
@@ -29,13 +29,12 @@ example_img_path = generate_temporary_file_path(
 )
 
 
-def test_render_state_from_dict(test_dict):
+def _check_render_state_from_dict(test_dict):
     input_dict = copy.deepcopy(test_dict)
     test_dict = copy.deepcopy(test_dict)
     test_dict["kwargs"]["state"] = OvercookedState.from_dict(
         test_dict["kwargs"]["state"]
     )
-    # check only if it raise error or not, for image fidelity render_state check is used
     StateVisualizer(**test_dict["config"]).display_rendered_state(
         img_path=example_img_path, **test_dict["kwargs"]
     )
@@ -96,10 +95,12 @@ def test_render_state_from_dict(test_dict):
     return True
 
 
-class TestStateVisualizer(unittest.TestCase):
-    def setUp(self):
-        Recipe.configure({})
+@pytest.fixture(autouse=True)
+def _configure_recipe():
+    Recipe.configure({})
 
+
+class TestStateVisualizer:
     def test_setting_up_configs(self):
         default_values = copy.deepcopy(StateVisualizer.DEFAULT_VALUES)
 
@@ -114,37 +115,32 @@ class TestStateVisualizer(unittest.TestCase):
         )
 
         visualizer = StateVisualizer(**init_config)
-        self.assertEqual(init_config["tile_size"], visualizer.tile_size)
+        assert init_config["tile_size"] == visualizer.tile_size
 
         visualizer.configure(**configure_config)
-        self.assertEqual(configure_config["tile_size"], visualizer.tile_size)
+        assert configure_config["tile_size"] == visualizer.tile_size
 
         StateVisualizer.configure_defaults(**configure_defaults_config)
-        self.assertEqual(
-            configure_defaults_config["tile_size"],
-            StateVisualizer.DEFAULT_VALUES["tile_size"],
+        assert (
+            configure_defaults_config["tile_size"]
+            == StateVisualizer.DEFAULT_VALUES["tile_size"]
         )
-        self.assertEqual(
-            configure_defaults_config["tile_size"], StateVisualizer().tile_size
-        )
+        assert configure_defaults_config["tile_size"] == StateVisualizer().tile_size
 
         invalid_kwargs = {"invalid_argument": 123}
-        self.assertRaises(AssertionError, StateVisualizer, **invalid_kwargs)
-        self.assertRaises(
-            AssertionError,
-            StateVisualizer.configure_defaults,
-            **invalid_kwargs
-        )
-        self.assertRaises(
-            AssertionError, visualizer.configure, **invalid_kwargs
-        )
+        with pytest.raises(AssertionError):
+            StateVisualizer(**invalid_kwargs)
+        with pytest.raises(AssertionError):
+            StateVisualizer.configure_defaults(**invalid_kwargs)
+        with pytest.raises(AssertionError):
+            visualizer.configure(**invalid_kwargs)
 
     def test_properties(self):
         visualizer = StateVisualizer(
             tile_size=30, hud_interline_size=7, hud_font_size=26
         )
-        self.assertEqual(visualizer.scale_by_factor, 2)
-        self.assertEqual(visualizer.hud_line_height, 26 + 7)
+        assert visualizer.scale_by_factor == 2
+        assert visualizer.hud_line_height == 26 + 7
 
     def test_hud_display(self):
         for d in load_from_json(
@@ -152,7 +148,7 @@ class TestStateVisualizer(unittest.TestCase):
                 state_visualizer_dir, "render_state_data_test_hud.json"
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_differnet_sizes(self):
         for d in load_from_json(
@@ -160,7 +156,7 @@ class TestStateVisualizer(unittest.TestCase):
                 state_visualizer_dir, "render_state_data_test_sizes.json"
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_cooking_timer_display(self):
         for d in load_from_json(
@@ -169,7 +165,7 @@ class TestStateVisualizer(unittest.TestCase):
                 "render_state_data_test_cooking_display.json",
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_various_states(self):
         for d in load_from_json(
@@ -177,7 +173,7 @@ class TestStateVisualizer(unittest.TestCase):
                 state_visualizer_dir, "render_state_data_test_various.json"
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_generated_layout_states(self):
         for d in load_from_json(
@@ -186,12 +182,12 @@ class TestStateVisualizer(unittest.TestCase):
                 "render_state_data_test_generated_layout.json",
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_default_hud_data_from_trajectories(self):
         traj_path = os.path.join(
             TESTING_DATA_DIR, "test_state_visualizer", "test_trajectory.json"
-        )  # NOTE: for test purposes reward is added here despite there was no soup delivery in trajectory
+        )
         test_trajectory = AgentEvaluator.load_traj_from_json(traj_path)
         hud_data_path = os.path.join(
             TESTING_DATA_DIR,
@@ -202,9 +198,8 @@ class TestStateVisualizer(unittest.TestCase):
         result_hud_data = StateVisualizer().default_hud_data_from_trajectories(
             test_trajectory
         )
-        self.assertEqual(
-            json.dumps(result_hud_data, sort_keys=True),
-            json.dumps(expected_hud_data, sort_keys=True),
+        assert json.dumps(result_hud_data, sort_keys=True) == json.dumps(
+            expected_hud_data, sort_keys=True
         )
 
     def test_action_probs_display(self):
@@ -214,10 +209,9 @@ class TestStateVisualizer(unittest.TestCase):
                 "render_state_data_test_action_probs_display.json",
             )
         ):
-            test_render_state_from_dict(d)
+            _check_render_state_from_dict(d)
 
     def test_trajectory_visualization(self):
-        # we don't have good way to check slider automatically so its mostly test for basic stuff like numer of outputed images, if using method raises error etc.
         traj_path = os.path.join(
             TESTING_DATA_DIR, "test_state_visualizer", "test_trajectory.json"
         )
@@ -237,16 +231,12 @@ class TestStateVisualizer(unittest.TestCase):
                 ipython_display=False,
             )
         )
-        self.assertEqual(
-            get_file_count(result_img_directory_path), expected_images_num
-        )
+        assert get_file_count(result_img_directory_path) == expected_images_num
 
         custom_img_directory_path = generate_temporary_file_path(
             prefix="overcooked_visualized_trajectory", extension=""
         )
-        self.assertNotEqual(
-            custom_img_directory_path, result_img_directory_path
-        )
+        assert custom_img_directory_path != result_img_directory_path
         result_img_directory_path = (
             StateVisualizer().display_rendered_trajectory(
                 test_trajectory,
@@ -254,11 +244,5 @@ class TestStateVisualizer(unittest.TestCase):
                 ipython_display=False,
             )
         )
-        self.assertEqual(custom_img_directory_path, result_img_directory_path)
-        self.assertEqual(
-            get_file_count(result_img_directory_path), expected_images_num
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert custom_img_directory_path == result_img_directory_path
+        assert get_file_count(result_img_directory_path) == expected_images_num

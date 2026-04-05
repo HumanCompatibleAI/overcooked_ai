@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77.0.3"]
+requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,32 +7,31 @@ name = "overcooked_ai"
 version = "2.0.0"
 description = "Cooperative multi-agent environment based on Overcooked"
 readme = "README.md"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.13"
 license = { file = "LICENSE" }
 authors = [{ name = "Micah Carroll", email = "mdc@berkeley.edu" }]
 urls = { homepage = "https://github.com/HumanCompatibleAI/overcooked_ai" }
 keywords = ["Overcooked", "AI", "Reinforcement Learning"]
 dependencies = [
-    "dill",
-    "gymnasium",
-    "ipywidgets",
-    "numpy<2",
-    "opencv-python",
-    "pygame",
-    "scipy",
-    "setuptools>=77.0.3",
-    "tqdm",
+    "dill>=0.4.1",
+    "gymnasium>=1.2.2",
+    "ipywidgets>=8.1.8",
+    "numpy>=2.4.4",
+    "opencv-python>=4.13.0.92",
+    "pygame>=2.6.1",
+    "scipy>=1.17.1",
+    "setuptools>=82.0.1",
+    "tqdm>=4.67.3",
 ]
 
 [project.optional-dependencies]
 harl = [
-    "ipykernel",
-    "ray[rllib,tune]==2.2",
-    "dm-tree",
-    "lz4",
-    "tensorflow[and-cuda]==2.19.0",
-    "wandb",
-    "gym",
+    "ipykernel>=7.2.0",
+    "ray[rllib,tune]>=2.54.1",
+    "dm-tree>=0.1.10",
+    "lz4>=4.4.5",
+    "tensorflow[and-cuda]>=2.21.0",
+    "wandb>=0.25.1",
 ]
 
 [project.scripts]

@@ -2,11 +2,12 @@ import glob
 import json
 import os
 import shutil
-import unittest
+import tempfile
 from math import factorial
 
 import gymnasium
 import numpy as np
+import pytest
 
 from overcooked_ai_py.agents.agent import (
     AgentGroup,
@@ -68,8 +69,9 @@ def comb(n, k):
     return factorial(n) / (factorial(n - k) * factorial(k))
 
 
-class TestRecipe(unittest.TestCase):
-    def setUp(self):
+class TestRecipe:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         Recipe.configure({})
         self.r1 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
         self.r2 = Recipe([Recipe.ONION, Recipe.ONION, Recipe.ONION])
@@ -85,26 +87,25 @@ class TestRecipe(unittest.TestCase):
         if not os.path.exists(self.pickle_temp_dir):
             os.makedirs(self.pickle_temp_dir)
 
-    def tearDown(self):
+        yield
+
         Recipe.configure({})
 
         if os.path.exists(self.pickle_temp_dir):
             shutil.rmtree(self.pickle_temp_dir)
 
     def test_eq(self):
-        self.assertEqual(self.r1, self.r2, "Failed basic equality check")
-        self.assertNotEqual(self.r1, self.r3, "Failed Basic inequality check")
-        self.assertNotEqual(
-            self.r1, self.r6, "Failed inequality check with all one ingredient"
-        )
-        self.assertEqual(self.r3, self.r4, "Failed basic equality check")
-        self.assertEqual(self.r4, self.r5, "Failed ordered equality check")
+        assert self.r1 == self.r2, "Failed basic equality check"
+        assert self.r1 != self.r3, "Failed Basic inequality check"
+        assert self.r1 != self.r6, "Failed inequality check with all one ingredient"
+        assert self.r3 == self.r4, "Failed basic equality check"
+        assert self.r4 == self.r5, "Failed ordered equality check"
 
     def test_caching(self):
-        self.assertIs(self.r1, self.r2)
-        self.assertIs(self.r3, self.r4)
-        self.assertIs(self.r4, self.r5)
-        self.assertFalse(self.r6 is self.r1, "different recipes cached to same value")
+        assert self.r1 is self.r2
+        assert self.r3 is self.r4
+        assert self.r4 is self.r5
+        assert not (self.r6 is self.r1), "different recipes cached to same value"
 
     def test_serialization(self):
         loaded_recipes = []
@@ -118,63 +119,62 @@ class TestRecipe(unittest.TestCase):
 
         # Ensure loaded recipes equal corresponding original recipe
         for original, loaded in zip(self.recipes, loaded_recipes):
-            self.assertEqual(original, loaded)
+            assert original == loaded
 
     def test_value(self):
         # TODO
         for recipe in self.recipes:
-            self.assertEqual(recipe.value, 20)
+            assert recipe.value == 20
 
     def test_time(self):
         # TODO
         for recipe in self.recipes:
-            self.assertEqual(recipe.time, 20)
+            assert recipe.time == 20
 
     def test_all_recipes(self):
         for recipe in self.recipes:
-            self.assertTrue(recipe in Recipe.ALL_RECIPES)
+            assert recipe in Recipe.ALL_RECIPES
 
-        self.assertEqual(
-            len(Recipe.ALL_RECIPES),
-            self._expected_num_recipes(
-                len(Recipe.ALL_INGREDIENTS), Recipe.MAX_NUM_INGREDIENTS
-            ),
+        assert len(Recipe.ALL_RECIPES) == self._expected_num_recipes(
+            len(Recipe.ALL_INGREDIENTS), Recipe.MAX_NUM_INGREDIENTS
         )
 
         Recipe.configure({"max_num_ingredients": 4})
 
-        self.assertEqual(
-            len(Recipe.ALL_RECIPES),
-            self._expected_num_recipes(len(Recipe.ALL_INGREDIENTS), 4),
+        assert len(Recipe.ALL_RECIPES) == self._expected_num_recipes(
+            len(Recipe.ALL_INGREDIENTS), 4
         )
 
     def test_invalid_input(self):
-        self.assertRaises(ValueError, Recipe, [Recipe.ONION, Recipe.TOMATO, "carrot"])
-        self.assertRaises(ValueError, Recipe, [Recipe.ONION] * 4)
-        self.assertRaises(ValueError, Recipe, [])
-        self.assertRaises(ValueError, Recipe, "invalid argument")
+        with pytest.raises(ValueError):
+            Recipe([Recipe.ONION, Recipe.TOMATO, "carrot"])
+        with pytest.raises(ValueError):
+            Recipe([Recipe.ONION] * 4)
+        with pytest.raises(ValueError):
+            Recipe([])
+        with pytest.raises(ValueError):
+            Recipe("invalid argument")
 
     def test_recipes_generation(self):
-        self.assertRaises(
-            AssertionError,
-            Recipe.generate_random_recipes,
-            max_size=Recipe.MAX_NUM_INGREDIENTS + 1,
-        )
-        self.assertRaises(AssertionError, Recipe.generate_random_recipes, min_size=0)
-        self.assertRaises(
-            AssertionError,
-            Recipe.generate_random_recipes,
-            min_size=3,
-            max_size=2,
-        )
-        self.assertRaises(
-            AssertionError,
-            Recipe.generate_random_recipes,
-            ingredients=["onion", "tomato", "fake_ingredient"],
-        )
-        self.assertRaises(AssertionError, Recipe.generate_random_recipes, n=99999)
-        self.assertEqual(len(Recipe.generate_random_recipes(n=3)), 3)
-        self.assertEqual(len(Recipe.generate_random_recipes(n=99, unique=False)), 99)
+        with pytest.raises(AssertionError):
+            Recipe.generate_random_recipes(
+                max_size=Recipe.MAX_NUM_INGREDIENTS + 1,
+            )
+        with pytest.raises(AssertionError):
+            Recipe.generate_random_recipes(min_size=0)
+        with pytest.raises(AssertionError):
+            Recipe.generate_random_recipes(
+                min_size=3,
+                max_size=2,
+            )
+        with pytest.raises(AssertionError):
+            Recipe.generate_random_recipes(
+                ingredients=["onion", "tomato", "fake_ingredient"],
+            )
+        with pytest.raises(AssertionError):
+            Recipe.generate_random_recipes(n=99999)
+        assert len(Recipe.generate_random_recipes(n=3)) == 3
+        assert len(Recipe.generate_random_recipes(n=99, unique=False)) == 99
 
         two_sized_recipes = [
             Recipe(["onion", "onion"]),
@@ -182,8 +182,7 @@ class TestRecipe(unittest.TestCase):
             Recipe(["tomato", "tomato"]),
         ]
         for _ in range(100):
-            self.assertCountEqual(
-                two_sized_recipes,
+            assert sorted(two_sized_recipes) == sorted(
                 Recipe.generate_random_recipes(
                     n=3,
                     min_size=2,
@@ -197,15 +196,13 @@ class TestRecipe(unittest.TestCase):
             Recipe(["onion", "onion", "onion"]),
         ]
         for _ in range(100):
-            self.assertCountEqual(
-                only_onions_recipes,
+            assert sorted(only_onions_recipes) == sorted(
                 Recipe.generate_random_recipes(
                     n=2, min_size=2, max_size=3, ingredients=["onion"]
                 ),
             )
 
-        self.assertCountEqual(
-            only_onions_recipes,
+        assert sorted(only_onions_recipes) == sorted(
             set(
                 [
                     Recipe.generate_random_recipes(n=1, recipes=only_onions_recipes)[0]
@@ -218,8 +215,9 @@ class TestRecipe(unittest.TestCase):
         return comb(num_ingredients + max_len, num_ingredients) - 1
 
 
-class TestSoupState(unittest.TestCase):
-    def setUp(self):
+class TestSoupState:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         Recipe.configure({})
         self.s1 = SoupState.get_soup((0, 0), num_onions=0, num_tomatoes=0)
         self.s2 = SoupState.get_soup((0, 1), num_onions=2, num_tomatoes=1)
@@ -229,120 +227,120 @@ class TestSoupState(unittest.TestCase):
         self.s4 = SoupState.get_soup(
             (1, 0), num_onions=0, num_tomatoes=2, finished=True
         )
+        yield
 
     def test_position(self):
         new_pos = (2, 0)
         self.s4.position = new_pos
 
         for ingredient in self.s4._ingredients:
-            self.assertEqual(new_pos, ingredient.position)
-        self.assertEqual(new_pos, self.s4.position)
+            assert new_pos == ingredient.position
+        assert new_pos == self.s4.position
 
     def test_is_cooking(self):
-        self.assertFalse(self.s1.is_cooking)
-        self.assertFalse(self.s2.is_cooking)
-        self.assertTrue(self.s3.is_cooking)
-        self.assertFalse(self.s4.is_cooking)
+        assert not self.s1.is_cooking
+        assert not self.s2.is_cooking
+        assert self.s3.is_cooking
+        assert not self.s4.is_cooking
 
     def test_is_ready(self):
-        self.assertFalse(self.s1.is_ready)
-        self.assertFalse(self.s2.is_ready)
-        self.assertFalse(self.s3.is_ready)
-        self.assertTrue(self.s4.is_ready)
+        assert not self.s1.is_ready
+        assert not self.s2.is_ready
+        assert not self.s3.is_ready
+        assert self.s4.is_ready
 
     def test_is_idle(self):
-        self.assertTrue(self.s1.is_idle)
-        self.assertTrue(self.s2.is_idle)
-        self.assertFalse(self.s3.is_idle)
-        self.assertFalse(self.s4.is_idle)
+        assert self.s1.is_idle
+        assert self.s2.is_idle
+        assert not self.s3.is_idle
+        assert not self.s4.is_idle
 
     def test_is_full(self):
-        self.assertFalse(self.s1.is_full)
-        self.assertTrue(self.s2.is_full)
-        self.assertTrue(self.s3.is_full)
-        self.assertTrue(self.s4.is_full)
+        assert not self.s1.is_full
+        assert self.s2.is_full
+        assert self.s3.is_full
+        assert self.s4.is_full
 
     def test_cooking(self):
         self.s1.add_ingredient_from_str(Recipe.ONION)
         self.s1.add_ingredient_from_str(Recipe.TOMATO)
 
-        self.assertTrue(self.s1.is_idle)
-        self.assertFalse(self.s1.is_cooking)
-        self.assertFalse(self.s1.is_full)
+        assert self.s1.is_idle
+        assert not self.s1.is_cooking
+        assert not self.s1.is_full
 
         self.s1.begin_cooking()
 
-        self.assertFalse(self.s1.is_idle)
-        self.assertTrue(self.s1.is_full)
-        self.assertTrue(self.s1.is_cooking)
+        assert not self.s1.is_idle
+        assert self.s1.is_full
+        assert self.s1.is_cooking
 
         for _ in range(self.s1.cook_time):
             self.s1.cook()
 
-        self.assertFalse(self.s1.is_cooking)
-        self.assertFalse(self.s1.is_idle)
-        self.assertTrue(self.s1.is_full)
-        self.assertTrue(self.s1.is_ready)
+        assert not self.s1.is_cooking
+        assert not self.s1.is_idle
+        assert self.s1.is_full
+        assert self.s1.is_ready
 
     def test_attributes(self):
-        self.assertListEqual(self.s1.ingredients, [])
-        self.assertListEqual(
-            self.s2.ingredients, [Recipe.ONION, Recipe.ONION, Recipe.TOMATO]
-        )
-        self.assertListEqual(self.s3.ingredients, [Recipe.ONION])
-        self.assertListEqual(self.s4.ingredients, [Recipe.TOMATO, Recipe.TOMATO])
+        assert self.s1.ingredients == []
+        assert self.s2.ingredients == [Recipe.ONION, Recipe.ONION, Recipe.TOMATO]
+        assert self.s3.ingredients == [Recipe.ONION]
+        assert self.s4.ingredients == [Recipe.TOMATO, Recipe.TOMATO]
 
-        try:
+        with pytest.raises(ValueError):
             self.s1.recipe
-            self.fail("Expected ValueError to be raised")
-        except ValueError as e:
-            pass
-        except Exception as e:
-            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
 
-        try:
+        with pytest.raises(ValueError):
             self.s2.recipe
-            self.fail("Expected ValueError to be raised")
-        except ValueError as e:
-            pass
-        except Exception as e:
-            self.fail("Expected ValueError to be raised, {} raised instead".format(e))
-        self.assertEqual(self.s3.recipe, Recipe([Recipe.ONION]))
-        self.assertEqual(self.s4.recipe, Recipe([Recipe.TOMATO, Recipe.TOMATO]))
+
+        assert self.s3.recipe == Recipe([Recipe.ONION])
+        assert self.s4.recipe == Recipe([Recipe.TOMATO, Recipe.TOMATO])
 
     def test_invalid_ops(self):
         # Cannot cook an empty soup
-        self.assertRaises(ValueError, self.s1.begin_cooking)
+        with pytest.raises(ValueError):
+            self.s1.begin_cooking()
 
         # Must call 'begin_cooking' before cooking a soup
-        self.assertRaises(ValueError, self.s2.cook)
+        with pytest.raises(ValueError):
+            self.s2.cook()
 
         # Cannot cook a done soup
-        self.assertRaises(ValueError, self.s4.cook)
+        with pytest.raises(ValueError):
+            self.s4.cook()
 
         # Cannot begin cooking a soup that is already cooking
-        self.assertRaises(ValueError, self.s3.begin_cooking)
+        with pytest.raises(ValueError):
+            self.s3.begin_cooking()
 
         # Cannot begin cooking a soup that is already done
-        self.assertRaises(ValueError, self.s4.begin_cooking)
+        with pytest.raises(ValueError):
+            self.s4.begin_cooking()
 
         # Cannot add ingredients to a soup that is cooking
-        self.assertRaises(ValueError, self.s3.add_ingredient_from_str, Recipe.ONION)
+        with pytest.raises(ValueError):
+            self.s3.add_ingredient_from_str(Recipe.ONION)
 
         # Cannot add ingredients to a soup that is ready
-        self.assertRaises(ValueError, self.s4.add_ingredient_from_str, Recipe.ONION)
+        with pytest.raises(ValueError):
+            self.s4.add_ingredient_from_str(Recipe.ONION)
 
         # Cannot remove an ingredient from a soup that is ready
-        self.assertRaises(ValueError, self.s4.pop_ingredient)
+        with pytest.raises(ValueError):
+            self.s4.pop_ingredient()
 
         # Cannot remove an ingredient from a soup that is cooking
-        self.assertRaises(ValueError, self.s3.pop_ingredient)
+        with pytest.raises(ValueError):
+            self.s3.pop_ingredient()
 
         # Cannot remove an ingredient from a soup that is empty
-        self.assertRaises(ValueError, self.s1.pop_ingredient)
+        with pytest.raises(ValueError):
+            self.s1.pop_ingredient()
 
 
-class TestDirection(unittest.TestCase):
+class TestDirection:
     def test_direction_number_conversion(self):
         all_directions = Direction.ALL_DIRECTIONS
         all_numbers = []
@@ -350,48 +348,50 @@ class TestDirection(unittest.TestCase):
         for direction in Direction.ALL_DIRECTIONS:
             number = Direction.DIRECTION_TO_INDEX[direction]
             direction_again = Direction.INDEX_TO_DIRECTION[number]
-            self.assertEqual(direction, direction_again)
+            assert direction == direction_again
             all_numbers.append(number)
 
         # Check that all directions are distinct
         num_directions = len(all_directions)
-        self.assertEqual(len(set(all_directions)), num_directions)
+        assert len(set(all_directions)) == num_directions
 
         # Check that the numbers are 0, 1, ... num_directions - 1
-        self.assertEqual(set(all_numbers), set(range(num_directions)))
+        assert set(all_numbers) == set(range(num_directions))
 
 
-class TestGridworld(unittest.TestCase):
+class TestGridworld:
     # TODO: write more smaller targeted tests to be loaded from jsons
 
     verbose = False
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("mdp_test")
+        yield
 
     def test_constructor_invalid_inputs(self):
         # Height and width must be at least 3.
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             mdp = OvercookedGridworld.from_grid(["X", "X", "X"])
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             mdp = OvercookedGridworld.from_grid([["X", "X", "X"]])
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # Borders must be present.
             mdp = OvercookedGridworld.from_grid(["XOSX", "P  D", " 21 "])
 
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # The grid can't be ragged.
             mdp = OvercookedGridworld.from_grid(["XXPXX", "O  2XX", "X1 3 X", "XDXSXX"])
 
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # The agents must be numbered 1 and 2.
             mdp = OvercookedGridworld.from_grid(["XXPXX", "O  3O", "X1  X", "XDXSX"])
 
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # The agents must be numbered 1 and 2.
             mdp = OvercookedGridworld.from_grid(["XXPXX", "O  1O", "X1  X", "XDXSX"])
 
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # B is not a valid element.
             mdp = OvercookedGridworld.from_grid(["XBPXX", "O  2O", "X1  X", "XDXSX"])
 
@@ -407,11 +407,8 @@ class TestGridworld(unittest.TestCase):
         expected_start_state = OvercookedState.from_dict(
             load_from_json(expected_state_path)
         )
-        self.assertEqual(
-            actual_start_state,
-            expected_start_state,
-            "\n" + str(actual_start_state) + "\n" + str(expected_start_state),
-        )
+        assert actual_start_state == expected_start_state, \
+            "\n" + str(actual_start_state) + "\n" + str(expected_start_state)
 
     def test_file_constructor(self):
         mdp = OvercookedGridworld.from_layout_name("corridor")
@@ -424,11 +421,8 @@ class TestGridworld(unittest.TestCase):
             all_orders=[{"ingredients": ["onion", "onion", "onion"]}],
         )
         actual_start_state = mdp.get_standard_start_state()
-        self.assertEqual(
-            actual_start_state,
-            expected_start_state,
-            "\n" + str(actual_start_state) + "\n" + str(expected_start_state),
-        )
+        assert actual_start_state == expected_start_state, \
+            "\n" + str(actual_start_state) + "\n" + str(expected_start_state)
 
     def test_actions(self):
         bad_state = OvercookedState(
@@ -438,13 +432,11 @@ class TestGridworld(unittest.TestCase):
             ],
             {},
         )
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             self.base_mdp.get_actions(bad_state)
 
-        self.assertEqual(
-            self.base_mdp.get_actions(self.base_mdp.get_standard_start_state()),
-            [Action.ALL_ACTIONS, Action.ALL_ACTIONS],
-        )
+        assert self.base_mdp.get_actions(self.base_mdp.get_standard_start_state()) == \
+            [Action.ALL_ACTIONS, Action.ALL_ACTIONS]
 
     def test_from_dict(self):
         state_dict = {
@@ -468,7 +460,7 @@ class TestGridworld(unittest.TestCase):
     def test_transitions_and_environment(self):
         bad_state = OvercookedState([P((0, 0), s), P((3, 1), s)], {})
 
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             self.base_mdp.get_state_transition(bad_state, stay)
 
         env = OvercookedEnv.from_mdp(self.base_mdp, info_level=0)
@@ -478,11 +470,8 @@ class TestGridworld(unittest.TestCase):
             state = env.state
             pred_state, _ = self.base_mdp.get_state_transition(state, action)
             new_state, sparse_reward, _, _ = env.step(action)
-            self.assertEqual(
-                pred_state,
-                new_state,
-                "\n" + str(pred_state) + "\n" + str(new_state),
-            )
+            assert pred_state == new_state, \
+                "\n" + str(pred_state) + "\n" + str(new_state)
 
             # Recompute expected values if desired
             if recompute:
@@ -498,11 +487,9 @@ class TestGridworld(unittest.TestCase):
             expected_reward = expected["reward"]
 
             # Make sure everything lines up (note __eq__ is transitive)
-            self.assertTrue(
-                pred_state.time_independent_equal(expected_state),
-                "\n" + str(pred_state) + "\n" + str(expected_state),
-            )
-            self.assertEqual(sparse_reward, expected_reward)
+            assert pred_state.time_independent_equal(expected_state), \
+                "\n" + str(pred_state) + "\n" + str(expected_state)
+            assert sparse_reward == expected_reward
 
         expected_path = os.path.join(
             TESTING_DATA_DIR,
@@ -525,7 +512,7 @@ class TestGridworld(unittest.TestCase):
         )
 
     def test_mdp_old_cook_dynamics(self):
-        with self.assertRaises(AssertionError):
+        with pytest.raises(AssertionError):
             # shouldn't be able to create a game with recipes of less than 3 ingredients
             OvercookedGridworld.from_layout_name(
                 layout_name="mdp_test", old_dynamics=True
@@ -540,11 +527,11 @@ class TestGridworld(unittest.TestCase):
         # test interacting with a 1-ingredient soup starts cooking in the new dynamics
         new_state_n, _ = new_mdp.get_state_transition(new_mdp.start_state, [interact])
         soup_new = new_state_n.get_object((2, 0))
-        self.assertTrue(soup_new.is_cooking)
+        assert soup_new.is_cooking
         # this should have no effects
         new_state_o, _ = old_mdp.get_state_transition(old_mdp.start_state, [interact])
         soup_old = new_state_o.get_object((2, 0))
-        self.assertFalse(soup_old.is_cooking)
+        assert not soup_old.is_cooking
 
     def test_mdp_old_put_dynamics(self):
         old_mdp = OvercookedGridworld.from_layout_name(
@@ -556,47 +543,43 @@ class TestGridworld(unittest.TestCase):
         # putting in the third ingredient will not start cooking in the new dynamics
         new_state_n, _ = new_mdp.get_state_transition(new_mdp.start_state, [interact])
         soup_new = new_state_n.get_object((2, 0))
-        self.assertFalse(soup_new.is_cooking)
+        assert not soup_new.is_cooking
         # cooking should start automatically in the old dynamics
         new_state_o, _ = old_mdp.get_state_transition(old_mdp.start_state, [interact])
         soup_old = new_state_o.get_object((2, 0))
-        self.assertTrue(soup_old.is_cooking)
+        assert soup_old.is_cooking
 
     def test_mdp_serialization(self):
-        # Where to store serialized states -- will be overwritten each timestep
-        dummy_path = os.path.join(
-            TESTING_DATA_DIR, "test_mdp_serialization", "dummy.json"
-        )
+        # Use a temp file to avoid file contention when tests run concurrently
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dummy_path = os.path.join(tmpdir, "dummy.json")
 
-        # Get starting seed and random agent pair
-        seed = 47
-        random_pair = AgentPair(
-            RandomAgent(all_actions=True), RandomAgent(all_actions=True)
-        )
+            # Get starting seed and random agent pair
+            seed = 47
+            random_pair = AgentPair(
+                RandomAgent(all_actions=True), RandomAgent(all_actions=True)
+            )
 
-        # Run rollouts with different seeds until sparse reward is achieved
-        sparse_reward = 0
-        while sparse_reward <= 0:
-            np.random.seed(seed)
-            state = self.base_mdp.get_standard_start_state()
-            for _ in range(1500):
-                # Ensure serialization and deserializations are inverses
-                reconstructed_state = OvercookedState.from_dict(
-                    load_from_json(save_as_json(state.to_dict(), dummy_path))
-                )
-                self.assertEqual(
-                    state,
-                    reconstructed_state,
-                    "\nState: \t\t\t{}\nReconstructed State: \t{}".format(
-                        state, reconstructed_state
-                    ),
-                )
+            # Run rollouts with different seeds until sparse reward is achieved
+            sparse_reward = 0
+            while sparse_reward <= 0:
+                np.random.seed(seed)
+                state = self.base_mdp.get_standard_start_state()
+                for _ in range(1500):
+                    # Ensure serialization and deserializations are inverses
+                    reconstructed_state = OvercookedState.from_dict(
+                        load_from_json(save_as_json(state.to_dict(), dummy_path))
+                    )
+                    assert state == reconstructed_state, \
+                        "\nState: \t\t\t{}\nReconstructed State: \t{}".format(
+                            state, reconstructed_state
+                        )
 
-                # Advance state
-                joint_action, _ = zip(*random_pair.joint_action(state))
-                state, infos = self.base_mdp.get_state_transition(state, joint_action)
-                sparse_reward += sum(infos["sparse_reward_by_agent"])
-            seed += 1
+                    # Advance state
+                    joint_action, _ = zip(*random_pair.joint_action(state))
+                    state, infos = self.base_mdp.get_state_transition(state, joint_action)
+                    sparse_reward += sum(infos["sparse_reward_by_agent"])
+                seed += 1
 
     def test_four_player_mdp(self):
         try:
@@ -633,8 +616,8 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val2 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val0, val1, "Picking up onion should increase potential")
-        self.assertLess(val1, val2, "Picking up tomato should increase potential")
+        assert val0 < val1, "Picking up onion should increase potential"
+        assert val1 < val2, "Picking up tomato should increase potential"
 
         # Pot tomato
         if self.verbose:
@@ -663,8 +646,8 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val4 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val2, val3, "Potting tomato should increase potential")
-        self.assertLess(val3, val4, "Potting onion should increase potential")
+        assert val2 < val3, "Potting tomato should increase potential"
+        assert val3 < val4, "Potting onion should increase potential"
 
         ## Repeat on second pot ##
 
@@ -690,8 +673,8 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val6 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val4, val5, "Picking up onion should increase potential")
-        self.assertLess(val5, val6, "Picking up tomato should increase potential")
+        assert val4 < val5, "Picking up onion should increase potential"
+        assert val5 < val6, "Picking up tomato should increase potential"
 
         # Pot onion
         if self.verbose:
@@ -721,8 +704,8 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val8 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val6, val7, "Potting onion should increase potential")
-        self.assertLess(val7, val8, "Potting tomato should increase potential")
+        assert val6 < val7, "Potting onion should increase potential"
+        assert val7 < val8, "Potting tomato should increase potential"
 
         ## Useless pickups ##
 
@@ -748,12 +731,8 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val10 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLessEqual(
-            val9, val8, "Extraneous pickup should not increase potential"
-        )
-        self.assertLessEqual(
-            val10, val8, "Extraneous pickup should not increase potential"
-        )
+        assert val9 <= val8, "Extraneous pickup should not increase potential"
+        assert val10 <= val8, "Extraneous pickup should not increase potential"
 
         ## Catastrophic soup failure ##
 
@@ -768,7 +747,7 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val11 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val11, val10, "Catastrophic potting should decrease potential")
+        assert val11 < val10, "Catastrophic potting should decrease potential"
 
         ## Bonus soup creation
 
@@ -810,9 +789,9 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val14 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val11, val12, "Useful onion pickup should increase potential")
-        self.assertLess(val12, val13, "Potting useful onion should increase potential")
-        self.assertLess(val13, val14, "Cooking optimal soup should increase potential")
+        assert val11 < val12, "Useful onion pickup should increase potential"
+        assert val12 < val13, "Potting useful onion should increase potential"
+        assert val13 < val14, "Cooking optimal soup should increase potential"
 
         ## Soup pickup ##
 
@@ -849,13 +828,9 @@ class TestGridworld(unittest.TestCase):
             print("potential: ", self.base_mdp.potential_function(state, mp))
         val17 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(val14, val15, "Useful dish pickups should increase potential")
-        self.assertLess(
-            val15,
-            val16,
-            "Moving towards soup with dish should increase potential",
-        )
-        self.assertLess(val16, val17, "Picking up soup should increase potential")
+        assert val14 < val15, "Useful dish pickups should increase potential"
+        assert val15 < val16, "Moving towards soup with dish should increase potential"
+        assert val16 < val17, "Picking up soup should increase potential"
 
         ## Removing failed soup from pot
 
@@ -901,18 +876,11 @@ class TestGridworld(unittest.TestCase):
                 print("potential: ", self.base_mdp.potential_function(state, mp))
         val21 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(
-            val17,
-            val18,
-            "Moving towards failed soup should increase potential",
-        )
-        self.assertLess(val18, val19, "Cooking failed soup should increase potential")
-        self.assertLess(val19, val20, "Dish pickup for failed soup is still useful")
-        self.assertLess(
-            val20,
-            val21,
-            "Moving towars pertinant pot with dish should increase potential",
-        )
+        assert val17 < val18, "Moving towards failed soup should increase potential"
+        assert val18 < val19, "Cooking failed soup should increase potential"
+        assert val19 < val20, "Dish pickup for failed soup is still useful"
+        assert val20 < val21, \
+            "Moving towars pertinant pot with dish should increase potential"
 
         ## Deliver failed soup ##
 
@@ -947,21 +915,11 @@ class TestGridworld(unittest.TestCase):
             print("potential: ", self.base_mdp.potential_function(state, mp))
         val24 = self.base_mdp.potential_function(state, mp)
 
-        self.assertLess(
-            val21, val22, "Picking up failed soup should increase potential"
-        )
-        self.assertAlmostEqual(
-            val23,
-            val22,
-            delta=0.2,
-            msg="Moving to serve failed soup doesn't change potential much",
-        )
-        self.assertAlmostEqual(
-            val23,
-            val24,
-            delta=0.2,
-            msg="Moving away from serving area with failed soup doesn't change much",
-        )
+        assert val21 < val22, "Picking up failed soup should increase potential"
+        assert val23 == pytest.approx(val22, abs=0.2), \
+            "Moving to serve failed soup doesn't change potential much"
+        assert val23 == pytest.approx(val24, abs=0.2), \
+            "Moving away from serving area with failed soup doesn't change much"
 
         ## Deliver successful soup ##
 
@@ -986,16 +944,10 @@ class TestGridworld(unittest.TestCase):
             print(self.base_mdp.state_string(state))
             print("potential: ", self.base_mdp.potential_function(state, mp))
 
-        self.assertLess(
-            val24,
-            val25,
-            "Moving towards serving area with valid soup increases potential",
-        )
-        self.assertEqual(
-            sum(rewards["sparse_reward_by_agent"]),
-            50,
-            "Soup was not properly devivered, probably an error with MDP logic",
-        )
+        assert val24 < val25, \
+            "Moving towards serving area with valid soup increases potential"
+        assert sum(rewards["sparse_reward_by_agent"]) == 50, \
+            "Soup was not properly devivered, probably an error with MDP logic"
 
 
 def random_joint_action():
@@ -1004,8 +956,9 @@ def random_joint_action():
     return (Action.INDEX_TO_ACTION[a_idx0], Action.INDEX_TO_ACTION[a_idx1])
 
 
-class TestFeaturizations(unittest.TestCase):
-    def setUp(self):
+class TestFeaturizations:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlam = MediumLevelActionManager.from_pickle_or_compute(
             self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True
@@ -1017,17 +970,15 @@ class TestFeaturizations(unittest.TestCase):
             GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam)
         )
         np.random.seed(0)
+        yield
 
     def test_lossless_state_featurization_shape(self):
         s = self.base_mdp.get_standard_start_state()
         obs = self.base_mdp.lossless_state_encoding(s)[0]
-        self.assertTrue(
-            np.array_equal(
-                obs.shape, self.base_mdp.get_lossless_state_encoding_shape()
-            ),
-            "{} vs {}".format(
-                obs.shape, self.base_mdp.get_lossless_state_encoding_shape()
-            ),
+        assert np.array_equal(
+            obs.shape, self.base_mdp.get_lossless_state_encoding_shape()
+        ), "{} vs {}".format(
+            obs.shape, self.base_mdp.get_lossless_state_encoding_shape()
         )
 
     def test_state_featurization_shape(self):
@@ -1038,14 +989,10 @@ class TestFeaturizations(unittest.TestCase):
                 s, self.mlam, num_pots=num_pots
             )
             expected_shape = self.base_mdp.get_featurize_state_shape(num_pots=num_pots)
-            self.assertTrue(
-                np.array_equal(obs_0.shape, expected_shape),
-                "{} vs {}".format(obs_0.shape, expected_shape),
-            )
-            self.assertTrue(
-                np.array_equal(obs_1.shape, expected_shape),
-                "{} vs {}".format(obs_1.shape, expected_shape),
-            )
+            assert np.array_equal(obs_0.shape, expected_shape), \
+                "{} vs {}".format(obs_0.shape, expected_shape)
+            assert np.array_equal(obs_1.shape, expected_shape), \
+                "{} vs {}".format(obs_1.shape, expected_shape)
 
     def test_lossless_state_featurization(self):
         trajs = self.env.get_rollouts(
@@ -1064,7 +1011,7 @@ class TestFeaturizations(unittest.TestCase):
         # featurizations by uncommenting the following line:
         # save_pickle(featurized_observations, pickle_path)
         expected_featurization = load_pickle(pickle_path)
-        self.assertTrue(np.array_equal(expected_featurization, featurized_observations))
+        assert np.array_equal(expected_featurization, featurized_observations)
 
     def test_state_featurization(self):
         trajs = self.env.get_rollouts(
@@ -1088,9 +1035,7 @@ class TestFeaturizations(unittest.TestCase):
             # featurizations by uncommenting the following line:
             # save_pickle(featurized_observations, pickle_path)
             expected_featurization = load_pickle(pickle_path)
-            self.assertTrue(
-                np.array_equal(expected_featurization, featurized_observations)
-            )
+            assert np.array_equal(expected_featurization, featurized_observations)
 
     def test_state_featurization_symmetry(self):
         trajs = self.env.get_rollouts(
@@ -1106,8 +1051,8 @@ class TestFeaturizations(unittest.TestCase):
             )
             state = state.reverse_players()
 
-            self.assertTrue(np.array_equal(p0_obs, p1_obs_swapped))
-            self.assertTrue(np.array_equal(p1_obs, p0_obs_swapped))
+            assert np.array_equal(p0_obs, p1_obs_swapped)
+            assert np.array_equal(p1_obs, p0_obs_swapped)
 
     def test_lossless_state_featurization_symmetry(self):
         trajs = self.env.get_rollouts(
@@ -1124,14 +1069,25 @@ class TestFeaturizations(unittest.TestCase):
             ) = self.base_mdp.lossless_state_encoding(state)
             state = state.reverse_players()
 
-            self.assertTrue(np.array_equal(p0_obs, p1_obs_swapped))
-            self.assertTrue(np.array_equal(p1_obs, p0_obs_swapped))
+            assert np.array_equal(p0_obs, p1_obs_swapped)
+            assert np.array_equal(p1_obs, p0_obs_swapped)
 
 
-class TestOvercookedEnvironment(unittest.TestCase):
+def _assert_files_equal(file_1, file_2):
+    with open(file_1, "r", encoding="utf-8") as f:
+        lines_1 = f.readlines()
+    with open(file_2, "r", encoding="utf-8") as f:
+        lines_2 = f.readlines()
+
+    for line_1, line_2 in zip(lines_1, lines_2):
+        assert line_1 == line_2
+
+
+class TestOvercookedEnvironment:
     dummy_dir = "overcooked_test_temp"
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         if not os.path.exists(self.dummy_dir):
             os.makedirs(self.dummy_dir)
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
@@ -1143,25 +1099,14 @@ class TestOvercookedEnvironment(unittest.TestCase):
         )
         np.random.seed(0)
 
-    def tearDown(self):
+        yield
+
         shutil.rmtree(self.dummy_dir)
 
-    def _assert_files_equal(self, file_1, file_2):
-        with open(file_1, "r", encoding="utf-8") as f:
-            lines_1 = f.readlines()
-        with open(file_2, "r", encoding="utf-8") as f:
-            lines_2 = f.readlines()
-
-        for line_1, line_2 in zip(lines_1, lines_2):
-            self.assertEqual(line_1, line_2)
-
     def test_constructor(self):
-        try:
-            OvercookedEnv.from_mdp(self.base_mdp, horizon=10, info_level=0)
-        except Exception as e:
-            self.fail("Failed to instantiate OvercookedEnv:\n{}".format(e))
+        OvercookedEnv.from_mdp(self.base_mdp, horizon=10, info_level=0)
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             OvercookedEnv.from_mdp(self.base_mdp, **{"invalid_env_param": None})
 
     def test_step_fn(self):
@@ -1176,14 +1121,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
     def test_run_agents(self):
         start_state = self.env.state
         self.env.run_agents(self.rnd_agent_pair)
-        self.assertNotEqual(self.env.state, start_state)
+        assert self.env.state != start_state
 
     def test_rollouts(self):
-        try:
-            self.env.get_rollouts(self.rnd_agent_pair, 3, info=False)
-        except Exception as e:
-            print(e.with_traceback())
-            self.fail("Failed to get rollouts from environment:\n{}".format(e))
+        self.env.get_rollouts(self.rnd_agent_pair, 3, info=False)
 
     def test_one_player_env(self):
         mdp = OvercookedGridworld.from_layout_name("cramped_room_single")
@@ -1191,7 +1132,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         a0 = FixedPlanAgent([stay, w, w, e, e, n, e, interact, w, n, interact])
         ag = AgentGroup(a0)
         env.run_agents(ag, display=False)
-        self.assertEqual(env.state.players_pos_and_or, (((2, 1), (0, -1)),))
+        assert env.state.players_pos_and_or == (((2, 1), (0, -1)),)
 
     def test_four_player_env_fixed(self):
         mdp = OvercookedGridworld.from_layout_name("multiplayer_schelling")
@@ -1223,14 +1164,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
         a3 = FixedPlanAgent([e, interact, n, n, w, w, w, n, interact, e, s])
         ag = AgentGroup(a0, a1, a2, a3)
         env.run_agents(ag, display=False)
-        self.assertEqual(
-            env.state.players_pos_and_or,
-            (
-                ((1, 1), (-1, 0)),
-                ((3, 1), (0, -1)),
-                ((2, 1), (-1, 0)),
-                ((4, 2), (0, 1)),
-            ),
+        assert env.state.players_pos_and_or == (
+            ((1, 1), (-1, 0)),
+            ((3, 1), (0, -1)),
+            ((2, 1), (-1, 0)),
+            ((4, 2), (0, 1)),
         )
 
     def test_display(self):
@@ -1252,7 +1190,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
         # If display intentionally updated, uncomment the line below to update expected values
         shutil.copy(actual_display_file, expected_display_file)
-        self._assert_files_equal(expected_display_file, actual_display_file)
+        _assert_files_equal(expected_display_file, actual_display_file)
 
     def test_display_phi(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
@@ -1274,7 +1212,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
 
         # If display intentionally updated, uncomment the line below to update expected values
         shutil.copy(actual_display_file, expected_display_file)
-        self._assert_files_equal(expected_display_file, actual_display_file)
+        _assert_files_equal(expected_display_file, actual_display_file)
 
     def test_multiple_mdp_env(self):
         mdp0 = OvercookedGridworld.from_layout_name("cramped_room")
@@ -1295,7 +1233,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         for _ in range(3):
             env.reset()
             curr_terrain = env.state.players_pos_and_or
-            self.assertFalse(np.array_equal(start_state, curr_terrain))
+            assert not np.array_equal(start_state, curr_terrain)
 
     def test_starting_obj_randomization(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
@@ -1307,10 +1245,10 @@ class TestOvercookedEnvironment(unittest.TestCase):
         for _ in range(3):
             env.reset()
             curr_terrain = env.state.all_objects_list
-            self.assertFalse(np.array_equal(start_state, curr_terrain))
+            assert not np.array_equal(start_state, curr_terrain)
 
     def test_failing_rnd_layout(self):
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             mdp_gen_params = {"None": None}
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(**mdp_gen_params)
             OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
@@ -1334,7 +1272,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         for _ in range(3):
             env.reset()
             curr_terrain = env.mdp.terrain_mtx
-            self.assertFalse(np.array_equal(start_terrain, curr_terrain))
+            assert not np.array_equal(start_terrain, curr_terrain)
 
         mdp_gen_params = {"layout_name": "cramped_room"}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params)
@@ -1348,7 +1286,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         all_same_layout = all(
             [np.array_equal(env.mdp.terrain_mtx, terrain) for terrain in layouts_seen]
         )
-        self.assertTrue(all_same_layout)
+        assert all_same_layout
 
         mdp_gen_params = {"layout_name": "asymmetric_advantages"}
         mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_gen_params)
@@ -1360,7 +1298,7 @@ class TestOvercookedEnvironment(unittest.TestCase):
         all_same_layout = all(
             [np.array_equal(env.mdp.terrain_mtx, terrain) for terrain in layouts_seen]
         )
-        self.assertFalse(all_same_layout)
+        assert not all_same_layout
 
     def test_random_layout_feature_types(self):
         mandatory_features = {POT, DISH_DISPENSER, SERVING_LOC}
@@ -1390,15 +1328,11 @@ class TestOvercookedEnvironment(unittest.TestCase):
                 env.reset()
                 curr_terrain = env.mdp.terrain_mtx
                 terrain_features = set.union(*(set(line) for line in curr_terrain))
-                self.assertTrue(
-                    all(elem in terrain_features for elem in used_features)
-                )  # all used_features are actually used
+                assert all(elem in terrain_features for elem in used_features)  # all used_features are actually used
                 if left_out_optional_features:
-                    self.assertFalse(
-                        any(
-                            elem in terrain_features
-                            for elem in left_out_optional_features
-                        )
+                    assert not any(
+                        elem in terrain_features
+                        for elem in left_out_optional_features
                     )  # all left_out optional_features are not used
 
     def test_random_layout_generated_recipes(self):
@@ -1427,8 +1361,8 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         for _ in range(10):
             env.reset()
-            self.assertCountEqual(env.mdp.start_all_orders, only_onions_dict_recipes)
-            self.assertEqual(len(env.mdp.start_bonus_orders), 0)
+            assert sorted(env.mdp.start_all_orders, key=lambda d: json.dumps(d, sort_keys=True)) == sorted(only_onions_dict_recipes, key=lambda d: json.dumps(d, sort_keys=True))
+            assert len(env.mdp.start_bonus_orders) == 0
 
         # checking if bonus_orders is subset of all_orders even if not specified
 
@@ -1451,9 +1385,9 @@ class TestOvercookedEnvironment(unittest.TestCase):
         env = OvercookedEnv(mdp_fn, **DEFAULT_ENV_PARAMS)
         for _ in range(10):
             env.reset()
-            self.assertCountEqual(env.mdp.start_all_orders, only_onions_dict_recipes)
-            self.assertEqual(len(env.mdp.start_bonus_orders), 1)
-            self.assertTrue(env.mdp.start_bonus_orders[0] in only_onions_dict_recipes)
+            assert sorted(env.mdp.start_all_orders, key=lambda d: json.dumps(d, sort_keys=True)) == sorted(only_onions_dict_recipes, key=lambda d: json.dumps(d, sort_keys=True))
+            assert len(env.mdp.start_bonus_orders) == 1
+            assert env.mdp.start_bonus_orders[0] in only_onions_dict_recipes
 
         # checking if after reset there are new recipes generated
         mdp_gen_params = {
@@ -1480,15 +1414,17 @@ class TestOvercookedEnvironment(unittest.TestCase):
             generated_recipes_strings |= {
                 json.dumps(o, sort_keys=True) for o in env.mdp.start_all_orders
             }
-        self.assertTrue(len(generated_recipes_strings) > 3)
+        assert len(generated_recipes_strings) > 3
 
 
-class TestGymEnvironment(unittest.TestCase):
-    def setUp(self):
+class TestGymEnvironment:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.env = OvercookedEnv.from_mdp(self.base_mdp, **DEFAULT_ENV_PARAMS)
         self.rnd_agent_pair = AgentPair(FixedPlanAgent([]), FixedPlanAgent([]))
         np.random.seed(0)
+        yield
 
     def test_creation(self):
         env = gymnasium.make(
@@ -1497,17 +1433,19 @@ class TestGymEnvironment(unittest.TestCase):
             featurize_fn=self.env.featurize_state_mdp,
         )
         # verify that the action_space * obs_space are initialized correctly
-        self.assertEqual(env.action_space, gymnasium.spaces.Discrete(6))
-        self.assertEqual(
-            env.observation_space.shape,
-            self.base_mdp.get_featurize_state_shape(),
-        )
+        assert env.action_space == gymnasium.spaces.Discrete(6)
+        expected_shape = self.base_mdp.get_featurize_state_shape()
+        assert isinstance(env.observation_space, gymnasium.spaces.Tuple)
+        assert len(env.observation_space.spaces) == 2
+        assert env.observation_space.spaces[0].shape == expected_shape
+        assert env.observation_space.spaces[1].shape == expected_shape
 
     # TODO: write more tests here
 
 
-class TestTrajectories(unittest.TestCase):
-    def setUp(self):
+class TestTrajectories:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.base_mdp = OvercookedGridworld.from_layout_name("cramped_room")
         self.mlam = MediumLevelActionManager.from_pickle_or_compute(
             self.base_mdp, NO_COUNTERS_PARAMS, force_compute=True
@@ -1519,6 +1457,7 @@ class TestTrajectories(unittest.TestCase):
             GreedyHumanModel(self.mlam), GreedyHumanModel(self.mlam)
         )
         np.random.seed(0)
+        yield
 
     def test_append(self):
         traj_one = self.env.get_rollouts(
@@ -1531,22 +1470,18 @@ class TestTrajectories(unittest.TestCase):
         combined = append_trajectories(traj_one, traj_two)
 
         # Ensure proper keys
-        self.assertEqual(set(combined.keys()), DEFAULT_TRAJ_KEYS)
+        assert set(combined.keys()) == DEFAULT_TRAJ_KEYS
 
         # Ensure proper shapes
         for key in TIMESTEP_TRAJ_KEYS:
             shape_one = traj_one[key].shape
             shape_two = traj_two[key].shape
             shape_combined = combined[key].shape
-            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
-            self.assertEqual(shape_combined[1], shape_one[1])
-            self.assertEqual(shape_combined[1], shape_two[1])
+            assert shape_combined[0] == shape_one[0] + shape_two[0]
+            assert shape_combined[1] == shape_one[1]
+            assert shape_combined[1] == shape_two[1]
         for key in EPISODE_TRAJ_KEYS:
             shape_one = traj_one[key].shape
             shape_two = traj_two[key].shape
             shape_combined = combined[key].shape
-            self.assertEqual(shape_combined[0], shape_one[0] + shape_two[0])
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert shape_combined[0] == shape_one[0] + shape_two[0]

@@ -1,3 +1,7 @@
+> **Note:** This is a temporary fork of [HumanCompatibleAI/overcooked_ai](https://github.com/HumanCompatibleAI/overcooked_ai), with full credit to [Micah Carroll](https://github.com/micahcarroll) and team for the original work. The purpose of this fork is to bring all Python dependencies up to date (Python 3.13, numpy 2.x, gymnasium, etc.) and modernize the test framework. We will close this fork if/when these changes can be merged into the original repository.
+
+---
+
 ![MDP python tests](https://github.com/HumanCompatibleAI/overcooked_ai/workflows/.github/workflows/pythontests.yml/badge.svg) ![overcooked-ai codecov](https://codecov.io/gh/HumanCompatibleAI/overcooked_ai/branch/master/graph/badge.svg) [![PyPI version](https://badge.fury.io/py/overcooked-ai.svg)](https://badge.fury.io/py/overcooked-ai) [!["Open Issues"](https://img.shields.io/github/issues-raw/HumanCompatibleAI/overcooked_ai.svg)](https://github.com/HumanCompatibleAI/minerl/overcooked_ai) [![GitHub issues by-label](https://img.shields.io/github/issues-raw/HumanCompatibleAI/overcooked_ai/bug.svg?color=red)](https://github.com/HumanCompatibleAI/overcooked_ai/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+label%3Abug) [![Downloads](https://pepy.tech/badge/overcooked-ai)](https://pepy.tech/project/overcooked-ai)
 [![arXiv](https://img.shields.io/badge/arXiv-1910.05789-bbbbbb.svg)](https://arxiv.org/abs/1910.05789)
 

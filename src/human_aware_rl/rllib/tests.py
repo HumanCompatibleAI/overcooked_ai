@@ -1,8 +1,7 @@
 import copy
-import unittest
-from math import isclose
 
 import numpy as np
+import pytest
 
 from human_aware_rl.rllib.rllib import OvercookedMultiAgent
 from human_aware_rl.rllib.utils import (
@@ -12,22 +11,15 @@ from human_aware_rl.rllib.utils import (
 )
 
 
-class RllibEnvTest(unittest.TestCase):
-    def setUp(self):
-        print(
-            "\nIn Class {}, in Method {}".format(
-                self.__class__.__name__, self._testMethodName
-            )
-        )
+class RllibEnvTest:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
         self.params = copy.deepcopy(OvercookedMultiAgent.DEFAULT_CONFIG)
         self.timesteps = [0, 10, 100, 500, 1000, 1500, 2000, 2500]
 
-    def tearDown(self):
-        pass
-
     def _assert_lists_almost_equal(self, first, second, places=7):
         for a, b in zip(first, second):
-            self.assertAlmostEqual(a, b, places=places)
+            assert a == pytest.approx(b, abs=10**-places)
 
     def _test_bc_schedule(self, bc_schedule, expected_bc_factors):
         self.params["multi_agent_params"]["bc_schedule"] = bc_schedule
@@ -48,16 +40,16 @@ class RllibEnvTest(unittest.TestCase):
             num_bc = sum(
                 map(lambda agent: int(agent.startswith("bc")), env.curr_agents)
             )
-            self.assertLessEqual(num_bc, 1)
+            assert num_bc <= 1
             tot_bc += num_bc
         actual_factor = tot_bc / trials
-        self.assertAlmostEqual(actual_factor, factor, places=1)
+        assert actual_factor == pytest.approx(factor, abs=0.1)
 
     def test_env_creation(self):
         # Valid creation
         env = OvercookedMultiAgent.from_config(self.params)
         for param, expected in self.params["multi_agent_params"].items():
-            self.assertEqual(expected, getattr(env, param))
+            assert expected == getattr(env, param)
 
         # Invalid bc_schedules
         invalid_schedules = [
@@ -67,9 +59,8 @@ class RllibEnvTest(unittest.TestCase):
         ]
         for sched in invalid_schedules:
             self.params["multi_agent_params"]["bc_schedule"] = sched
-            self.assertRaises(
-                AssertionError, OvercookedMultiAgent.from_config, self.params
-            )
+            with pytest.raises(AssertionError):
+                OvercookedMultiAgent.from_config(self.params)
 
     def test_reward_shaping_annealing(self):
         self.params["multi_agent_params"]["reward_shaping_factor"] = 1
@@ -123,8 +114,8 @@ class RllibEnvTest(unittest.TestCase):
         obs = env.reset()
 
         # Check that we have the right number of agents with valid names
-        self.assertEqual(len(env.curr_agents), 2)
-        self.assertListEqual(list(obs.keys()), env.curr_agents)
+        assert len(env.curr_agents) == 2
+        assert list(obs.keys()) == env.curr_agents
 
         # Ensure that bc agents are created 'factor' percentage of the time
         bc_factors = [0.0, 0.1, 0.5, 0.9, 1.0]
@@ -132,18 +123,7 @@ class RllibEnvTest(unittest.TestCase):
             self._test_bc_creation_proportion(env, factor)
 
 
-class RllibUtilsTest(unittest.TestCase):
-    def setUp(self):
-        print(
-            "\nIn Class {}, in Method {}".format(
-                self.__class__.__name__, self._testMethodName
-            )
-        )
-        pass
-
-    def tearDown(self):
-        pass
-
+class RllibUtilsTest:
     def test_softmax(self):
         logits = np.array(
             [
@@ -164,18 +144,16 @@ class RllibUtilsTest(unittest.TestCase):
 
         actual = softmax(logits)
 
-        self.assertTrue(np.allclose(expected, actual))
+        assert np.allclose(expected, actual)
 
     def test_iterable_equal(self):
         a = [(1,), (1, 2)]
         b = ([1], [1, 2])
-
-        self.assertTrue(iterable_equal(a, b))
+        assert iterable_equal(a, b)
 
         a = [(1, 2), (1)]
         b = [(1,), (1, 2)]
-
-        self.assertFalse(iterable_equal(a, b))
+        assert not iterable_equal(a, b)
 
     def test_get_required_arguments(self):
         def foo1(a):
@@ -197,8 +175,4 @@ class RllibUtilsTest(unittest.TestCase):
         expected = [1, 2, 3, 2, 1]
 
         for fn, expected in zip(fns, expected):
-            self.assertEqual(expected, len(get_required_arguments(fn)))
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert expected == len(get_required_arguments(fn))
