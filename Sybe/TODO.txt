@@ -1,0 +1,19 @@
+
+
+
+### DONE! ###
+- Fixed Python version conflict
+- Repaired pip, created virtual environment
+- Fixed dependency hell with mismatching versions of libraries
+
+- Figured out how to generate game data with 2 random agents
+- Implemented manual stitching of pngs to create a gif
+- Diskliked the gif, so I created an interactive viewer in a pygame environment
+- Added HUD to viewer, improved UX with tap/hold of buttons.
+
+TODO:
+- Replace random agents with reinforcement learning agents
+- Train on the JaxMARL server
+- Save trajectory instead of gif
+
+
